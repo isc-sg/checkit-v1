@@ -1,0 +1,139 @@
+<!doctype html>
+{% load bootstrap4 %}
+{% bootstrap_css %}
+{% bootstrap_javascript jquery='full' %}
+{{ form.media }}
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <title>
+    Check IT
+  </title>
+  <!--     Fonts and icons     -->
+
+  <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet" />
+  <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
+  <!-- Nucleo Icons -->
+    {% load static %}
+  <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}" />
+  <!-- CSS Files -->
+  <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}" />
+  <link rel="stylesheet" type="text/css" href="{% static 'fontawesome-free/css/all.css' %}" />
+  <!-- CSS Just for demo purpose, don't include it in your project -->
+    </head>
+    <body>
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-sm-2">
+        <div class="sidebar" data="blue">
+      <!--
+        Tip 1: You can change the color of the sidebar using: data-color="blue | green | orange | red"
+    -->
+      <div class="sidebar-wrapper">
+        <div class="logo">
+          <a>
+           <img src="{% static 'isc_logo.png' %}" height="40px" />
+          </a>
+          <a href="javascript:void(0)" class="simple-text logo-normal">
+            Check IT
+          </a>
+        </div>
+        <ul class="nav">
+          <li class="active ">
+            <a href="http://localhost:8000/status">
+              <i class="tim-icons icon-user-run"></i>
+              <p>Status</p>
+            </a>
+          </li>
+          <li>
+            <a href="http://localhost:8000/cameras">
+              <i class="tim-icons icon-video-66"></i>
+              <p>Cameras</p>
+            </a>
+          </li>
+
+          <li>
+            <a href="http://localhost:8000/logs">
+              <i class="tim-icons icon-bell-55"></i>
+              <p>Logs</p>
+            </a>
+          </li>
+          <li>
+            <a href="http://localhost:8000/admin">
+              <i class="tim-icons icon-cloud-upload-94"></i>
+              <p>Import/Export</p>
+            </a>
+          </li>
+
+          <li>
+              <a href="http://localhost:8000/license">
+              <i class="tim-icons icon-settings"></i>
+              <p>Licensing</p>
+            </a>
+          </li>
+          <li>
+            <a href="/logout/">
+              <i class="tim-icons icon-button-power"></i>
+              <p>Logout</p>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    </div>
+    <div class="col-sm-10">
+      <div class="content">
+
+
+
+</div>
+<div class="container-fluid">
+
+	    <h1 id="heading1">Date</h1>
+
+			<div id="container1">
+			<div id="row1" class="row">
+
+
+                <!-- input with datetimepicker -->
+              <div class="form-group">
+                  <label class="label-control">Select date for export</label>
+                  <input type="text" class="form-control datetimepicker" name="date"/>
+              </div>
+			</div>
+              <script>
+                  $('.datetimepicker').datetimepicker({
+                      icons: {
+                        time: "tim-icons icon-watch-time",
+                        date: "tim-icons icon-calendar-60",
+                        up: "fa fa-chevron-up",
+                        down: "fa fa-chevron-down",
+                        previous: 'tim-icons icon-minimal-left',
+                        next: 'tim-icons icon-minimal-right',
+                        today: 'fa fa-screenshot',
+                        clear: 'fa fa-trash',
+                        close: 'fa fa-remove'
+                      }
+                  });
+              </script>
+              <div class="col-md-4">
+              <form method="post">
+                {% csrf_token %}
+                <button class="btn" type="submit">Submit</button>
+              </form>
+              </div>
+		</div>
+
+  </div>
+
+     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4" crossorigin="anonymous"></script>
+    </div>
+  </div>
+  </div>
+    </body>
+</html>

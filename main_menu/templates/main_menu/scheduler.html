@@ -1,0 +1,213 @@
+<!doctype html>
+{% load bootstrap4 %}
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">
+    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <title>
+        Check IT
+    </title>
+    <!--     Fonts and icons     -->
+
+    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
+    <!-- Nucleo Icons -->
+    {% load static %}
+    <!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
+    <!-- CSS Files -->
+    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
+    <!-- CSS Just for demo purpose, don't include it in your project -->
+    <style>
+
+      ::placeholder {
+        color: red;
+        opacity: 1;
+      }
+      :placeholder-shown {
+        border: 1px solid red;
+      }
+
+    </style>
+</head>
+<body class="">
+
+<div class="wrapper">
+    <div class="sidebar" data="blue">
+        <!--
+          Tip 1: You can change the color of the sidebar using: data-color="blue | green | orange | red"
+      -->
+
+
+        <div class="sidebar-wrapper">
+            <div class="logo">
+                <a>
+                    <img src="{% static 'isc_logo.png' %}" height="40px"/>
+                </a>
+                <a href="/" style="color:#FFFFFF">
+                    CheckIT
+                </a>
+                <ul style="list-style-type:none">
+                    {% if user.is_authenticated %}
+                    <li><i class="far fa-user"></i> {{ user.get_username }} <br><a
+                            href="/accounts/password_change">Change password</a></li>
+                    {% else %}
+                    <li><a href="{% url 'login'%}?next={{request.path}}"> <i class="fa fa-sign-in-alt"></i>
+                        Login</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+            <ul class="nav">
+                <li>
+                    <a href="/status/">
+                        <i class="fas fa-person-running"></i>
+                        <p>System Status</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/cameras/">
+                        <i class="fas fa-video"></i>
+                        <p>Cameras</p>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/logs/">
+                        <i class="fas fa-bell"></i>
+                        <p>Results</p>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/state/">
+                        <i class="fas fa-download"></i>
+                        <p>Export</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/license/">
+                        <i class="fas fa-cogs"></i>
+                        <p>Licensing</p>
+                    </a>
+                </li>
+                <li class="active">
+                    <a href="/scheduler/">
+                        <i class="fas fa-clock" style="color:#5603ad"></i>
+                        <p style="color:#5603ad">Scheduler</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/regions/">
+                        <i class="fas fa-th"></i>
+
+                        <p>Regions</p>
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/">
+                        <!--                                <i class="tim-icons icon-settings"></i>-->
+                        <i class="fas fa-tools"></i>
+
+                        <p>Admin</p>
+                    </a>
+                </li>
+                {% if user.is_authenticated %}
+                <li>
+                    <a href="/accounts/logout/">
+                        <i class="fas fa-power-off"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    <div class="main-panel">
+        <div class="content">
+            <div class="row">
+                <div class="col-sm-10">
+
+                </div>
+                <div class="container-fluid">
+
+                    <h1 id="heading1">System Status</h1>
+
+                    <div id="container1">
+                        <div id="row1" class="row">
+                            <div class="col-md-4">
+
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit" name="start_engine">Start Now</button>
+                                </form>
+                            </div>
+                            <div class="col-md-4">
+                                <i style="font-size:2em"> {{ system_state }} &nbsp;&nbsp;</i>
+                                {% if system_state == "STARTED" %}
+                                <i class="fa fa-traffic-light" style="color:green;font-size:4em;"></i>
+                                {% else %}
+                                <i class="fa fa-traffic-light" style="color:red;font-size:4em;"></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <p></p>
+                        <h3></h3>
+                        <h3>Current run schedule</h3>
+                        <div class="col-md-2 pr-md-1">
+                            <div class="form-group">
+                                <div class="alert alert-info">
+
+                                    {% if run_schedule == 0 %}
+                                    <span>The scheduler is not running</span>
+                                    {% endif %}
+                                    {% if run_schedule == 1 %}
+                                    <span>The system will run hourly</span>
+                                    {% endif %}
+                                    {% if run_schedule > 1 %}
+                                    <span>The system will run every {{ run_schedule }} hours</span>
+                                    {% endif %}
+
+                                </div>
+                                <form method="post">
+                                    {% csrf_token %}
+
+                                    <label>Enter new hourly interval for run</label>
+                                    <input type="number" class="form-control" name="new_run"/>
+                                    <h3></h3>
+                                </form>
+                            </div>
+                            <h3>Run on a single camera</h3>
+                            <form method="post">
+                                {% csrf_token %}
+
+                                <label>Enter camera to check</label>
+                                {% if camera_does_not_exist %}
+                                <input type="number" style="::placeholder {color: red;};"
+                                       placeholder="Camera Does Not Exist" class="form-control"
+                                       name="camera_check"/>
+                                {% else %}
+                                <input type="number" class="form-control" name="camera_check"/>
+                                {% endif %}
+
+                            </form>
+                        </div>
+                        <div id="row2" class="row">
+                            <div class="col-md-4">
+
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+                        integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+                        crossorigin="anonymous"></script>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
