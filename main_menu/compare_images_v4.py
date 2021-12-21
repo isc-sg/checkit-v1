@@ -163,6 +163,7 @@ except mysql.connector.Error as e:
 if transaction_count >= transaction_limit or datetime.date.today() > end_date:
     logging.error("Licenses expired or transaction limit reached")
     exit(1)
+camera_count = 0
 
 try:
     checkit_cursor = checkit_db.cursor()
@@ -176,7 +177,6 @@ except mysql.connector.Error as e:
 if camera_count > camera_limit:
     logging.error("Camera limit reached")
     exit(1)
-
 
 
 # checkit_cursor = checkit_db.cursor()
