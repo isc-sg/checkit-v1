@@ -299,7 +299,8 @@ def display_image_in_page_from_memory(request, camera_number):
             co_ordinates = select_region.get_coordinates(regions, height, width)
 
             image = select_region.draw_grid(co_ordinates, img, height, width)
-            img_cv2_converted_to_string = cv2.imencode('.jpg', image)[1]
+            resized_image = cv2.resize(image, (960, 720), cv2.INTER_AREA)
+            img_cv2_converted_to_string = cv2.imencode('.jpg', resized_image)[1]
             image_base64 = base64.b64encode(img_cv2_converted_to_string).decode('utf-8')
             data_uri = 'data:image/jpg;base64,'
             data_uri += str(image_base64)
