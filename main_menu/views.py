@@ -27,7 +27,7 @@ from .filters import CameraFilter, LogFilter, EngineStateFilter
 import main_menu.select_region as select_region
 
 
-logging.basicConfig(filename='/tmp/checkit.log', format='%(asctime)s %(message)s', level=logging.INFO)
+logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s', level=logging.INFO)
 
 
 def index(request):

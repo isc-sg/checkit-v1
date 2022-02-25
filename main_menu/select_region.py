@@ -34,9 +34,9 @@ def draw_grid(c_list, img, h, w):
     if not c_list:
         resized_image = img
     if h > 640:
-        font_size = 2
-        font_thickness = 6
-        line_thickness = 5
+        font_size = 1
+        font_thickness = 4
+        line_thickness = 4
     else:
         font_size = .8
         font_thickness = 1
