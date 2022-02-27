@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from import_export.admin import ImportExportModelAdmin
+from simple_history.admin import SimpleHistoryAdmin
 
 
 # Register your models here.
@@ -26,7 +27,7 @@ class ReferenceAdmin(admin.ModelAdmin):
     exclude = ('id',)
     list_display = ['url', 'hour', 'reference_image']
     readonly_fields = ['hour', 'get_regions', 'reference_image', ]
-    list_filter = ['hour']
+    list_filter = ['hour', 'url__camera_location']
 
     def get_regions(self, obj):
         return obj.url.image_regions
@@ -35,8 +36,8 @@ class ReferenceAdmin(admin.ModelAdmin):
     def reference_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
             url=obj.image.url,
-            width=(obj.image.width/2),
-            height=(obj.image.height/2),
+            width=(obj.image.width/4),
+            height=(obj.image.height/4),
                                                                                      )
                         )
 
@@ -48,7 +49,7 @@ class LogImageAdmin(admin.ModelAdmin):
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
-    list_filter = ['creation_date']
+    list_filter = ['creation_date', 'url__camera_location']
 
     def log_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(

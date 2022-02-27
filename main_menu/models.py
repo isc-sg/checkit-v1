@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.urls import reverse
 from django.template.defaultfilters import slugify
+from simple_history.models import HistoricalRecords
 from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
 LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Failed', 'Failed'), ('Capture Error', 'Capture Error'),
@@ -49,6 +50,8 @@ class Camera(models.Model):
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
+    history = HistoricalRecords()
+
 
     def __str__(self):
         return f'{self.camera_name}/ #{self.camera_number}'
@@ -73,6 +76,7 @@ class ReferenceImage(models.Model):
     url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera")
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f'{self.url}/{self.image}'
@@ -87,6 +91,7 @@ class LogImage(models.Model):
     focus_value = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     action = models.CharField(max_length=20, null=True)
     creation_date = models.DateTimeField('date created', default=timezone.now)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f'{self.url}/{self.creation_date}'
