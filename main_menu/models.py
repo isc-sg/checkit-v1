@@ -51,7 +51,7 @@ class Camera(models.Model):
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
 
     def __str__(self):
-        return f'{self.camera_name}/{self.camera_number}'
+        return f'{self.camera_name}/ #{self.camera_number}'
 
     def get_slug_camera_name(self):
         return reverse('images', kwargs={'slug': self.slug})

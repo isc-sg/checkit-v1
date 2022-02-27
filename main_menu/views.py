@@ -236,7 +236,6 @@ def export_logs_to_csv(request):
     # for i in selection:
     #     count += 1
     writer = csv.writer(response)
-
     for i in selection:
         log_index = int(i)
         prev_log_index = log_index - 1
@@ -244,7 +243,6 @@ def export_logs_to_csv(request):
         start = EngineState.objects.get(id=prev_log_index).state_timestamp
         state = EngineState.objects.get(id=prev_log_index).state
         first_record = EngineState.objects.first().id
-
         while state != "STARTED" and prev_log_index > (int(first_record) + 1):
             prev_log_index = prev_log_index - 1
             try:

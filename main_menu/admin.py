@@ -43,7 +43,8 @@ class ReferenceAdmin(admin.ModelAdmin):
 
 class LogImageAdmin(admin.ModelAdmin):
     resource_class = LogImage
-    search_fields = ['url__camera_name','image', 'action', 'creation_date']
+    search_fields = ['url__camera_name', 'image', 'action', 'creation_date']
+    list_display = ['url', 'creation_date']
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
