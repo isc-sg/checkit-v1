@@ -25,7 +25,7 @@ class ReferenceAdmin(admin.ModelAdmin):
     resource_class = ReferenceImageResource
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
     exclude = ('id',)
-    list_display = ['url', 'hour', 'reference_image']
+    list_display = ['url', 'hour', 'reference_image', 'get_location']
     readonly_fields = ['hour', 'get_regions', 'reference_image', ]
     list_filter = ['hour', 'url__camera_location']
 
@@ -41,11 +41,14 @@ class ReferenceAdmin(admin.ModelAdmin):
                                                                                      )
                         )
 
+    def get_location(self, obj):
+        return obj.url.camera_location
+    get_location.short_description = "Location"
 
 class LogImageAdmin(admin.ModelAdmin):
     resource_class = LogImage
     search_fields = ['url__camera_name', 'image', 'action', 'creation_date']
-    list_display = ['url', 'creation_date']
+    list_display = ['url', 'creation_date', 'get_location']
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
@@ -59,6 +62,9 @@ class LogImageAdmin(admin.ModelAdmin):
                                                                                      )
                         )
 
+    def get_location(self, obj):
+        return obj.url.camera_location
+    get_location.short_description = "Location"
 
 admin.site.register(Camera, CameraAdmin)
 admin.site.register(ReferenceImage, ReferenceAdmin)
