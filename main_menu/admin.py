@@ -45,6 +45,7 @@ class ReferenceAdmin(admin.ModelAdmin):
         return obj.url.camera_location
     get_location.short_description = "Location"
 
+
 class LogImageAdmin(admin.ModelAdmin):
     resource_class = LogImage
     search_fields = ['url__camera_name', 'image', 'action', 'creation_date']

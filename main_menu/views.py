@@ -236,6 +236,8 @@ def export_logs_to_csv(request):
     # for i in selection:
     #     count += 1
     writer = csv.writer(response)
+    writer.writerow(["camera_name", "camera_number", "camera_location",
+                     "pass_fail", "matching_score", "focus_value", "creation_date"])
     for i in selection:
         log_index = int(i)
         prev_log_index = log_index - 1
@@ -252,11 +254,14 @@ def export_logs_to_csv(request):
                 break
 
         logs = LogImage.objects.filter(creation_date__range=(start, end))
-        writer.writerow(["camera_name", "camera_number", "camera_location",
-                         "url", "matching_score", "focus_value", "creation_date"])
+
         for log in logs:
+            pass_fail = "Pass"
+            if log.matching_score < log.current_matching_threshold:
+                pass_fail = "Fail"
             writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
-                             log.url.url, log.matching_score, log.focus_value, log.creation_date])
+                             pass_fail, log.matching_score, log.focus_value,
+                             datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
 
     return response
 
