@@ -54,7 +54,7 @@ class Camera(models.Model):
 
 
     def __str__(self):
-        return f'{self.camera_name}/ #{self.camera_number}'
+        return f'{self.camera_name} / #{self.camera_number}'
 
     def get_slug_camera_name(self):
         return reverse('images', kwargs={'slug': self.slug})
@@ -73,7 +73,7 @@ class ReferenceImage(models.Model):
     def get_hour(self):
         return now().strftime('%H')
 
-    url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera")
+    url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
     history = HistoricalRecords()
@@ -83,7 +83,7 @@ class ReferenceImage(models.Model):
 
 
 class LogImage(models.Model):
-    url = models.ForeignKey('main_menu.Camera', on_delete=models.CASCADE)
+    url = models.ForeignKey('main_menu.Camera', on_delete=models.CASCADE, verbose_name="Camera Name and Number")
     image = models.ImageField(upload_to='logs/%Y/%m/%d')
     matching_score = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     region_scores = models.JSONField(default=dict)
