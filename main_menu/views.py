@@ -33,8 +33,8 @@ from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.units import mm, inch, cm
 from reportlab.lib.colors import HexColor
 
-
-logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s', level=logging.INFO)
+logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s',
+                    level=logging.INFO)
 
 
 def coord(x, y, h, unit=1):
@@ -293,7 +293,8 @@ def export_logs_to_csv(request):
                     for c in camera:
                         base_image = settings.MEDIA_ROOT + "/base_images/" + c.slug + "/" + hour + ".jpg"
                     matching_score = log.matching_score
-                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score, log.action, log_image))
+                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
+                                       log.action, log_image))
             buffer = io.BytesIO()
             c = canvas.Canvas(buffer, pagesize=A4)
             c.setFillColor(HexColor("#99b0e7"))
@@ -334,38 +335,84 @@ def export_logs_to_csv(request):
                     creation_time = creation_time
 
                     c.drawString(
-                        *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5, page_height, mm),
+                        *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5, page_height,
+                               mm),
                         text=camera_name + " - Camera Number: " + str(camera_number))
 
                     c.drawString(
                         *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos), page_height, mm),
                         text="Time: " + creation_time.strftime("%d-%b-%Y %H:%M:%S"))
                     c.drawString(
-                        *coord(left_margin_pos + 90, top_margin_text_pos + (count * top_margin_image_pos), page_height, mm),
+                        *coord(left_margin_pos + 90, top_margin_text_pos + (count * top_margin_image_pos), page_height,
+                               mm),
                         text="Matching Score: " + str(matching_score))
 
                     image_rl = canvas.ImageReader(base_image)
                     image_width, image_height = image_rl.getSize()
                     scaling_factor = image_width / page_width
 
-                    c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57, page_height,
-                                  mm),
-                           *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                                  page_height, mm))
-                    c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                                  page_height,
-                                  mm),
-                           *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                                  page_height, mm))
-                    c.line(*coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                                  page_height,
-                                  mm),
-                           *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                                  page_height, mm))
+                    # c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #               page_height, mm),
+                    #        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #               page_height, mm))
+                    # c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #               page_height, mm),
+                    #        *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                    #               page_height, mm))
+                    # c.line(*coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #               page_height, mm),
+                    #        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                    #               page_height, mm))
+                    path = c.beginPath()
+                    # path.moveTo(*coord(left_margin_pos - 10,
+                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #                    page_height, mm))
+                    # path.moveTo(*coord(left_margin_pos + 175,
+                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #                    page_height, mm))
+                    # path.moveTo(*coord(left_margin_pos + 175,
+                    #                    top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                    #                    page_height, mm))
+                    # path.moveTo(*coord(left_margin_pos - 10,
+                    #                    top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                    #                    page_height, mm))
+                    # path.moveTo(*coord(left_margin_pos - 10,
+                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                    #                    page_height, mm))
+                    # path.moveTo((left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
+                    # print("Point 1", (left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
+                    # path.moveTo((left_margin_pos + 140) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
+                    # print("Point 2", (left_margin_pos + 140) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
+                    # path.moveTo((left_margin_pos + 140) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
+                    # print("Point 3", (left_margin_pos + 140) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
+                    # path.moveTo((left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
+                    # print("point 4", (left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
+                    # path.moveTo((left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
+                    # print("Point 5",(left_margin_pos) * mm,
+                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm )
+                    # path.lineTo(1 * cm, 1 * cm )
+                    # path.lineTo(1 * cm, 7.5 * cm)
+                    # path.lineTo(19.5 * cm, 7.5 * cm)
+                    # path.lineTo(19.5 * cm, 1 * cm)
+                    # path.lineTo(1 * cm, 1 * cm)
 
+                    # this creates a rectangle the size of the sheet
+                    # c.drawPath(path, stroke=1, fill=0, fillMode=None)
+                    c.roundRect(left_margin_pos + 10,
+                                (top_margin_image_pos + (count * top_margin_image_pos * 2.83)) - 30,
+                                width=520, height=170, radius=4, stroke=1, fill=0)
                     c.drawImage(image_rl,
-                                *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos), page_height,
-                                       mm),
+                                *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos),
+                                       page_height, mm),
                                 width=image_width / (mm * scaling_factor),
                                 height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
                     image_rl2 = canvas.ImageReader(log_image)
@@ -376,10 +423,11 @@ def export_logs_to_csv(request):
                                        top_margin_image_pos + (count * top_margin_image_pos),
                                        page_height, mm), width=image_width / (mm * scaling_factor),
                                 height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
-                    c.line(
-                        *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5, page_height, mm),
-                        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos + 5),
-                               page_height, mm))
+                    # c.line(
+                    #     *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                    #            page_height, mm),
+                    #     *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos + 5),
+                    #            page_height, mm))
 
                     count += 1
                 c.showPage()
@@ -391,6 +439,7 @@ def export_logs_to_csv(request):
     else:
         response = messages.add_message(request, messages.INFO, 'Hello world.')
         return HttpResponse(response)
+
 
 def export_logs_to_pdf(request):
     selection = request.POST.getlist("selection")
