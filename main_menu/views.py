@@ -314,6 +314,8 @@ def export_logs_to_csv(request):
                     # this creates a rectangle the size of the sheet
                     c.drawPath(path, True, True)
                     c.setFillColor(HexColor("#000000"))
+                    c.setStrokeColor(HexColor("#000000"))
+
                     c.setFont("Helvetica-BoldOblique", 18, )
                     c.drawString(*coord(60, 10, page_height, mm),
                                  text="Failed Images Report")
@@ -378,6 +380,7 @@ def export_logs_to_csv(request):
                 # this creates a rectangle the size of the sheet
                 c.drawPath(path, True, True)
                 c.setFillColor(HexColor("#000000"))
+                c.setStrokeColor(HexColor("#000000"))
                 c.setFont("Helvetica-BoldOblique", 18, )
                 c.drawString(*coord(25, 10, page_height, mm),
                              text="There are no failed images for the selected records")
