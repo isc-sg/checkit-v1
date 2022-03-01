@@ -42,7 +42,8 @@ class LogTable(tables.Table):
 
 
 class EngineStateTable(tables.Table):
-    selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk')  # Override here to show checkbox
+    selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
+                                      attrs={"th__input": {"onclick": "toggle(this)"}})
     state_timestamp = tables.DateTimeColumn(format='d M Y, h:i A')
 
     class Meta:
