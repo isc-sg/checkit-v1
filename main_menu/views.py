@@ -348,9 +348,19 @@ def export_logs_to_csv(request):
                     image_width, image_height = image_rl.getSize()
                     scaling_factor = image_width / page_width
 
-                    c.line(*coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos) - 57, page_height,
+                    c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57, page_height,
                                   mm),
-                           *coord(left_margin_pos + 165, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                           *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                                  page_height, mm))
+                    c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                                  page_height,
+                                  mm),
+                           *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
+                                  page_height, mm))
+                    c.line(*coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                                  page_height,
+                                  mm),
+                           *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) + 5,
                                   page_height, mm))
 
                     c.drawImage(image_rl,
@@ -367,8 +377,8 @@ def export_logs_to_csv(request):
                                        page_height, mm), width=image_width / (mm * scaling_factor),
                                 height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
                     c.line(
-                        *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos) + 5, page_height, mm),
-                        *coord(left_margin_pos + 165, top_margin_image_pos + (count * top_margin_image_pos + 5),
+                        *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5, page_height, mm),
+                        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos + 5),
                                page_height, mm))
 
                     count += 1
