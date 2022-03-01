@@ -229,7 +229,7 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     model = EngineState
     table_class = EngineStateTable
     template_name = 'main_menu/engine_state_table.html'
-    paginate_by = 18
+    paginate_by = 24
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
@@ -271,11 +271,8 @@ def export_logs_to_csv(request):
                              "pass_fail", "matching_score", "focus_value", "creation_date"])
 
             for log in logs:
-                pass_fail = "Pass"
-                if log.matching_score < log.current_matching_threshold:
-                    pass_fail = "Fail"
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
-                                 pass_fail, log.matching_score, log.focus_value,
+                                 log.action, log.matching_score, log.focus_value,
                                  datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
 
             return response
@@ -351,62 +348,6 @@ def export_logs_to_csv(request):
                     image_width, image_height = image_rl.getSize()
                     scaling_factor = image_width / page_width
 
-                    # c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #               page_height, mm),
-                    #        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #               page_height, mm))
-                    # c.line(*coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #               page_height, mm),
-                    #        *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                    #               page_height, mm))
-                    # c.line(*coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #               page_height, mm),
-                    #        *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                    #               page_height, mm))
-                    path = c.beginPath()
-                    # path.moveTo(*coord(left_margin_pos - 10,
-                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #                    page_height, mm))
-                    # path.moveTo(*coord(left_margin_pos + 175,
-                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #                    page_height, mm))
-                    # path.moveTo(*coord(left_margin_pos + 175,
-                    #                    top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                    #                    page_height, mm))
-                    # path.moveTo(*coord(left_margin_pos - 10,
-                    #                    top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                    #                    page_height, mm))
-                    # path.moveTo(*coord(left_margin_pos - 10,
-                    #                    top_margin_image_pos + (count * top_margin_image_pos) - 57,
-                    #                    page_height, mm))
-                    # path.moveTo((left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
-                    # print("Point 1", (left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
-                    # path.moveTo((left_margin_pos + 140) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
-                    # print("Point 2", (left_margin_pos + 140) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
-                    # path.moveTo((left_margin_pos + 140) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
-                    # print("Point 3", (left_margin_pos + 140) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
-                    # path.moveTo((left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
-                    # print("point 4", (left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos) + 60) * mm)
-                    # path.moveTo((left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm)
-                    # print("Point 5",(left_margin_pos) * mm,
-                    #             (top_margin_image_pos + (count * top_margin_image_pos)) * mm )
-                    # path.lineTo(1 * cm, 1 * cm )
-                    # path.lineTo(1 * cm, 7.5 * cm)
-                    # path.lineTo(19.5 * cm, 7.5 * cm)
-                    # path.lineTo(19.5 * cm, 1 * cm)
-                    # path.lineTo(1 * cm, 1 * cm)
-
-                    # this creates a rectangle the size of the sheet
-                    # c.drawPath(path, stroke=1, fill=0, fillMode=None)
                     c.roundRect(left_margin_pos + 10,
                                 (top_margin_image_pos + (count * top_margin_image_pos * 2.83)) - 30,
                                 width=520, height=170, radius=4, stroke=1, fill=0)
@@ -423,11 +364,6 @@ def export_logs_to_csv(request):
                                        top_margin_image_pos + (count * top_margin_image_pos),
                                        page_height, mm), width=image_width / (mm * scaling_factor),
                                 height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
-                    # c.line(
-                    #     *coord(left_margin_pos - 10, top_margin_image_pos + (count * top_margin_image_pos) + 5,
-                    #            page_height, mm),
-                    #     *coord(left_margin_pos + 175, top_margin_image_pos + (count * top_margin_image_pos + 5),
-                    #            page_height, mm))
 
                     count += 1
                 c.showPage()
@@ -438,52 +374,7 @@ def export_logs_to_csv(request):
         return FileResponse(buffer, as_attachment=True, filename='results.pdf')
     else:
         response = messages.add_message(request, messages.INFO, 'Hello world.')
-        return HttpResponse(response)
-
-
-def export_logs_to_pdf(request):
-    selection = request.POST.getlist("selection")
-    print(selection)
-    response = HttpResponse(
-        content_type='text/csv',
-        headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
-    )
-    # log_index = int(selection[0])
-    # prev_log_index = log_index - 1
-    # end = EngineState.objects.get(id=log_index).state_timestamp
-    # start = EngineState.objects.get(id=prev_log_index).state_timestamp
-    # logs = LogImage.objects.filter(creation_date__range=(start, end))
-    # for i in selection:
-    #     count += 1
-    writer = csv.writer(response)
-    writer.writerow(["camera_name", "camera_number", "camera_location",
-                     "pass_fail", "matching_score", "focus_value", "creation_date"])
-    for i in selection:
-        log_index = int(i)
-        prev_log_index = log_index - 1
-        end = EngineState.objects.get(id=log_index).state_timestamp
-        start = EngineState.objects.get(id=prev_log_index).state_timestamp
-        state = EngineState.objects.get(id=prev_log_index).state
-        first_record = EngineState.objects.first().id
-        while state != "STARTED" and prev_log_index > (int(first_record) + 1):
-            prev_log_index = prev_log_index - 1
-            try:
-                start = EngineState.objects.get(id=prev_log_index).state_timestamp
-            except ObjectDoesNotExist:
-                writer.writerow(["Error in retrieving start time for selected run id ", log_index])
-                break
-
-        logs = LogImage.objects.filter(creation_date__range=(start, end))
-
-        for log in logs:
-            pass_fail = "Pass"
-            if log.matching_score < log.current_matching_threshold:
-                pass_fail = "Fail"
-            writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
-                             pass_fail, log.matching_score, log.focus_value,
-                             datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
-
-    return response
+        return HttpResponseRedirect("/state")
 
 
 @permission_required('camera_checker.main_menu')
