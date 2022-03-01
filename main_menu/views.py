@@ -344,9 +344,14 @@ def export_logs_to_csv(request):
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
                         scaling_factor = image_width / page_width
-
+                        c.setLineWidth(2)
+                        c.setStrokeColor(HexColor("#CCCCCC"))
+                        c.roundRect(left_margin_pos + 11,
+                                    (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 29,
+                                    width=518, height=168, radius=4, stroke=1, fill=0)
+                        c.setStrokeColor(HexColor("#555555"))
                         c.roundRect(left_margin_pos + 10,
-                                    (top_margin_image_pos + (count * top_margin_image_pos * 2.83)) - 30,
+                                    (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 30,
                                     width=520, height=170, radius=4, stroke=1, fill=0)
                         c.drawImage(image_rl,
                                     *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos),
