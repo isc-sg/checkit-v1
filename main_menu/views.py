@@ -3,11 +3,12 @@ import time
 import subprocess
 import csv
 import os
+import io
 import base64
 import logging
 
 import cv2
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
@@ -16,6 +17,7 @@ from django_filters.views import FilterView
 from django.core.exceptions import *
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
 from django.conf import settings
 from django.views.decorators.cache import cache_control
 
@@ -26,8 +28,18 @@ from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter
 import main_menu.select_region as select_region
 
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.units import mm, inch, cm
+from reportlab.lib.colors import HexColor
+
 
 logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s', level=logging.INFO)
+
+
+def coord(x, y, h, unit=1):
+    x, y = x * unit, h - y * unit
+    return x, y
 
 
 def index(request):
@@ -224,6 +236,155 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
 
 def export_logs_to_csv(request):
     selection = request.POST.getlist("selection")
+    selection.sort()
+    print(selection)
+    log_list = []
+    if selection:
+        for i in selection:
+            current_record = EngineState.objects.get(id=i)
+            # print(current_record)
+            if EngineState.objects.get(id=i).state != "RUN COMPLETED":
+                selection.remove(i)
+            else:
+                previous_record = current_record.get_previous_by_state_timestamp()
+                # print(previous_record.id, previous_record.state_timestamp)
+                start = previous_record.state_timestamp
+                end = current_record.state_timestamp
+                logs = LogImage.objects.filter(creation_date__range=(start, end))
+                for log in logs:
+                    log_list.append(log.id)
+                    # print(log_list)
+        # start = EngineState.objects.get(id=selection[0]).state_timestamp
+        # end = EngineState.objects.get(id=selection[-1]).state_timestamp
+        #
+        # logs = LogImage.objects.filter(creation_date__range=(start, end))
+        logs = LogImage.objects.filter(id__in=log_list)
+
+        if request.POST.get('action') == "Export CSV":
+            response = HttpResponse(
+                content_type='text/csv',
+                headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
+            )
+
+            writer = csv.writer(response)
+            writer.writerow(["camera_name", "camera_number", "camera_location",
+                             "pass_fail", "matching_score", "focus_value", "creation_date"])
+
+            for log in logs:
+                pass_fail = "Pass"
+                if log.matching_score < log.current_matching_threshold:
+                    pass_fail = "Fail"
+                writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
+                                 pass_fail, log.matching_score, log.focus_value,
+                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
+
+            return response
+
+        elif request.POST.get('action') == "Export PDF":
+            image_list = []
+            for log in logs:
+                if log.action == "Failed":
+                    camera_name = log.url.camera_name
+                    camera_number = log.url.camera_number
+                    hour = str(log.creation_date.hour).zfill(2)
+                    log_image = settings.MEDIA_ROOT + "/" + str(log.image)
+                    camera = Camera.objects.filter(id=log.url_id)
+                    # print(camera)
+                    for c in camera:
+                        base_image = settings.MEDIA_ROOT + "/base_images/" + c.slug + "/" + hour + ".jpg"
+                    matching_score = log.matching_score
+                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score, log.action, log_image))
+            buffer = io.BytesIO()
+            c = canvas.Canvas(buffer, pagesize=A4)
+            c.setFillColor(HexColor("#99b0e7"))
+            path = c.beginPath()
+            path.moveTo(0 * cm, 0 * cm)
+            path.lineTo(0 * cm, 30 * cm)
+            path.lineTo(25 * cm, 30 * cm)
+            path.lineTo(25 * cm, 0 * cm)
+            # this creates a rectangle the size of the sheet
+            c.drawPath(path, True, True)
+            page_width, page_height = A4
+
+            while len(image_list) > 0:
+                left_margin_pos = 20
+                top_margin_text_pos = 25
+                top_margin_image_pos = 70
+                second_image_pos = 90
+                count = 0
+                c.setFillColor(HexColor("#a2a391"))
+                path = c.beginPath()
+                path.moveTo(0 * cm, 0 * cm)
+                path.lineTo(0 * cm, 30 * cm)
+                path.lineTo(25 * cm, 30 * cm)
+                path.lineTo(25 * cm, 0 * cm)
+                # this creates a rectangle the size of the sheet
+                c.drawPath(path, True, True)
+                c.setFillColor(HexColor("#000000"))
+                c.setFont("Helvetica-BoldOblique", 18, )
+                c.drawString(*coord(60, 10, page_height, mm),
+                             text="Failed Images Report")
+                # c.line(*coord(60, 12, page_height, mm), *coord(125, 12, page_height, mm))
+                c.setFont("Helvetica", 10)
+                c.drawString(*coord(180, 10, page_height, mm),
+                             text="Page " + str(c.getPageNumber()))
+                for i in image_list[:4]:
+                    # print(i)
+                    camera_name, camera_number, creation_time, base_image, matching_score, log.action, log_image = i
+                    creation_time = creation_time
+
+                    c.drawString(
+                        *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5, page_height, mm),
+                        text=camera_name + " - Camera Number: " + str(camera_number))
+
+                    c.drawString(
+                        *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos), page_height, mm),
+                        text="Time: " + creation_time.strftime("%d-%b-%Y %H:%M:%S"))
+                    c.drawString(
+                        *coord(left_margin_pos + 90, top_margin_text_pos + (count * top_margin_image_pos), page_height, mm),
+                        text="Matching Score: " + str(matching_score))
+
+                    image_rl = canvas.ImageReader(base_image)
+                    image_width, image_height = image_rl.getSize()
+                    scaling_factor = image_width / page_width
+
+                    c.line(*coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos) - 57, page_height,
+                                  mm),
+                           *coord(left_margin_pos + 165, top_margin_image_pos + (count * top_margin_image_pos) - 57,
+                                  page_height, mm))
+
+                    c.drawImage(image_rl,
+                                *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos), page_height,
+                                       mm),
+                                width=image_width / (mm * scaling_factor),
+                                height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+                    image_rl2 = canvas.ImageReader(log_image)
+                    image_width, image_height = image_rl.getSize()
+
+                    c.drawImage(image_rl2,
+                                *coord(left_margin_pos + second_image_pos,
+                                       top_margin_image_pos + (count * top_margin_image_pos),
+                                       page_height, mm), width=image_width / (mm * scaling_factor),
+                                height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+                    c.line(
+                        *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos) + 5, page_height, mm),
+                        *coord(left_margin_pos + 165, top_margin_image_pos + (count * top_margin_image_pos + 5),
+                               page_height, mm))
+
+                    count += 1
+                c.showPage()
+                del image_list[:4]
+            c.save()
+            buffer.seek(0)
+
+        return FileResponse(buffer, as_attachment=True, filename='results.pdf')
+    else:
+        response = messages.add_message(request, messages.INFO, 'Hello world.')
+        return HttpResponse(response)
+
+def export_logs_to_pdf(request):
+    selection = request.POST.getlist("selection")
+    print(selection)
     response = HttpResponse(
         content_type='text/csv',
         headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
