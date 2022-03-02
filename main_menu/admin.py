@@ -15,7 +15,7 @@ class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     exclude = ('id',)
     list_display = ('camera_name', 'camera_number', 'url',
                     'camera_location', 'matching_threshold',)
-    readonly_fields = ["creation_date", "last_check_date",]
+    readonly_fields = ["creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = ['camera_location']
 
