@@ -455,16 +455,30 @@ def display_image_grid_regions(request):
         form = RegionsForm(request.POST)
         # check whether it's valid:
         if form.is_valid():
-            if 'camera_number' in request.POST and "returned_number" not in request.POST:
-                try:
-                    camera_number = request.POST.get('camera_number')
-                except ObjectDoesNotExist:
-                    return render(request, 'main_menu/regions.html', {'form': form})
-                else:
-                    return render(request, 'main_menu/regions.html', {'form': form, 'camera_number': camera_number})
+            if 'camera_number' in request.POST and 'returned_camera' not in request.POST:
+                if request.POST.get('camera_number') != '':
+                    try:
+                        camera_number = request.POST.get('camera_number')
+                        camera_object = Camera.objects.get(camera_number=camera_number)
+                        regions = camera_object.image_regions
+                        initial_data = {'regions': eval(regions)}
+                        form = RegionsForm(initial=initial_data)
+                        mydict = {
+                            'form': form,
+                            'camera_number': camera_number
+                        }
+
+                        return render(request, 'main_menu/regions.html', context=mydict)
+
+                    except ObjectDoesNotExist:
+                        return render(request, 'main_menu/regions.html', {'form': form})
+                    # else:
+                    #     form = RegionsForm
+                    #     print("at the else")
+                    #     return render(request, 'main_menu/regions.html', {'form': form, 'camera_number': camera_number})
             else:
                 regions = form.cleaned_data['regions']
-                camera_number = request.POST.get('returned_number')
+                camera_number = request.POST.get('camera_number')
                 camera_object = Camera.objects.get(camera_number=camera_number)
                 camera_object.image_regions = regions
                 camera_object.save()
@@ -474,5 +488,10 @@ def display_image_grid_regions(request):
     # if a GET (or any other method) we'll create a blank form
     else:
         form = RegionsForm()
-
+    # print("rendering", form)
     return render(request, 'main_menu/regions.html', {'form': form})
+
+
+def test(request):
+    form = RegionsForm
+    return render(request, 'main_menu/test.html', {'form': form})

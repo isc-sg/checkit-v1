@@ -27,6 +27,7 @@
   width:4em;
 }
 
+
     </style>
 </head>
 
@@ -107,13 +108,13 @@
                         <p>Scheduler</p>
                     </a>
                 </li>
-                                                                <li class="active">
-                            <a href="/regions/">
-                                    <i class="fas fa-th" style="color:#5603ad"></i>
+                <li class="active">
+                    <a href="/regions/">
+                        <i class="fas fa-th" style="color:#5603ad"></i>
 
-                                <p style="color:#5603ad">Regions</p>
-                            </a>
-                        </li>
+                        <p style="color:#5603ad">Regions</p>
+                    </a>
+                </li>
                 <li>
                     <a href="/admin/">
                         <i class="fas fa-tools"></i>
@@ -138,8 +139,9 @@
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="title">Image Regions</h5>
-                            <iframe width="1000" height="900" frameborder="0" src="{% url 'ref_image' camera_number %}"></iframe>
+                            <h5 class="title">Image Regions - Camera {{camera_number}}</h5>
+                            <iframe width="1000" height="900" frameborder="0"
+                                    src="{% url 'ref_image' camera_number %}"></iframe>
                         </div>
                     </div>
                 </div>
@@ -147,12 +149,15 @@
                     <div class="card card-user">
                         <div class="card-body">
                         </div>
-                        <form action="/regions/" method="post">
-                            {% csrf_token %}
-                            <input type="hidden" name="returned_number" value={{ camera_number }}>
-                            {{ form }}
-                            <input class="btn" type="submit" value="Submit">
-                        </form>
+                        <div class="list-group list-group-horizontal">
+                            <form action="/regions/" method="post">
+                                {% csrf_token %}
+                                {{ form.as_p }}
+                                <input type="submit" value="Submit">
+                                <input type="hidden" id="camera_number" name="camera_number" value={{camera_number}}>
+                                <input type="hidden" id="returned_camera" name="returned_camera" value={{camera_number}}>
+                            </form>
+                        </div>
                     </div>
 
                 </div>
@@ -161,7 +166,7 @@
                     <form method="post">
                         {% csrf_token %}
                         <label>Enter Camera Number</label>
-                        <input type="number" class="form-control" name="camera_number"  tabindex="1">
+                        <input type="number" class="form-control" name="camera_number" tabindex="1">
                         <h3></h3>
                     </form>
                 </div>
@@ -169,7 +174,6 @@
             </div>
         </div>
     </div>
-</div>
 </div>
 
 

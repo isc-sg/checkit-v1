@@ -33,14 +33,10 @@ def draw_grid(c_list, img, h, w):
     count = 0
     if not c_list:
         resized_image = img
-    if h > 640:
-        font_size = 1
-        font_thickness = 4
-        line_thickness = 4
-    else:
-        font_size = .8
-        font_thickness = 1
-        line_thickness = 1
+
+    font_size = .8
+    font_thickness = 1
+    line_thickness = 1
     while count < 8:
         count += 1
         img = cv2.line(img, ((count * qw), 0), ((count * qw), h), (0, 255, 0), line_thickness)
@@ -68,13 +64,14 @@ def draw_grid(c_list, img, h, w):
         (x, y), (qw, qh) = i
         sub_img = img[y:y + qh, x:x + qw]
 
-        if darkness > 100:
-            blk_rect = np.zeros(sub_img.shape, dtype=np.uint8) * 255
-            res = cv2.addWeighted(sub_img, 0.3, blk_rect, 0.5, 1.0)
+        # if darkness > 100:
+        blk_rect = np.ones(sub_img.shape, dtype=np.uint8) * 255
+        red_rect = cv2.rectangle(blk_rect, (0,0), (qw, qh), (255,0,255), -1)
+        res = cv2.addWeighted(sub_img, 0.7, red_rect, 0.7, 1.0)
 
-        else:
-            blk_rect = np.ones(sub_img.shape, dtype=np.uint8) * 255
-            res = cv2.addWeighted(sub_img, .3, blk_rect, .5, 1.0)
+        # else:
+        #     blk_rect = np.ones(sub_img.shape, dtype=np.uint8) * 255
+        #     res = cv2.addWeighted(sub_img, .3, blk_rect, .5, 1.0)
 
         # Putting the image back to its position
         img[y:y + qh, x:x + qw] = res

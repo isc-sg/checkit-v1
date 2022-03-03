@@ -16,6 +16,7 @@ urlpatterns = [
     path("state/", views.EngineStateView.as_view()),
     path('license/', views.licensing, name='licensing'),
     path("date/", views.get_date, name='date'),
+    path("test/", views.test, name='test'),
     path("export/", views.export_logs_to_csv, name='export csv logs'),
     path("images/", views.compare_images, name="images"),
     path('show_ref/<int:camera_number>/', views.display_image_in_page_from_memory, name='ref_image'),
