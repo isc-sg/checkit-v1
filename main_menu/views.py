@@ -395,7 +395,6 @@ def export_logs_to_csv(request):
                 return FileResponse(buffer, as_attachment=True, filename='results.pdf')
 
     else:
-        response = messages.add_message(request, messages.INFO, 'Hello world.')
         return HttpResponseRedirect("/state")
 
 
