@@ -70,7 +70,7 @@ class ReferenceImage(models.Model):
         h = now().strftime('%H')
         return f'base_images/{self.url.slug}/{h}-{filename}'
 
-    def get_hour(self):
+    def get_hour():
         return now().strftime('%H')
 
     url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
