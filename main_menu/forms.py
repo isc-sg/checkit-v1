@@ -9,12 +9,6 @@ for i in range(1,65):
 # REGIONS = [("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"), ("6", "6"), ("7", "7"), ("8", "8")]
 
 
-CONTACT_PREFERENCE = [
-    ('email', 'Email'),
-    ('chat', 'Chat'),
-    ('call', 'Call'),
-]
-
 class DateForm(forms.Form):
     select_date = forms.DateField(widget=DatePickerInput(format='%m/%d/%Y'))
 
