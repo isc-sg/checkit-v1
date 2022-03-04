@@ -49,7 +49,7 @@ class EngineStateTable(tables.Table):
     class Meta:
         model = EngineState
         template_name = 'django_tables2/bootstrap4.html'
-        fields = ("state", "state_timestamp")
+        fields = ("state", "state_timestamp", "number_failed_images")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
-        sequence = ('selection', 'state', 'state_timestamp')
+        sequence = ('selection', 'state', 'state_timestamp', 'number_failed_images')
         order_by = '-state_timestamp'
