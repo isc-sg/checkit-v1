@@ -5,7 +5,8 @@ import pathlib
 import time
 
 from sys import exit
-from skimage.metrics import structural_similarity as ssim
+# from skimage.metrics import structural_similarity as ssim
+import ssim
 import cv2
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
@@ -14,6 +15,7 @@ import multiprocessing as mp
 import subprocess
 from passlib.hash import sha512_crypt
 import logging
+import requests
 
 
 import select_region as select_region
@@ -164,6 +166,19 @@ def init_pools():
             exit(0)
 
 
+def look_for_objects(image):
+    url = "http://localhost:8000/api/v1/detection"
+    payload = {"model": "yolov4", }
+    files = [
+        ('image', ('1561-7_26_4.jpg', open('/Users/sam/Downloads/1561-7_26_4.jpg', 'rb'), 'image/jpeg'))
+    ]
+    headers = {}
+    response = requests.request("POST", url, headers=headers, data=payload, files=files)
+    objects = ""
+    # rtsp://192.168.1.166:7001/e3e9a385-7fe0-3ba5-5482-a86cde7faf48?stream=0
+    return objects
+
+
 def compare_images(base, frame, r):
     # r = ['1', '3', '5', '29', '8', '11', '24', '44', '55', '64']
     h, w = frame.shape[:2]
@@ -175,7 +190,7 @@ def compare_images(base, frame, r):
     # full_ss = ssim(base, frame)
     frame_equalised = cv2.equalizeHist(frame)
     based_equalised = cv2.equalizeHist(base)
-    full_ss = ssim(based_equalised, frame_equalised)
+    full_ss = ssim.ssim(based_equalised, frame_equalised)
     count = 0
     for i in coordinates:
         (x, y), (qw, qh) = i
@@ -186,7 +201,7 @@ def compare_images(base, frame, r):
         # cv2.waitKey(0)
         ss = 0
         try:
-            ss = ssim(sub_img_base, sub_img_frame)
+            ss = ssim.ssim(sub_img_base, sub_img_frame)
         except Exception as e:
             print(e)
 
@@ -440,12 +455,19 @@ def process_list(x):
 
                 cv2.imwrite(log_image_file_name, image_frame)
                 # write the log file - create variable to store in DB
-                image_base_grey = cv2.cvtColor(image_base, cv2.COLOR_BGR2GRAY)
-                image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-                reference_dimensions = image_base_grey.shape[:2]
-                capture_dimensions = image_frame_grey.shape[:2]
+                try:
+                    image_base_grey = cv2.cvtColor(image_base, cv2.COLOR_BGR2GRAY)
+                    image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
+                    reference_dimensions = image_base_grey.shape[:2]
+                    capture_dimensions = image_frame_grey.shape[:2]
+                    status = "success"
+                except cv2.error as err:
+                    logging.error(f"Error in converting image {e}")
+                    status = "failed"
+
+
                 # print(reference_dimensions, capture_dimensions)
-                if reference_dimensions != capture_dimensions:
+                if reference_dimensions != capture_dimensions or status == "failed":
                     logging.error(f"Image sizes don't match on camera number {current_record[camera_number_index]}")
                     # TODO: clean up below - replicated and no need
                     now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
