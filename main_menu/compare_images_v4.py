@@ -126,9 +126,9 @@ adm_db = mysql.connector.connect(**adm_db_config)
 
 try:
     admin_cursor = adm_db.cursor()
-    sql_statement = "SELECT * FROM adm WHERE id = 1"
+    sql_statement = "SELECT * FROM adm"
     admin_cursor.execute(sql_statement)
-    result = admin_cursor.fetchone()
+    result = admin_cursor.fetchall()[-1]
     field_names = [i[0] for i in admin_cursor.description]
 
     transaction_count_index = field_names.index('tx_count')
@@ -151,10 +151,13 @@ except mysql.connector.Error as e:
 
 try:
     checkit_cursor = checkit_db.cursor()
+    sql = "SELECT id from main_menu_licensing"
+    checkit_cursor.execute(sql)
+    license_record_id = checkit_cursor.fetchall()[-1]
     sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
           "transaction_limit = " + str(transaction_limit) + " , " + \
           "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
-          "license_key = " + "\"" + license_key + "\"" + " WHERE id = 1"
+          "license_key = " + "\"" + license_key + "\"" + " WHERE id = " + str(license_record_id)
     checkit_cursor.execute(sql)
     checkit_db.commit()
 except mysql.connector.Error as e:
