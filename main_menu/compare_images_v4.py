@@ -212,7 +212,6 @@ if checkit_result is None:
 
 
 else:
-# TODO: get field names like I do earlier - order may change in DB
 
     state = checkit_result[state_index]
     transaction_rate = checkit_result[transaction_rate_index]
