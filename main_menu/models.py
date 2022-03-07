@@ -60,8 +60,7 @@ class Camera(models.Model):
         return reverse('images', kwargs={'slug': self.slug})
 
     def save(self, *args, **kwargs): # new
-        if not self.slug:
-            self.slug = slugify(self.camera_name)
+        self.slug = slugify(self.camera_name)
         return super().save(*args, **kwargs)
 
 
