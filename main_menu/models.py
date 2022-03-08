@@ -67,7 +67,7 @@ class Camera(models.Model):
 class ReferenceImage(models.Model):
     def get_image_filename(self, filename):
         h = now().strftime('%H')
-        return f'base_images/{self.url.slug}/{h}-{filename}'
+        return f'base_images/{str(self.url.id).zfill(8)}-{self.url.slug}/{h}-{filename}'
 
     def get_hour():
         return now().strftime('%H')
