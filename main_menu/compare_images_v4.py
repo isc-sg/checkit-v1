@@ -203,7 +203,8 @@ transaction_rate = 0
 if checkit_result is None:
     # this is needed if there are no records in enginestate table ( ie first time run )
     sql_statement = "INSERT INTO main_menu_enginestate " \
-                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images) VALUES (%s,%s,%s,%s,%s)"
+                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                    " VALUES (%s,%s,%s,%s,%s)"
     values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
 
     # checkit_cursor = checkit_db.cursor()
@@ -242,7 +243,8 @@ if state == "STARTED" and process_state == "NOT RUNNING":
     state = "ERROR"
     state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
     sql_statement = "INSERT INTO main_menu_enginestate " \
-                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images) VALUES (%s,%s,%s,%s,%s)"
+                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                    " VALUES (%s,%s,%s,%s,%s)"
     values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
     logging.info("transaction rate %s", transaction_rate)
     logging.error("Last run failed to exit properly")
@@ -258,7 +260,8 @@ engine_process_id = os.getpid()
 transaction_rate = 0
 
 sql_statement = "INSERT INTO main_menu_enginestate " \
-                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images) VALUES (%s,%s,%s,%s,%s)"
+                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                " VALUES (%s,%s,%s,%s,%s)"
 values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0)
 
 
@@ -270,7 +273,8 @@ current_process_row_id = checkit_cursor.lastrowid
 
 
 def calculate_transaction_rate():
-    sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " + "\"" + start_state_timestamp + "\""
+    sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " +\
+                    "\"" + start_state_timestamp + "\""
     # below used for testing
     # sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " + "\"" + "2021-07-08" + "\""
 
@@ -286,11 +290,12 @@ def calculate_transaction_rate():
 
 
 def count_failed():
-    sql_statement = """SELECT COUNT(*) FROM main_menu_logimage WHERE action = "Failed" AND creation_date > """ + "\"" + start_state_timestamp + "\""
+    sql_statement = """SELECT COUNT(*) FROM main_menu_logimage WHERE action = "Failed" AND creation_date > """ +\
+                    "\"" + start_state_timestamp + "\""
     checkit_cursor.execute(sql_statement)
     checkit_result = checkit_cursor.fetchall()[0][0]
-    print("number of fails", checkit_result)
     return checkit_result
+
 
 process_list_v2.main(list_to_process)
 
@@ -343,11 +348,10 @@ checkit_cursor = checkit_db.cursor()
 
 
 transaction_rate = calculate_transaction_rate()
-print(transaction_rate)
 fails = count_failed()
-print("Failed", fails)
 sql_statement = "INSERT INTO main_menu_enginestate " \
-                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images) VALUES (%s,%s,%s,%s,%s)"
+                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                " VALUES (%s,%s,%s,%s,%s)"
 values = (state, engine_process_id, transaction_rate, state_timestamp, fails)
 logging.info("Run completed")
 checkit_cursor.execute(sql_statement, values)
