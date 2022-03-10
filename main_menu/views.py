@@ -473,6 +473,8 @@ def display_image_grid_regions(request):
                         camera_number = request.POST.get('camera_number')
                         camera_object = Camera.objects.get(camera_number=camera_number)
                         regions = camera_object.image_regions
+                        if regions == "":
+                            regions = "[0]"
                         initial_data = {'regions': eval(regions)}
                         form = RegionsForm(initial=initial_data)
                         mydict = {
