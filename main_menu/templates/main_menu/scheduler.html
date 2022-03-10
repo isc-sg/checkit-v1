@@ -174,7 +174,7 @@
                                     {% csrf_token %}
 
                                     <label>Enter new hourly interval for run</label>
-                                    <input type="number" class="form-control" name="new_run"/>
+                                    <input type="number" class="form-control" min="0" max="24" name="new_run"/>
                                     <h3></h3>
                                 </form>
                             </div>

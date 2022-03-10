@@ -110,8 +110,8 @@ def compare_images(request):
 
 @permission_required('camera_checker.main_menu')
 def scheduler(request):
-    # user_name = request.user.username
-    # logging.info("User {u} access to Scheduler".format(u=user_name))
+    user_name = request.user.username
+    logging.info("User {u} access to Scheduler".format(u=user_name))
 
     template = loader.get_template('main_menu/scheduler.html')
     # get the actual state from the engine here and pass it to context
@@ -124,25 +124,37 @@ def scheduler(request):
     # can use pid method to check if actually running. see compare_images_v2
 
     if request.method == 'POST' and 'start_engine' in request.POST:
-        subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
-        # logging.info("User {u} started engine".format(u=user_name))
+        logging.info("User {u} started engine".format(u=user_name))
+        # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
+        process_output = subprocess.check_output(["/home/checkit/env/bin/python",
+                                                  "/home/checkit/camera_checker/main_menu/start.py"])
+        logging.info("Process Output", process_output)
         time.sleep(5)
         return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'new_run' in request.POST:
         new_run_schedule = request.POST.get('new_run')
-        if new_run_schedule != license_obj.run_schedule:
+        old_run_schedule = license_obj.run_schedule
+        if new_run_schedule != old_run_schedule:
             license_obj.run_schedule = new_run_schedule
             license_obj.save()
             if int(new_run_schedule) == 0:
                 command = "/usr/bin/crontab -r"
-                # logging.info("User {u} set scheduler to not running".format(u=user_name))
+                logging.info("User {u} set scheduler to not running".format(u=user_name))
             else:
 
-                command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
-                          " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
-                # TODO - check crontab -l to see if this line worked
+                # command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
+                #           " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
+                if int(new_run_schedule) < 24:
+                    command = "/bin/echo 0 *" + "/" + new_run_schedule + \
+                              " \* \* \* /home/checkit/env/bin/python " \
+                              "/home/checkit/camera_checker/main_menu/start.py | crontab -"
+                else:
+                    command = "/bin/echo 0 0 \* \* \* /home/checkit/env/bin/python " \
+                              "/home/checkit/camera_checker/main_menu/start.py | crontab -"
             subprocess.Popen(command, shell=True)
-            # logging.info("User {u} started engine".format(u=user_name))
+            logging.info("User {u} modified run schedule to {n} hours from {o} hours".format(u=user_name,
+                                                                                             n=new_run_schedule,
+                                                                                             o=old_run_schedule))
         return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'camera_check' in request.POST:
         input_number = request.POST.get('camera_check')
@@ -156,11 +168,12 @@ def scheduler(request):
             context = {'camera_does_not_exist': input_number, 'system_state': state, 'run_schedule': run_schedule}
             return HttpResponse(template.render(context, request))
         camera_number = str(camera_object.camera_number)
-        process_output = subprocess.check_output(["/home/checkit/camera_checker/main_menu/compare_images_v2.bin",
-                                                  camera_number])
-        # user_name = request.user.username
-        # logging.info("User {u} completed camera check for camera {c}".format(u=user_name, c=camera_number))
-        # logging.info(process_output)
+        # process_output = subprocess.check_output(["/home/checkit/camera_checker/main_menu/compare_images_v2.bin",
+        #                                           camera_number])
+        process_output = subprocess.check_output(["/home/checkit/env/bin/python",
+                                                  "/home/checkit/camera_checker/main_menu/start.py", camera_number])
+        logging.info("User {u} completed camera check for camera {c}".format(u=user_name, c=camera_number))
+        logging.info("Process Output", process_output)
         time.sleep(5)
         return HttpResponseRedirect(reverse(index))
     return HttpResponse(template.render(context, request))

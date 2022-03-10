@@ -13,27 +13,27 @@ import multiprocessing
 import process_list_v2
 import logging
 from logging.handlers import RotatingFileHandler
-import argparse
+# import argparse
+#
+#
+# parser = argparse.ArgumentParser(description='Checkit image comparison')
+# parser.add_argument('list_of_cameras', metavar='N', type=int, nargs='*')
+# parser.add_argument('--debug', action='store_true',
+#                     help='set logging to debug level')
+#
+# args = parser.parse_args()
 
 
-parser = argparse.ArgumentParser(description='Checkit image comparison')
-parser.add_argument('list_of_cameras', metavar='N', type=int, nargs='*')
-parser.add_argument('--debug', action='store_true',
-                    help='set logging to debug level')
-
-args = parser.parse_args()
-
-
-if args.debug:
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
-                                                   '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-                        handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
-                                                      maxBytes=10000000, backupCount=10)])
-else:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
-                                                   '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-                        handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
-                                                      maxBytes=10000000, backupCount=10)])
+# if args.debug:
+#     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
+#                                                    '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+#                         handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
+#                                                       maxBytes=10000000, backupCount=10)])
+# else:
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
+                                               '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+                    handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
+                                                  maxBytes=10000000, backupCount=10)])
 
 
 def create_key(em):
@@ -75,204 +75,219 @@ def create_key(em):
     return key[1], pw[1]
 
 
-license_file = open("/etc/checkit/checkit.lic", "r")
-registered_key = license_file.readline().strip('\n')
-email = license_file.readline().strip('\n')
-license_key, password = create_key(email)
-if license_key != registered_key:
-    logging.error("Licensing error")
-    exit(1)
-
-try:
-    checkit_db = mysql.connector.connect(
-        host="localhost",
-        user="checkit",
-        password="checkit",
-        database="checkit"
-    )
-except mysql.connector.Error as err:
-    if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        logging.error("Invalid password on main database")
+def check_license():
+    license_file = open("/etc/checkit/checkit.lic", "r")
+    registered_key = license_file.readline().strip('\n')
+    email = license_file.readline().strip('\n')
+    license_key, password = create_key(email)
+    if license_key != registered_key:
+        logging.error("Licensing error")
         exit(1)
-    elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        logging.error("Database not initialised")
+    return license_key, password
+
+
+def check_main_databases_initialised():
+    try:
+        checkit_db = mysql.connector.connect(
+            host="localhost",
+            user="checkit",
+            password="checkit",
+            database="checkit"
+        )
+        return checkit_db
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            logging.error("Invalid password on main database")
+            exit(1)
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            logging.error("Database not initialised")
+            exit(1)
+
+
+def get_camera_ids(camera_numbers, checkit_cursor):
+    if camera_numbers:
+        joined_string = ' '.join(map(str, camera_numbers))
+        sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
+    else:
+        sql_statement = "SELECT id FROM main_menu_camera"
+
+
+    try:
+        # checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(sql_statement)
+        z = checkit_cursor.fetchall()
+        ids = [x[0] for x in z]
+        # print(list_to_process)
+    except mysql.connector.Error as e:
+        logging.error(f"Database connection error {e}")
         exit(1)
 
-if args.list_of_cameras:
-    joined_string = ' '.join(map(str, args.list_of_cameras))
-    sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
-else:
-    sql_statement = "SELECT id FROM main_menu_camera"
+    return ids
 
 
-try:
-    checkit_cursor = checkit_db.cursor()
-    checkit_cursor.execute(sql_statement)
-    z = checkit_cursor.fetchall()
-    list_to_process = [x[0] for x in z]
-    # print(list_to_process)
-except mysql.connector.Error as e:
-    logging.error(f"Database connection error {e}")
-    exit(1)
+def check_adm_database(password):
+    adm_db_config = {
+        "host": "localhost",
+        "user": "root",
+        "password": password,
+        "database": "adm"
+    }
 
-adm_db_config = {
-    "host": "localhost",
-    "user": "root",
-    "password": password,
-    "database": "adm"
-}
+    adm_db = mysql.connector.connect(**adm_db_config)
 
-adm_db = mysql.connector.connect(**adm_db_config)
+    try:
+        admin_cursor = adm_db.cursor()
+        sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
+        admin_cursor.execute(sql_statement)
+        result = admin_cursor.fetchone()
+        field_names = [i[0] for i in admin_cursor.description]
 
-try:
-    admin_cursor = adm_db.cursor()
-    sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
-    admin_cursor.execute(sql_statement)
-    result = admin_cursor.fetchone()
-    field_names = [i[0] for i in admin_cursor.description]
+        transaction_count_index = field_names.index('tx_count')
+        transaction_limit_index = field_names.index('tx_limit')
+        end_date_index = field_names.index('end_date')
+        camera_limit_index = field_names.index('camera_limit')
 
-    transaction_count_index = field_names.index('tx_count')
-    transaction_limit_index = field_names.index('tx_limit')
-    end_date_index = field_names.index('end_date')
-    camera_limit_index = field_names.index('camera_limit')
+        transaction_count = result[transaction_count_index]
+        transaction_limit = result[transaction_limit_index]
+        end_date = result[end_date_index]
+        camera_limit = result[camera_limit_index]
 
-    transaction_count = result[transaction_count_index]
-    transaction_limit = result[transaction_limit_index]
-    end_date = result[end_date_index]
-    camera_limit = result[camera_limit_index]
+        adm_db.close()
+        return transaction_count, transaction_limit, end_date, camera_limit
 
-    adm_db.close()
+    except mysql.connector.Error as e:
+        logging.error(f"Database connection error {e}")
+        exit(1)
 
-except mysql.connector.Error as e:
-    logging.error(f"Database connection error {e}")
-    exit(1)
 
 # sync up checkit and adm data - in case checkit has been manually modified.
 
-try:
+
+def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key):
+    try:
+        checkit_cursor = checkit_db.cursor()
+        sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
+              "transaction_limit = " + str(transaction_limit) + " , " + \
+              "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
+              "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
+        checkit_cursor.execute(sql)
+        checkit_db.commit()
+    except mysql.connector.Error as e:
+        logging.error(f"Database connection error {e}")
+
+    if transaction_count >= transaction_limit or datetime.date.today() > end_date:
+        logging.error("Licenses expired or transaction limit reached")
+        exit(1)
+    camera_count = 0
+
+    try:
+        checkit_cursor = checkit_db.cursor()
+        sql = "SELECT COUNT(id) from main_menu_camera"
+        checkit_cursor.execute(sql)
+        camera_count = checkit_cursor.fetchone()[0]
+
+    except mysql.connector.Error as e:
+        logging.error(f"Database connection error {e}")
+
+    if camera_count > camera_limit:
+        logging.error("Camera limit reached")
+        exit(1)
+
+
+def check_engine_state(checkit_db):
     checkit_cursor = checkit_db.cursor()
-    sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
-          "transaction_limit = " + str(transaction_limit) + " , " + \
-          "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
-          "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
-    checkit_cursor.execute(sql)
-    checkit_db.commit()
-except mysql.connector.Error as e:
-    logging.error(f"Database connection error {e}")
+    checkit_cursor.execute("SELECT * FROM main_menu_enginestate ORDER BY id DESC LIMIT 1")
+    checkit_result = checkit_cursor.fetchone()
+    field_names = [i[0] for i in checkit_cursor.description]
 
-if transaction_count >= transaction_limit or datetime.date.today() > end_date:
-    logging.error("Licenses expired or transaction limit reached")
-    exit(1)
-camera_count = 0
+    state_index = field_names.index('state')
+    transaction_rate_index = field_names.index('transaction_rate')
+    engine_process_id_index = field_names.index('engine_process_id')
+    state_timestamp_index = field_names.index('state_timestamp')
 
-try:
-    checkit_cursor = checkit_db.cursor()
-    sql = "SELECT COUNT(id) from main_menu_camera"
-    checkit_cursor.execute(sql)
-    camera_count = checkit_cursor.fetchone()[0]
+    # this will get the last record/state in the state file
+    # this format allows us to keep a history the engine states
+    # should always be started followed by stopped - if not then engine crashed or still running
+    # use process id field in table to check if its actually running
 
-except mysql.connector.Error as e:
-    logging.error(f"Database connection error {e}")
-
-if camera_count > camera_limit:
-    logging.error("Camera limit reached")
-    exit(1)
-
-
-# checkit_cursor = checkit_db.cursor()
-checkit_cursor.execute("SELECT * FROM main_menu_enginestate ORDER BY id DESC LIMIT 1")
-checkit_result = checkit_cursor.fetchone()
-field_names = [i[0] for i in checkit_cursor.description]
-
-state_index = field_names.index('state')
-transaction_rate_index = field_names.index('transaction_rate')
-engine_process_id_index = field_names.index('engine_process_id')
-state_timestamp_index = field_names.index('state_timestamp')
-
-# this will get the last record/state in the state file
-# this format allows us to keep a history the engine states
-# should always be started followed by stopped - if not then engine crashed or still running
-# use process id field in table to check if its actually running
-
-# initialise for first time
-state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-state = "STARTED"
-engine_process_id = os.getpid()
-transaction_rate = 0
-
-if checkit_result is None:
-    # this is needed if there are no records in enginestate table ( ie first time run )
-    sql_statement = "INSERT INTO main_menu_enginestate " \
-                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                    " VALUES (%s,%s,%s,%s,%s)"
-    values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
-
-    # checkit_cursor = checkit_db.cursor()
-    checkit_cursor.execute(sql_statement, values)
-    checkit_db.commit()
-
-
-else:
-
-    state = checkit_result[state_index]
-    transaction_rate = checkit_result[transaction_rate_index]
-    state_timestamp = checkit_result[state_timestamp_index]
-    engine_process_id = checkit_result[engine_process_id_index]
-
-try:
-    os.kill(engine_process_id, 0)
-except OSError:
-    process_state = "NOT RUNNING"
-else:
-    process_state = "RUNNING"
-
-if state == "STARTED":
-    if process_state == "RUNNING":
-        logging.info("Engine already running - exiting")
-        exit(0)
-
-    # exit gracefully because engine is running
-
-    # no need to check for state = "STOPPED" just start it.
-    # just make sure we add a record at the end of processing to state STOPPED
-    # start the engine because the process_state not running so engine must have crashed ie state != STARTED and
-    # process_state = "NOT RUNNING"
-    # lines below add ERROR entry to show improper exit of previous engine run
-
-if state == "STARTED" and process_state == "NOT RUNNING":
-    state = "ERROR"
+    # initialise for first time
     state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    state = "STARTED"
+    engine_process_id = os.getpid()
+    transaction_rate = 0
+
+    if checkit_result is None:
+        # this is needed if there are no records in enginestate table ( ie first time run )
+        sql_statement = "INSERT INTO main_menu_enginestate " \
+                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                        " VALUES (%s,%s,%s,%s,%s)"
+        values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
+
+        # checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(sql_statement, values)
+        checkit_db.commit()
+
+
+    else:
+
+        state = checkit_result[state_index]
+        transaction_rate = checkit_result[transaction_rate_index]
+        state_timestamp = checkit_result[state_timestamp_index]
+        engine_process_id = checkit_result[engine_process_id_index]
+
+    try:
+        os.kill(engine_process_id, 0)
+    except OSError:
+        process_state = "NOT RUNNING"
+    else:
+        process_state = "RUNNING"
+
+    if state == "STARTED":
+        if process_state == "RUNNING":
+            logging.info("Engine already running - exiting")
+            exit(0)
+
+        # exit gracefully because engine is running
+
+        # no need to check for state = "STOPPED" just start it.
+        # just make sure we add a record at the end of processing to state STOPPED
+        # start the engine because the process_state not running so engine must have crashed ie state != STARTED and
+        # process_state = "NOT RUNNING"
+        # lines below add ERROR entry to show improper exit of previous engine run
+
+    if state == "STARTED" and process_state == "NOT RUNNING":
+        state = "ERROR"
+        state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+        sql_statement = "INSERT INTO main_menu_enginestate " \
+                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                        " VALUES (%s,%s,%s,%s,%s)"
+        values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
+        logging.info("transaction rate %s", transaction_rate)
+        logging.error("Last run failed to exit properly")
+        # checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(sql_statement, values)
+        checkit_db.commit()
+
+
+    # now insert a STARTED state for this process
+    start_state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    state = "STARTED"
+    engine_process_id = os.getpid()
+    transaction_rate = 0
+
     sql_statement = "INSERT INTO main_menu_enginestate " \
                     "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
                     " VALUES (%s,%s,%s,%s,%s)"
-    values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
-    logging.info("transaction rate %s", transaction_rate)
-    logging.error("Last run failed to exit properly")
+    values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0)
+
+
     # checkit_cursor = checkit_db.cursor()
     checkit_cursor.execute(sql_statement, values)
     checkit_db.commit()
+    return start_state_timestamp
 
 
-# now insert a STARTED state for this process
-start_state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-state = "STARTED"
-engine_process_id = os.getpid()
-transaction_rate = 0
-
-sql_statement = "INSERT INTO main_menu_enginestate " \
-                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                " VALUES (%s,%s,%s,%s,%s)"
-values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0)
-
-
-# checkit_cursor = checkit_db.cursor()
-checkit_cursor.execute(sql_statement, values)
-checkit_db.commit()
-current_process_row_id = checkit_cursor.lastrowid
-# checkit_db.close
-
-
-def calculate_transaction_rate():
+def calculate_transaction_rate(checkit_cursor, start_state_timestamp):
     sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " +\
                     "\"" + start_state_timestamp + "\""
     # below used for testing
@@ -289,7 +304,7 @@ def calculate_transaction_rate():
     return tr
 
 
-def count_failed():
+def count_failed(checkit_cursor, start_state_timestamp):
     sql_statement = """SELECT COUNT(*) FROM main_menu_logimage WHERE action = "Failed" AND creation_date > """ +\
                     "\"" + start_state_timestamp + "\""
     checkit_cursor.execute(sql_statement)
@@ -297,7 +312,59 @@ def count_failed():
     return checkit_result
 
 
-process_list_v2.main(list_to_process)
+def shutdown_engine_state(start_state_timestamp):
+    state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    state = "RUN COMPLETED"
+    engine_process_id = os.getpid()
+
+    try:
+        checkit_db = mysql.connector.connect(
+            host="localhost",
+            user="checkit",
+            password="checkit",
+            database="checkit"
+        )
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            logging.error("Invalid password on main database")
+            exit(1)
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            logging.error("Database not initialised")
+            exit(1)
+
+    checkit_cursor = checkit_db.cursor()
+
+    transaction_rate = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
+    fails = count_failed(checkit_cursor, start_state_timestamp)
+    sql_statement = "INSERT INTO main_menu_enginestate " \
+                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
+                    " VALUES (%s,%s,%s,%s,%s)"
+    values = (state, engine_process_id, transaction_rate, state_timestamp, fails)
+    logging.info("Run completed")
+    checkit_cursor.execute(sql_statement, values)
+    checkit_db.commit()
+    checkit_db.close()
+
+
+def main(ids):
+    license_key, password = check_license()
+    checkit_db = check_main_databases_initialised()
+    checkit_cursor = checkit_db.cursor()
+
+    transaction_count, transaction_limit, end_date, camera_limit = check_adm_database(password)
+    sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key)
+    start_state_timestamp = check_engine_state(checkit_db)
+
+    list_to_process = get_camera_ids(ids, checkit_cursor)
+    process_list_v2.main(list_to_process)
+    tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
+    failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
+    shutdown_engine_state(start_state_timestamp)
+
+
+if __name__ == '__main__':
+    main()
+
 
 # this will compare last_check_date which includes time as well but still returns values less than today's date
 # sql_statement = "SELECT * FROM main_menu_camera WHERE last_check_date < " + \
@@ -322,41 +389,8 @@ process_list_v2.main(list_to_process)
 
 
 # insert records for proper shutdown
-# TODO UPDATE transaction rate to STARTED record
 # time.sleep(10)
-state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-state = "RUN COMPLETED"
-engine_process_id = os.getpid()
 
-
-try:
-    checkit_db = mysql.connector.connect(
-        host="localhost",
-        user="checkit",
-        password="checkit",
-        database="checkit"
-    )
-except mysql.connector.Error as err:
-    if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        logging.error("Invalid password on main database")
-        exit(1)
-    elif err.errno == errorcode.ER_BAD_DB_ERROR:
-        logging.error("Database not initialised")
-        exit(1)
-
-checkit_cursor = checkit_db.cursor()
-
-
-transaction_rate = calculate_transaction_rate()
-fails = count_failed()
-sql_statement = "INSERT INTO main_menu_enginestate " \
-                "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                " VALUES (%s,%s,%s,%s,%s)"
-values = (state, engine_process_id, transaction_rate, state_timestamp, fails)
-logging.info("Run completed")
-checkit_cursor.execute(sql_statement, values)
-checkit_db.commit()
-checkit_db.close()
 
 
 #
