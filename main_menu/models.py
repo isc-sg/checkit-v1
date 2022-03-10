@@ -1,4 +1,5 @@
 import datetime
+import os.path
 
 from django.db import models
 from django.core import validators
@@ -9,6 +10,7 @@ from django.utils.timezone import now
 from django.urls import reverse
 from django.template.defaultfilters import slugify
 from simple_history.models import HistoricalRecords
+import shutil
 from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
 LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Failed', 'Failed'), ('Capture Error', 'Capture Error'),
@@ -38,20 +40,19 @@ class CameraURLField(models.URLField):
 class Camera(models.Model):
     url = models.CharField(max_length=300, unique=True, verbose_name="Camera URL")
     # image = models.ImageField(upload_to='base_images/')
-    camera_number = models.IntegerField(null=False, blank=False,
+    camera_number = models.IntegerField(null=False, blank=False, unique=True,
                                         validators=[
                                           MaxValueValidator(100000),
 
                                           MinValueValidator(1)])
-    camera_name = models.CharField(max_length=100, null=False, blank=False)
+    camera_name = models.CharField(max_length=100, null=False, blank=False, unique=True)
     slug = models.SlugField(max_length=100, null=True, blank=False, unique=True, verbose_name="URL friendly name")
     camera_location = models.CharField(max_length=100)
     image_regions = models.CharField(max_length=300)
-    matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0.5)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     history = HistoricalRecords()
-
 
     def __str__(self):
         return f'{self.camera_name} / #{self.camera_number}'
@@ -59,7 +60,7 @@ class Camera(models.Model):
     def get_slug_camera_name(self):
         return reverse('images', kwargs={'slug': self.slug})
 
-    def save(self, *args, **kwargs): # new
+    def save(self, *args, **kwargs):
         self.slug = slugify(self.camera_name)
         return super().save(*args, **kwargs)
 
@@ -67,7 +68,7 @@ class Camera(models.Model):
 class ReferenceImage(models.Model):
     def get_image_filename(self, filename):
         h = now().strftime('%H')
-        return f'base_images/{str(self.url.id).zfill(8)}-{self.url.slug}/{h}-{filename}'
+        return f'base_images/{self.url.slug}/{h}-{filename}'
 
     def get_hour():
         return now().strftime('%H')
