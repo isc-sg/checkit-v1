@@ -129,8 +129,8 @@ def scheduler(request):
         process_output = subprocess.check_output(["/home/checkit/env/bin/python",
                                                   "/home/checkit/camera_checker/main_menu/start.py"])
         logging.info("Process Output", process_output)
-        time.sleep(5)
-        return HttpResponseRedirect(reverse(scheduler))
+        time.sleep(2)
+        return HttpResponseRedirect(reverse(index))
     if request.method == 'POST' and 'new_run' in request.POST:
         new_run_schedule = request.POST.get('new_run')
         old_run_schedule = license_obj.run_schedule
@@ -174,7 +174,7 @@ def scheduler(request):
                                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number])
         logging.info("User {u} completed camera check for camera {c}".format(u=user_name, c=camera_number))
         logging.info("Process Output", process_output)
-        time.sleep(5)
+        time.sleep(2)
         return HttpResponseRedirect(reverse(index))
     return HttpResponse(template.render(context, request))
 
