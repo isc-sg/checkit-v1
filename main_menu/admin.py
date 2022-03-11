@@ -15,7 +15,7 @@ from .models import Camera, ReferenceImage, LogImage
 from .resources import CameraResource, ReferenceImageResource
 
 
-class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     resource_class = CameraResource
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
     exclude = ('id',)
@@ -62,7 +62,7 @@ class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         queryset.delete()
 
 
-class ReferenceAdmin(admin.ModelAdmin):
+class ReferenceAdmin(SimpleHistoryAdmin):
     # model = ReferenceImage
     resource_class = ReferenceImageResource
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
@@ -88,7 +88,7 @@ class ReferenceAdmin(admin.ModelAdmin):
     get_location.short_description = "Location"
 
 
-class LogImageAdmin(admin.ModelAdmin):
+class LogImageAdmin(SimpleHistoryAdmin):
     resource_class = LogImage
     search_fields = ['url__camera_name', 'image', 'action', 'creation_date', 'url__camera_location']
     list_display = ['url', 'creation_date', 'action', 'get_location', ]
@@ -104,6 +104,20 @@ class LogImageAdmin(admin.ModelAdmin):
             height=(obj.image.height/2),
                                                                                      )
                         )
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['readonly'] = True
+        return super(LogImageAdmin, self).change_view(request, object_id, extra_context=extra_context)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def get_location(self, obj):
         return obj.url.camera_location
