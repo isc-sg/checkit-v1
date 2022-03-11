@@ -48,7 +48,7 @@ class Camera(models.Model):
     camera_name = models.CharField(max_length=100, null=False, blank=False, unique=True)
     slug = models.SlugField(max_length=100, null=True, blank=False, unique=True, verbose_name="URL friendly name")
     camera_location = models.CharField(max_length=100)
-    image_regions = models.CharField(max_length=300)
+    image_regions = models.CharField(max_length=300, default="[]")
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0.5)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
@@ -68,7 +68,7 @@ class Camera(models.Model):
 class ReferenceImage(models.Model):
     def get_image_filename(self, filename):
         h = now().strftime('%H')
-        return f'base_images/{self.url.slug}/{h}-{filename}'
+        return f'base_images/{self.url.id}/{h}-{filename}'
 
     def get_hour():
         return now().strftime('%H')
