@@ -27,7 +27,7 @@ class LogTable(tables.Table):
     camera_location = tables.Column(accessor='url.camera_location')
     matching_score = tables.Column()
     matching_threshold = tables.Column(accessor='url.matching_threshold')
-    action = tables.Column(visible=True)
+    action = tables.Column(visible=True, verbose_name="Status")
     image = tables.Column(visible=False)
     reference_image = tables.Column(accessor='url.image', visible=False)
     display_image = TemplateColumn(template_name='main_menu/display_reference_and_capture_button.html')
@@ -35,8 +35,9 @@ class LogTable(tables.Table):
     class Meta:
         model = LogImage
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('camera_number', 'camera_name', 'camera_location', "image", "matching_score",
-                  "matching_threshold", "focus_value", "action", "creation_date")
+        fields = ('camera_number', 'camera_name', 'camera_location', 'image', 'matching_score',
+                  'focus_value', 'action', 'creation_date')
+        exclude = (['matching_threshold'])
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = '-creation_date'
 
