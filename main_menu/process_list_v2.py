@@ -287,9 +287,9 @@ def no_base_image(record):
         else:
             logging.debug(f"Able to capture base image on {record[camera_name_index]}")
             time_stamp = datetime.datetime.now()
-            file_name = "/home/checkit/camera_checker/media/base_images/" + record[slug_index] + "/" + \
+            file_name = "/home/checkit/camera_checker/media/base_images/" + str(record[camera_id_index]) + "/" + \
                         time_stamp.strftime('%H') + ".jpg"
-            directory = "/home/checkit/camera_checker/media/base_images/" + record[slug_index]
+            directory = "/home/checkit/camera_checker/media/base_images/" + str(record[camera_id_index])
 
             try:
                 pathlib.Path(directory).mkdir(parents=True, exist_ok=True)

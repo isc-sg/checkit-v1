@@ -47,8 +47,11 @@ def index(request):
     # logging.info("User {u} access to System Status".format(u=user_name))
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
-    state = obj.state
-    context = {'system_state': state}
+    if obj is not None:
+        state = obj.state
+        context = {'system_state': state}
+    else:
+        context = {'system_state': "RUN COMPLETED"}
     return HttpResponse(template.render(context, request))
 
 
@@ -116,7 +119,10 @@ def scheduler(request):
     template = loader.get_template('main_menu/scheduler.html')
     # get the actual state from the engine here and pass it to context
     obj = EngineState.objects.last()
-    state = obj.state
+    if obj is not None:
+        state = obj.state
+    else:
+        state = "RUN COMPLETED"
     license_obj = Licensing.objects.last()
     run_schedule = license_obj.run_schedule
     context = {'system_state': state, 'run_schedule': run_schedule}
@@ -301,7 +307,7 @@ def export_logs_to_csv(request):
                     camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
                     for c in camera:
-                        base_image = settings.MEDIA_ROOT + "/base_images/" + c.slug + "/" + hour + ".jpg"
+                        base_image = settings.MEDIA_ROOT + "/base_images/" + str(c.id) + "/" + hour + ".jpg"
                     matching_score = log.matching_score
                     image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
                                        log.action, log_image))
