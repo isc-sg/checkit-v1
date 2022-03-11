@@ -30,10 +30,10 @@ class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
         if not change:
             # only set owner when object is first created
-            print("not changed", obj.id)
-            print(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
+            # print("not changed", obj.id)
+            # print(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
             if not os.path.isdir(f'{settings.MEDIA_ROOT}/base_images/{obj.id}'):
-                print("directory doesnt exists")
+                # print("directory doesnt exists")
                 os.mkdir(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
         # else:
         #     print("changed", obj.id)
@@ -42,10 +42,10 @@ class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         #     new_name = slugify(form.data['camera_name'])
         #     shutil.move(f'{settings.MEDIA_ROOT}/base_images/{obj.slug}',
         #                 f'{settings.MEDIA_ROOT}/base_images/{new_name}')
-        print("New id is", obj.id)
+        # print("New id is", obj.id)
 
     def delete_model(self, request, obj):
-        print(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
+        # print(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
         try:
             shutil.rmtree(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
         except OSError:
@@ -54,7 +54,7 @@ class CameraAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
     def delete_queryset(self, request, queryset):
         for camera in queryset:
-            print(camera.id)
+            # print(camera.id)
             try:
                 shutil.rmtree(f'{settings.MEDIA_ROOT}/base_images/{camera.id}')
             except OSError:
