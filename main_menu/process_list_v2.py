@@ -12,13 +12,15 @@ import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 from mysql.connector import errorcode
 import multiprocessing as mp
+from multiprocessing.pool import ThreadPool as Pool
+# use ThreadPool instead of Pool due to cython compile error see link below
+# https://stackoverflow.com/questions/8804830/python-multiprocessing-picklingerror-cant-pickle-type-function
 import subprocess
 from passlib.hash import sha512_crypt
 import logging
 import requests
 
-
-import select_region as select_region
+import select_region
 
 # list_to_process = 3573
 # list_to_process = sys.argv[1].split(",")
@@ -434,7 +436,7 @@ def process_list(x):
                 # capture_device = cv2.VideoCapture(current_record[camera_url_index])
                 capture_device = cv2.VideoCapture(current_record[camera_url_index], cv2.CAP_FFMPEG)
             except cv2.error as err:
-                logging.error(f"Error reading video {e}")
+                logging.error(f"Error reading video {err}")
             # print("read frame")
             ret, image_frame = capture_device.read()
 
@@ -451,7 +453,7 @@ def process_list(x):
                 try:
                     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
                 except OSError as error:
-                    logging.error(f"Error saving log file {e}")
+                    logging.error(f"Error saving log file {error}")
 
                 cv2.imwrite(log_image_file_name, image_frame)
                 # write the log file - create variable to store in DB
@@ -462,7 +464,7 @@ def process_list(x):
                     capture_dimensions = image_frame_grey.shape[:2]
                     status = "success"
                 except cv2.error as err:
-                    logging.error(f"Error in converting image {e}")
+                    logging.error(f"Error in converting image {err}")
                     status = "failed"
 
 
@@ -563,7 +565,7 @@ def process_list(x):
 def main(list_to_process):
     logging.info(f"Processing list {list_to_process}")
     mp.set_start_method("fork")
-    with mp.Pool(32, initializer=init_pools) as p:
+    with Pool(32, initializer=init_pools) as p:
         p.map(process_list, list_to_process)
     p.close()
     p.join()

@@ -1,5 +1,4 @@
 import datetime
-import time
 import subprocess
 import csv
 import os
@@ -17,7 +16,6 @@ from django_filters.views import FilterView
 from django.core.exceptions import *
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from django.conf import settings
 from django.views.decorators.cache import cache_control
 
@@ -26,11 +24,11 @@ from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage
 from .tables import CameraTable, LogTable, EngineStateTable
 from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter
-import select_region as select_region
+import main_menu.select_region as select_region
 
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import mm, inch, cm
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor
 
 logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s',

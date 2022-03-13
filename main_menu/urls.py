@@ -3,8 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
-from . import views
-
+from main_menu import views
 
 urlpatterns = [
     path('', views.index, name='home'),

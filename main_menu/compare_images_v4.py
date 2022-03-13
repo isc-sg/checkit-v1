@@ -2,14 +2,11 @@ import datetime
 import os
 
 from sys import exit
-import sys
 
 import mysql.connector
-import cython
 from mysql.connector import errorcode
 import subprocess
 from passlib.hash import sha512_crypt
-import multiprocessing
 import process_list_v2
 import logging
 from logging.handlers import RotatingFileHandler
