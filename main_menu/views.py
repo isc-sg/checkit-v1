@@ -134,8 +134,10 @@ def scheduler(request):
         # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
         process_output = subprocess.check_output(["/home/checkit/env/bin/python",
                                                   "/home/checkit/camera_checker/main_menu/start.py"])
-        logging.info("Process Output", process_output)
-        time.sleep(2)
+        if process_output.decode() == '':
+            process_output = "Run Completed - No errors reported"
+        logging.info("Process Output {p}".format(p=process_output))
+
         return HttpResponseRedirect(reverse(index))
     if request.method == 'POST' and 'new_run' in request.POST:
         new_run_schedule = request.POST.get('new_run')
@@ -179,8 +181,10 @@ def scheduler(request):
         process_output = subprocess.check_output(["/home/checkit/env/bin/python",
                                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number])
         logging.info("User {u} completed camera check for camera {c}".format(u=user_name, c=camera_number))
-        logging.info("Process Output", process_output)
-        time.sleep(2)
+        # logging.info("Process Output", process_output)
+        if process_output.decode() == '':
+            process_output = "Run Completed - No errors reported"
+        logging.info("Process Output {p}".format(p=process_output))
         return HttpResponseRedirect(reverse(index))
     return HttpResponse(template.render(context, request))
 
