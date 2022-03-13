@@ -41,15 +41,14 @@ class Camera(models.Model):
     url = models.CharField(max_length=300, unique=True, verbose_name="Camera URL")
     # image = models.ImageField(upload_to='base_images/')
     camera_number = models.IntegerField(null=False, blank=False, unique=True,
-                                        validators=[
-                                          MaxValueValidator(100000),
-
-                                          MinValueValidator(1)])
+                                        validators=[MaxValueValidator(100000), MinValueValidator(1)])
     camera_name = models.CharField(max_length=100, null=False, blank=False, unique=True)
     slug = models.SlugField(max_length=100, null=True, blank=False, unique=True, verbose_name="URL friendly name")
     camera_location = models.CharField(max_length=100)
     image_regions = models.CharField(max_length=300, default="[]")
-    matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0.5)
+    matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
+                                             validators=[MaxValueValidator(1), MinValueValidator(0)],
+                                             default=0.5)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     history = HistoricalRecords()
