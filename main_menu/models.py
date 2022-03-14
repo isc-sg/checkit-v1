@@ -38,7 +38,7 @@ class CameraURLField(models.URLField):
 
 
 class Camera(models.Model):
-    url = models.CharField(max_length=300, unique=True, verbose_name="Camera URL")
+    url = models.CharField(max_length=255, unique=True, verbose_name="Camera URL")
     # image = models.ImageField(upload_to='base_images/')
     camera_number = models.IntegerField(null=False, blank=False, unique=True,
                                         validators=[MaxValueValidator(100000), MinValueValidator(1)])
