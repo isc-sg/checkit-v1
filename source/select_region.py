@@ -75,13 +75,13 @@ def draw_grid(c_list, img, h, w):
 
         # Putting the image back to its position
         img[y:y + qh, x:x + qw] = res
-        resized_image = img
-        if h > 640:
-            scaling_factor = round(540 / h, 2)
-            # resized_image = cv2.resize(img, (int(scaling_factor * w), int(scaling_factor * w)), cv2.INTER_AREA)
-            resized_image = cv2.resize(img, (960, 720), cv2.INTER_AREA)
+        # resized_image = img
+        # if h > 640:
+        #     scaling_factor = round(540 / h, 2)
+        #     # resized_image = cv2.resize(img, (int(scaling_factor * w), int(scaling_factor * w)), cv2.INTER_AREA)
+        #     resized_image = cv2.resize(img, (960, 720), cv2.INTER_AREA)
 
-    return resized_image
+    return img
 
 
 # region = ['1', '3', '5', '29', '8', '11', '24', '44', '55', '64']

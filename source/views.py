@@ -5,8 +5,9 @@ import os
 import io
 import base64
 import logging
-
+from bisect import bisect_left
 import cv2
+
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
@@ -33,6 +34,55 @@ from reportlab.lib.colors import HexColor
 
 logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s',
                     level=logging.INFO)
+
+
+def take_closest(my_list, my_number):
+    """
+    Assumes my_list is sorted. Returns closest value to my_number.
+
+    If two numbers are equally close, return the smallest number.
+    """
+    pos = bisect_left(my_list, my_number)
+    if pos == 0:
+        return my_list[0]
+    if pos == len(my_list):
+        return my_list[-1]
+    before = my_list[pos - 1]
+    after = my_list[pos]
+    if after - my_number < my_number - before:
+        return after
+    else:
+        return before
+    
+    
+def get_base_image(reference_images_list, url_id, regions):
+    time_stamp = datetime.datetime.now()
+    hour = time_stamp.strftime('%H')
+    hours = []
+    for record in reference_images_list:
+        hours.append(record.hour)
+    for i in range(0, len(hours)):
+        hours[i] = int(hours[i])
+    hour = int(hour)
+    hours.sort()
+
+    closest_hour = take_closest(hours, hour)
+    closest_hour = str(closest_hour).zfill(2)
+
+    closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour)
+    image = closest_reference_image.image
+    base_image_file = settings.MEDIA_ROOT + "/" + str(image)
+    img = cv2.imread(base_image_file)
+
+    regions = eval(regions)
+    height, width, channels = img.shape
+
+    co_ordinates = select_region.get_coordinates(regions, height, width)
+
+    image = select_region.draw_grid(co_ordinates, img, height, width)
+
+    img_cv2_converted_to_binary = cv2.imencode('.jpg', image)[1]
+    return base64.b64encode(img_cv2_converted_to_binary).decode('utf-8')
 
 
 def coord(x, y, h, unit=1):
@@ -420,102 +470,71 @@ def export_logs_to_csv(request):
 
 
 @permission_required('camera_checker.main_menu')
-def display_image_in_page_from_memory(request, camera_number):
-    try:
-        camera_object = Camera.objects.get(camera_number=camera_number)
-    except ObjectDoesNotExist as error:
-        form = RegionsForm()
-        camera_number = "<h1 style=\"color: #FFFFFF\">Camera not found</h1>"
-        return HttpResponse(camera_number)
-        # return render(request, 'main_menu/regions.html', {'form': form, 'camera_number': camera_number})
-    else:
-        time_stamp = datetime.datetime.now()
-        hour = time_stamp.strftime('%H')
+def input_camera_for_regions(request):
+    user_name = request.user.username
+    logging.info("User {u} access to Regions".format(u=user_name))
 
-        reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
-        if reference_images:
-            hours = []
-            # TODO: need error checking if there are no reference images
-            for record in reference_images:
-                hours.append(record.hour)
-            for i in range(0, len(hours)):
-                hours[i] = int(hours[i])
-            hour = int(hour)
-            absolute_difference_function = lambda list_value: abs(list_value - hour)
-            closest_hour = min(hours, key=absolute_difference_function)
-            closest_hour = str(closest_hour).zfill(2)
+    if request.method == 'POST':
 
-            reference_images = ReferenceImage.objects.get(url_id=camera_object.id, hour=closest_hour)
-            image = reference_images.image
-            img = cv2.imread(os.path.join(settings.MEDIA_ROOT, str(image)))
+        try:
+            camera_number = request.POST.get('camera_number')
+            camera_object = Camera.objects.get(camera_number=camera_number)
             regions = camera_object.image_regions
-            regions = eval(regions)
-            height, width, channels = img.shape
+            if regions == "":
+                regions = "[]"
 
-            co_ordinates = select_region.get_coordinates(regions, height, width)
+        except ObjectDoesNotExist:
+            message = "Camera Not Found"
+            return render(request, 'main_menu/regions.html', {'message': message})
 
-            image = select_region.draw_grid(co_ordinates, img, height, width)
-            resized_image = cv2.resize(image, (960, 720), cv2.INTER_AREA)
-            img_cv2_converted_to_string = cv2.imencode('.jpg', resized_image)[1]
-            image_base64 = base64.b64encode(img_cv2_converted_to_string).decode('utf-8')
-            data_uri = 'data:image/jpg;base64,'
-            data_uri += str(image_base64)
-            img_string = "<img src=" + "\"" + data_uri + "\"" + "/>"
-            return HttpResponse(img_string)
+        initial_data = {'regions': eval(regions)}
+        form = RegionsForm(initial=initial_data)
+
+        url_id = camera_object.id
+        reference_images = ReferenceImage.objects.filter(url_id=url_id)
+        
+        if reference_images:
+            base64_image = get_base_image(reference_images, url_id, regions)
+            context = {
+                'form': form,
+                'camera_number': camera_number,
+                'image': base64_image
+                      }
+            return render(request, 'main_menu/regions_main_form.html', context=context)
         else:
-            camera_number = "<h1 style=\"color: #FFFFFF\">No Reference Images</h1>"
-            return HttpResponse(camera_number)
+            message = "No reference images for this camera"
+            return render(request, 'main_menu/regions.html', {'message': message})
+    else:
+        message = ""
+        return render(request, 'main_menu/regions.html', {'message': message})
 
 
 @permission_required('camera_checker.main_menu')
-def display_image_grid_regions(request):
-    user_name = request.user.username
-    logging.info("User {u} access to Scheduler".format(u=user_name))
-    template = loader.get_template('main_menu/regions.html')
-    if request.method == 'POST':
-        # create a form instance and populate it with data from the request:
+def display_regions(request):
+    if request.method == "POST":
         form = RegionsForm(request.POST)
-        # check whether it's valid:
         if form.is_valid():
-            if 'camera_number' in request.POST and 'returned_camera' not in request.POST:
-                if request.POST.get('camera_number') != '':
-                    try:
-                        camera_number = request.POST.get('camera_number')
-                        camera_object = Camera.objects.get(camera_number=camera_number)
-                        regions = camera_object.image_regions
-                        if regions == "":
-                            regions = "[0]"
-                        initial_data = {'regions': eval(regions)}
-                        form = RegionsForm(initial=initial_data)
-                        mydict = {
-                            'form': form,
-                            'camera_number': camera_number
-                        }
+            regions = str(form.cleaned_data['regions'])
+            camera_number = request.POST.get('camera_number')
+            camera_object = Camera.objects.get(camera_number=camera_number)
+            camera_object.image_regions = regions
+            camera_object.save()
 
-                        return render(request, 'main_menu/regions.html', context=mydict)
+            initial_data = {'regions': eval(regions)}
+            form = RegionsForm(initial=initial_data)
 
-                    except ObjectDoesNotExist:
-                        return render(request, 'main_menu/regions.html', {'form': form})
-                    # else:
-                    #     form = RegionsForm
-                    #     print("at the else")
-                    #     return render(request, 'main_menu/regions.html', {'form': form, 'camera_number': camera_number})
-            else:
-                regions = form.cleaned_data['regions']
-                camera_number = request.POST.get('camera_number')
-                camera_object = Camera.objects.get(camera_number=camera_number)
-                camera_object.image_regions = regions
-                camera_object.save()
-                # template = loader.get_template('main_menu/saved.html')
-                return render(request, 'main_menu/regions.html', {'form': form, 'camera_number': camera_number})
+            url_id = camera_object.id
+            reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
 
-    # if a GET (or any other method) we'll create a blank form
+            if reference_images:
+                base64_image = get_base_image(reference_images, url_id, regions)
+                context = {
+                    'form': form,
+                    'camera_number': camera_number,
+                    'image': base64_image
+                }
+                return render(request, 'main_menu/regions_main_form.html', context=context)
+
     else:
-        form = RegionsForm()
-    # print("rendering", form)
-    return render(request, 'main_menu/regions.html', {'form': form})
-
-
-def test(request):
-    form = RegionsForm
-    return render(request, 'main_menu/test.html', {'form': form})
+        message = ""
+        return render(request, 'main_menu/regions.html', {'message': message})

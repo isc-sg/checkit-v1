@@ -17,7 +17,6 @@ class RegionsForm(forms.Form):
     regions = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple(), choices=REGIONS)
 
 
-
 class TestForm(forms.Form):
     image_regions = forms.MultipleChoiceField(
         choices=REGIONS,

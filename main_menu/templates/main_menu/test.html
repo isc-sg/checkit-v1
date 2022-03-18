@@ -142,40 +142,8 @@
     <div class="main-panel">
         <div class="content">
             <div class="row">
-                {%if camera_number %}
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="title">Image Regions</h5>
-                            <iframe width="1000" height="900" frameborder="0"
-                                    src="{% url 'ref_image' camera_number %}"></iframe>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card card-user">
-                        <div class="card-body">
-                        </div>
-            <div class="list-group list-group-horizontal">
-                <form action="/test/" method="post">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <input type="submit" value="Submit">
-                </form>
-            </div>
-                    </div>
+                <img src="data:image/png;base64, {{image}}">
 
-                </div>
-                {% else %}
-                <div>
-                    <form method="post">
-                        {% csrf_token %}
-                        <label>Enter Camera Number</label>
-                        <input type="number" class="form-control" name="camera_number" tabindex="1">
-                        <h3></h3>
-                    </form>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>

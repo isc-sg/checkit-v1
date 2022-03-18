@@ -15,12 +15,10 @@ urlpatterns = [
     path("state/", views.EngineStateView.as_view()),
     path('license/', views.licensing, name='licensing'),
     path("date/", views.get_date, name='date'),
-    path("test/", views.test, name='test'),
+    path("display_regions/", views.display_regions, name='test'),
     path("export/", views.export_logs_to_csv, name='export csv logs'),
     path("images/", views.compare_images, name="images"),
-    path('show_ref/<int:camera_number>/', views.display_image_in_page_from_memory, name='ref_image'),
-    path('regions/', views.display_image_grid_regions, name='regions'),
-
+    path('regions/', views.input_camera_for_regions, name='regions'),
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()
 urlpatterns += [
