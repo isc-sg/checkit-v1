@@ -7,6 +7,7 @@ import base64
 import logging
 from bisect import bisect_left
 import cv2
+import numpy as np
 
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.template import loader
@@ -35,6 +36,11 @@ from reportlab.lib.colors import HexColor
 logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s',
                     level=logging.INFO)
 
+error_image = np.zeros((720, 1280, 3), np.uint8)
+
+error_image = cv2.putText(error_image, "Error retrieving image",
+                              (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
+                              (0, 0, 255), 2, cv2.LINE_AA)
 
 def take_closest(my_list, my_number):
     """
@@ -68,18 +74,22 @@ def get_base_image(reference_images_list, url_id, regions):
 
     closest_hour = take_closest(hours, hour)
     closest_hour = str(closest_hour).zfill(2)
+    try:
+        closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour)
 
-    closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour)
-    image = closest_reference_image.image
-    base_image_file = settings.MEDIA_ROOT + "/" + str(image)
-    img = cv2.imread(base_image_file)
+        image = closest_reference_image.image
+        base_image_file = settings.MEDIA_ROOT + "/" + str(image)
+        img = cv2.imread(base_image_file)
 
-    regions = eval(regions)
-    height, width, channels = img.shape
+        regions = eval(regions)
+        height, width, channels = img.shape
 
-    co_ordinates = select_region.get_coordinates(regions, height, width)
+        co_ordinates = select_region.get_coordinates(regions, height, width)
 
-    image = select_region.draw_grid(co_ordinates, img, height, width)
+        image = select_region.draw_grid(co_ordinates, img, height, width)
+
+    except ObjectDoesNotExist:
+        image = error_image
 
     img_cv2_converted_to_binary = cv2.imencode('.jpg', image)[1]
     return base64.b64encode(img_cv2_converted_to_binary).decode('utf-8')
@@ -492,7 +502,6 @@ def input_camera_for_regions(request):
 
         url_id = camera_object.id
         reference_images = ReferenceImage.objects.filter(url_id=url_id)
-        
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
             context = {
