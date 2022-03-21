@@ -7,7 +7,6 @@ from .models import Camera, LogImage, EngineState
 
 
 class CameraTable(tables.Table):
-    last_check_date = tables.DateTimeColumn(format='d M Y, h:i A')
     url = tables.Column(verbose_name="IP Address", attrs={
         "td": {
             "width": 150, "align": "center"
@@ -20,10 +19,11 @@ class CameraTable(tables.Table):
         "td": {
             "width": 200, "align": "center"
         }})
-    last_check_date = tables.Column(attrs={
+    last_check_date = tables.DateTimeColumn(format='d M Y, h:i A', attrs={
         "td": {
             "width": 200, "align": "left"
         }})
+
 
     def render_url(self, value):
         return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
@@ -42,24 +42,30 @@ class LogTable(tables.Table):
             "width": 200, "align": "left"
         }})
     camera_name = tables.Column(accessor='url.camera_name')
+
     camera_number = tables.Column(accessor='url.camera_number', attrs={
         "td": {
             "width": 150, "align": "center"
         }})
     camera_location = tables.Column(accessor='url.camera_location')
+
     matching_score = tables.Column(attrs={
         "td": {
             "width": 150, "align": "center"
         }})
+
     focus_value = tables.Column(attrs={
         "td": {
             "width": 150, "align": "center"
         }})
+
     matching_threshold = tables.Column(accessor='url.matching_threshold')
+
     action = tables.Column(visible=True, verbose_name="Status", attrs={
         "td": {
             "width": 150, "align": "center"
         }})
+
     image = tables.Column(visible=False)
     reference_image = tables.Column(accessor='url.image', visible=False)
     display_image = TemplateColumn(template_name='main_menu/display_reference_and_capture_button.html', attrs={
