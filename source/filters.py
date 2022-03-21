@@ -1,7 +1,7 @@
 from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, RangeFilter, NumberFilter, CharFilter
 from django_filters.widgets import RangeWidget
 from .models import LogImage, EngineState, Camera
-from django.forms.widgets import TextInput, Textarea
+from django.forms.widgets import TextInput, NumberInput
 from django.forms import widgets
 
 
@@ -12,10 +12,13 @@ STATE_CHOICES = (('RUN COMPLETED', 'Finished'), ('STARTED', 'Started'), ('ERROR'
 
 
 class CameraFilter(FilterSet):
-    camera_name = CharFilter(lookup_expr='icontains')
-    url = CharFilter(lookup_expr='icontains')
-    camera_location = CharFilter(lookup_expr='icontains')
-    matching_threshold = NumberFilter()
+    camera_name = CharFilter(lookup_expr='icontains',
+                             widget=TextInput(attrs={'size': '13'}))
+    url = CharFilter(lookup_expr='icontains',
+                     widget=TextInput(attrs={'size': '13'}))
+    camera_location = CharFilter(lookup_expr='icontains',
+                                 widget=TextInput(attrs={'size': '13'}))
+    matching_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
     last_check_date = DateRangeFilter()
 
     class Meta:

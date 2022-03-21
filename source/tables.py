@@ -8,7 +8,22 @@ from .models import Camera, LogImage, EngineState
 
 class CameraTable(tables.Table):
     last_check_date = tables.DateTimeColumn(format='d M Y, h:i A')
-    url = tables.Column(verbose_name="IP Address")
+    url = tables.Column(verbose_name="IP Address", attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+    camera_number = tables.Column(attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+    matching_threshold = tables.Column(attrs={
+        "td": {
+            "width": 200, "align": "center"
+        }})
+    last_check_date = tables.Column(attrs={
+        "td": {
+            "width": 200, "align": "left"
+        }})
 
     def render_url(self, value):
         return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
@@ -22,16 +37,35 @@ class CameraTable(tables.Table):
 
 
 class LogTable(tables.Table):
-    creation_date = tables.DateTimeColumn(format='d M Y, h:i A')
+    creation_date = tables.DateTimeColumn(format='d M Y, h:i A', attrs={
+        "td": {
+            "width": 200, "align": "left"
+        }})
     camera_name = tables.Column(accessor='url.camera_name')
-    camera_number = tables.Column(accessor='url.camera_number')
+    camera_number = tables.Column(accessor='url.camera_number', attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
     camera_location = tables.Column(accessor='url.camera_location')
-    matching_score = tables.Column()
+    matching_score = tables.Column(attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+    focus_value = tables.Column(attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
     matching_threshold = tables.Column(accessor='url.matching_threshold')
-    action = tables.Column(visible=True, verbose_name="Status")
+    action = tables.Column(visible=True, verbose_name="Status", attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
     image = tables.Column(visible=False)
     reference_image = tables.Column(accessor='url.image', visible=False)
-    display_image = TemplateColumn(template_name='main_menu/display_reference_and_capture_button.html')
+    display_image = TemplateColumn(template_name='main_menu/display_reference_and_capture_button.html', attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
 
     class Meta:
         model = LogImage
@@ -45,7 +79,13 @@ class LogTable(tables.Table):
 
 class EngineStateTable(tables.Table):
     selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
-                                      attrs={"th__input": {"onclick": "toggle(this)"}})
+                                      attrs={"td": {
+                                             "width": 50, "align": "center"
+                                             }, "th__input": {"onclick": "toggle(this)"}})
+    state = tables.Column(attrs={
+        "td": {
+            "width": 250, "align": "center"
+        }})
     state_timestamp = tables.DateTimeColumn(format='d M Y, h:i A')
     number_failed_images = tables.Column(verbose_name="Number of failed images")
 
