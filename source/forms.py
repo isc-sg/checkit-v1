@@ -15,12 +15,3 @@ class DateForm(forms.Form):
 
 class RegionsForm(forms.Form):
     regions = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple(), choices=REGIONS)
-
-
-class SimpleNumberFrom(forms.Form):
-    class Meta:
-        model = EngineState
-        fields = ('number_failed_images',)
-        widgets = {
-            'number_failed_images': forms.NumberInput(attrs={'size': '5'}),
-        }
