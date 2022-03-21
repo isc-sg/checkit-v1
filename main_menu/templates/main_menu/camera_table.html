@@ -1,7 +1,7 @@
 <!doctype html>
 {% load render_table from django_tables2 %}
 {% load bootstrap4 %}
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
 
 <head>
     {% load static %}
@@ -143,9 +143,13 @@
             {% if filter %}
             <form action="" method="get" class="form form-inline">
                 {% bootstrap_form filter.form layout='inline' %}
-                {% bootstrap_button 'filter' %}
+                {% bootstrap_button 'Filter' %}
+                <a>   </a>
+                <a class="btn btn-secondary" href="{% url 'cameras' %}">Reset</a>
+
             </form>
             {% endif %}
+
             {% render_table table 'django_tables2/bootstrap.html' %}
         </div>
     </div>

@@ -1,7 +1,7 @@
 import bootstrap_datepicker_plus
 from django import forms
 from bootstrap_datepicker_plus import DatePickerInput
-from .models import Camera
+from .models import Camera, EngineState
 
 REGIONS = []
 for i in range(1,65):
@@ -17,12 +17,10 @@ class RegionsForm(forms.Form):
     regions = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple(), choices=REGIONS)
 
 
-class TestForm(forms.Form):
-    image_regions = forms.MultipleChoiceField(
-        choices=REGIONS,
-        widget=forms.CheckboxSelectMultiple()
-    )
-
+class SimpleNumberFrom(forms.Form):
     class Meta:
-        model = Camera
-        fields = ('image_regions',)
+        model = EngineState
+        fields = ('number_failed_images',)
+        widgets = {
+            'number_failed_images': forms.NumberInput(attrs={'size': '5'}),
+        }

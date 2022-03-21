@@ -2,6 +2,7 @@ import re
 
 import django_tables2 as tables
 from django_tables2 import TemplateColumn
+from django.utils.html import format_html
 from .models import Camera, LogImage, EngineState
 
 
@@ -46,6 +47,14 @@ class EngineStateTable(tables.Table):
     selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
                                       attrs={"th__input": {"onclick": "toggle(this)"}})
     state_timestamp = tables.DateTimeColumn(format='d M Y, h:i A')
+    number_failed_images = tables.Column(verbose_name="Number of failed images")
+
+    def render_number_failed_images(self, value, column):
+        if value > 0:
+            column.attrs = {'td': {'bgcolor': '#5603ad', "width": 200, "align": "center"}}
+        else:
+            column.attrs = {'td': {"width": 200, "align": "center"}}
+        return value
 
     class Meta:
         model = EngineState
