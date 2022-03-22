@@ -149,7 +149,7 @@
                         {% csrf_token %}
 
                         <label>Enter Camera Number</label>
-                        <input type="text" class="form-control" name="camera_number" tabindex="1" value="{{camera_number}}">
+                        <input type="number" class="form-control" name="camera_number" required min = 1 tabindex="1" value="{{camera_number}}">
                         {% if message %}
                         <a style="color: #FF0000">{{message}}</a>
                         {% endif %}
