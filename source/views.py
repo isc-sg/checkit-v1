@@ -327,9 +327,12 @@ def export_logs_to_csv(request):
             if EngineState.objects.get(id=i).state != "RUN COMPLETED":
                 selection.remove(i)
             else:
-                previous_record = current_record.get_previous_by_state_timestamp()
-                # print(previous_record.id, previous_record.state_timestamp)
-                start = previous_record.state_timestamp
+                try:
+                    previous_record = current_record.get_previous_by_state_timestamp()
+                    # print(previous_record.id, previous_record.state_timestamp)
+                    start = previous_record.state_timestamp
+                except ObjectDoesNotExist:
+                    start = current_record.state_timestamp
                 end = current_record.state_timestamp
                 logs = LogImage.objects.filter(creation_date__range=(start, end))
                 for log in logs:
