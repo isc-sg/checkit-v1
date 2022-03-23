@@ -498,7 +498,7 @@ def input_camera_for_regions(request):
                 regions = "[]"
 
         except ObjectDoesNotExist:
-            message = "Camera Not Found"
+            message = "Camera does not exist"
             return render(request, 'main_menu/regions.html', {'message': message})
 
         initial_data = {'regions': eval(regions)}
