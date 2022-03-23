@@ -37,6 +37,16 @@
 }
 
 
+      ::placeholder {
+        color: red;
+        opacity: 1;
+      }
+      :placeholder-shown {
+        border: 1px solid red;
+      }
+
+
+
     </style>
 </head>
 
@@ -149,10 +159,14 @@
                         {% csrf_token %}
 
                         <label>Enter Camera Number</label>
-                        <input type="number" class="form-control" name="camera_number" required min = 1 tabindex="1" value="{{camera_number}}">
                         {% if message %}
-                        <a style="color: #FF0000">{{message}}</a>
+                                <input type="number" style="::placeholder {color: red;};"
+                                       placeholder="{{message}}" class="form-control"
+                                       name="camera_number" required min=1 >
+                        {% else %}
+                                <input type="number" class="form-control" name="camera_number" required min=1 >
                         {% endif %}
+
                     </form>
                 </div>
             </div>
