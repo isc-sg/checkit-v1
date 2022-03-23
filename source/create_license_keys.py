@@ -113,7 +113,7 @@ try:
     admin_cursor.execute(sql_statement)
     sql_statement = "CREATE TABLE adm (id SMALLINT NOT NULL AUTO_INCREMENT, " \
                     "tx_count INT, tx_limit INT, end_date DATE, " \
-                    "license_key VARCHAR(256), email VARCHAR(128), PRIMARY KEY (id))"
+                    "license_key VARCHAR(256), email VARCHAR(128), PRIMARY KEY (id), camera_limit SMALLINT)"
     admin_cursor.execute(sql_statement)
     sql_statement = "ALTER TABLE adm ENCRYPTION = \'Y\'"
     admin_cursor.execute(sql_statement)
@@ -138,11 +138,21 @@ try:
         except ValueError:
             print("Please enter a valid date (format YYYY-MM-DD)")
 
+    while True:
+        try:
+            camera_limit = int(input("Enter camera limit: "))
+            # going to set upper limit of transactions to 9 million - based on 24x1000x365.  Agreed with MS 6/11/21
+            if camera_limit < 1:
+                raise ValueError
+            break
+        except ValueError:
+            print("Please enter a number greater than 1")
 
 
     try:
-        sql_statement = "INSERT INTO adm (tx_limit, tx_count, end_date, license_key, email) VALUES (%s, %s, %s, %s, %s)"
-        admin_cursor.execute(sql_statement, (transaction_limit, "0", end_date_string, license_key, email))
+        sql_statement = "INSERT INTO adm (tx_limit, tx_count, end_date, license_key, email, " \
+                        "camera_limit) VALUES (%s, %s, %s, %s, %s, %s)"
+        admin_cursor.execute(sql_statement, (transaction_limit, "0", end_date_string, license_key, email, camera_limit))
         admin_db.commit()
     except mysql.connector.Error as err:
         print(err)
@@ -166,8 +176,8 @@ try:
         checkit_cursor.execute(sql_statement, (start_date, end_date_string, transaction_limit, "0", license_key,
                                                license_owner, site_name, "0"))
         sql_statement = "INSERT INTO main_menu_enginestate " \
-                        "(state,transaction_rate, state_timestamp, engine_process_id) VALUES (%s, %s, %s, %s)"
-        checkit_cursor.execute(sql_statement, ("RUN COMPLETED", "0", start_date, "0"))
+                        "(state,transaction_rate, state_timestamp, engine_process_id, number_failed_images) VALUES (%s, %s, %s, %s, %s)"
+        checkit_cursor.execute(sql_statement, ("RUN COMPLETED", "0", start_date, "0", 0))
         checkit_db.commit()
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
