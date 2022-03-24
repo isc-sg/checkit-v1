@@ -1,6 +1,8 @@
+import os
 from import_export import resources
 from django.db import IntegrityError
 from import_export.admin import ImportExportModelAdmin
+from django.conf import settings
 
 from .models import Camera, ReferenceImage
 
@@ -21,6 +23,13 @@ class CameraResource(resources.ModelResource):
             super(CameraResource, self).save_instance(instance, using_transactions, dry_run)
         except IntegrityError:
             pass
+
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        # the model instance will have been saved at this point, and will have a pk
+        if not dry_run:
+            if not os.path.isdir(f'{settings.MEDIA_ROOT}/base_images/{instance.pk}'):
+                # print("directory doesnt exists")
+                os.mkdir(f'{settings.MEDIA_ROOT}/base_images/{instance.pk}')
 
 
 class ReferenceImageResource(resources.ModelResource):
