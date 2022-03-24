@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 
-def ssim(img1, img2):
+def movement(img1, img2):
     c1 = (0.01 * 255)**2
     c2 = (0.03 * 255)**2
 
@@ -23,27 +23,24 @@ def ssim(img1, img2):
     sigma2_sq = cv2.filter2D(img2**2, -1, window)[5:-5, 5:-5] - mu2_sq
     sigma12 = cv2.filter2D(img1 * img2, -1, window)[5:-5, 5:-5] - mu1_mu2
 
-    ssim_map = ((2 * mu1_mu2 + c1) * (2 * sigma12 + c2)) / ((mu1_sq + mu2_sq + c1) *
+    movement_map = ((2 * mu1_mu2 + c1) * (2 * sigma12 + c2)) / ((mu1_sq + mu2_sq + c1) *
                                                             (sigma1_sq + sigma2_sq + c2))
-    return ssim_map.mean()
+    return movement_map.mean()
 
 
-def calculate_ssim(img1, img2):
-    '''calculate SSIM
-    the same outputs as MATLAB's
-    img1, img2: [0, 255]
-    '''
+def calculate_movement(img1, img2):
+
     if not img1.shape == img2.shape:
         raise ValueError('Input images must have the same dimensions.')
     if img1.ndim == 2:
-        return ssim(img1, img2)
+        return movement(img1, img2)
     elif img1.ndim == 3:
         if img1.shape[2] == 3:
-            ssims = []
+            movements = []
             for i in range(3):
-                ssims.append(ssim(img1, img2))
-            return np.array(ssims).mean()
+                movements.append(movement(img1, img2))
+            return np.array(movements).mean()
         elif img1.shape[2] == 1:
-            return ssim(np.squeeze(img1), np.squeeze(img2))
+            return movement(np.squeeze(img1), np.squeeze(img2))
     else:
         raise ValueError('Wrong input image dimensions.')

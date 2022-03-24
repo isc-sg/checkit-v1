@@ -5,7 +5,6 @@ import pathlib
 import time
 
 from sys import exit
-# from skimage.metrics import structural_similarity as ssim
 import a_eye
 import cv2
 import mysql.connector
@@ -21,9 +20,6 @@ import logging
 import requests
 
 import select_region
-
-# list_to_process = 3573
-# list_to_process = sys.argv[1].split(",")
 
 
 def create_key(em):
@@ -189,10 +185,10 @@ def compare_images(base, frame, r):
     region_scores = {}
     coordinates = select_region.get_coordinates(all_regions, h, w)
     scores = []
-    # full_ss = ssim(base, frame)
+    # full_ss = movement(base, frame)
     frame_equalised = cv2.equalizeHist(frame)
     based_equalised = cv2.equalizeHist(base)
-    full_ss = a_eye.ssim(based_equalised, frame_equalised)
+    full_ss = a_eye.movement(based_equalised, frame_equalised)
     count = 0
     for i in coordinates:
         (x, y), (qw, qh) = i
@@ -203,7 +199,7 @@ def compare_images(base, frame, r):
         # cv2.waitKey(0)
         ss = 0
         try:
-            ss = a_eye.ssim(sub_img_base, sub_img_frame)
+            ss = a_eye.movement(sub_img_base, sub_img_frame)
         except Exception as e:
             print(e)
 
