@@ -28,7 +28,7 @@
 
 table.import-preview tr.skip {
   background-color: #d41515;
-  color: #000000
+  color: #000000;
 }
 
 table.import-preview tr.new {
@@ -36,11 +36,13 @@ table.import-preview tr.new {
 }
 
 table.import-preview tr.delete {
-  background-color: #f9bebf;
+  background-color: #ff5733;
+  color: #000000;
 }
 
 table.import-preview tr.update {
-  background-color: #fdfdcf;
+  background-color: #f7f716;
+  color: #000000;
 }
 
 .import-preview td:hover .validation-error-count {
