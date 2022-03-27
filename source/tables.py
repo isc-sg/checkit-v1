@@ -45,18 +45,18 @@ class LogTable(tables.Table):
 
     camera_number = tables.Column(accessor='url.camera_number', attrs={
         "td": {
-            "width": 150, "align": "center"
+            "width": 100, "align": "center"
         }})
     camera_location = tables.Column(accessor='url.camera_location')
 
     matching_score = tables.Column(attrs={
         "td": {
-            "width": 150, "align": "center"
+            "width": 140, "align": "center"
         }})
 
     focus_value = tables.Column(attrs={
         "td": {
-            "width": 150, "align": "center"
+            "width": 140, "align": "center"
         }})
 
     matching_threshold = tables.Column(accessor='url.matching_threshold')
@@ -90,7 +90,7 @@ class EngineStateTable(tables.Table):
                                              }, "th__input": {"onclick": "toggle(this)"}})
     state = tables.Column(attrs={
         "td": {
-            "width": 250, "align": "center"
+            "width": 150, "align": "center"
         }})
     state_timestamp = tables.DateTimeColumn(format='d M Y, h:i A')
     number_failed_images = tables.Column(verbose_name="Number of failed images")
