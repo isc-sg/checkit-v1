@@ -10,16 +10,32 @@ import cv2
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 from mysql.connector import errorcode
+from mysql.connector.errors import Error
 import multiprocessing as mp
 from multiprocessing.pool import ThreadPool as Pool
 # use ThreadPool instead of Pool due to cython compile error see link below
 # https://stackoverflow.com/questions/8804830/python-multiprocessing-picklingerror-cant-pickle-type-function
 import subprocess
+from wurlitzer import pipes
 from passlib.hash import sha512_crypt
 import logging
+from logging.handlers import RotatingFileHandler
 import requests
-
+import configparser
 import select_region
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
+                                               '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+                    handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
+                                                  maxBytes=10000000, backupCount=10)])
+
+config = configparser.ConfigParser()
+config.read('/home/checkit/camera_checker/main_menu/config/config.cfg')
+try:
+    network_interface = config['DEFAULT']['network_interface']
+except configparser.NoOptionError:
+    logging.error("Unable to read config file")
+    exit(0)
 
 
 def create_key(em):
@@ -76,6 +92,7 @@ pool_for_checkit = None
 pool_for_adm = None
 camera_id_index = None
 camera_url_index = None
+camera_multicast_address_index = None
 camera_number_index = None
 camera_name_index = None
 image_regions_index = None
@@ -91,6 +108,7 @@ def init_pools():
     global pool_for_adm
     global camera_id_index
     global camera_url_index
+    global camera_multicast_address_index
     global camera_number_index
     global camera_name_index
     global image_regions_index
@@ -120,6 +138,7 @@ def init_pools():
 
         camera_id_index = field_names.index('id')
         camera_url_index = field_names.index('url')
+        camera_multicast_address_index = field_names.index('multicast_address')
         camera_number_index = field_names.index('camera_number')
         camera_name_index = field_names.index('camera_name')
         image_regions_index = field_names.index('image_regions')
@@ -137,10 +156,10 @@ def init_pools():
 
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            print("Invalid password on main database")
+            logging.error("Invalid password on main database")
             exit(0)
         elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            print("Database not initialised")
+            logging.error("Database not initialised")
             exit(0)
 
     try:
@@ -157,11 +176,51 @@ def init_pools():
                                            **adm_db_config)
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            print("Invalid password")
+            logging.error(f"Invalid password")
             exit(0)
         elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            print("Database not initialised")
+            logging.error(f"Database not initialised")
             exit(0)
+
+
+def open_capture_device(record):
+    if record[camera_multicast_address_index]:
+
+        with pipes() as (out, err):
+            subprocess.call(['sudo', 'ip', 'addr', 'add',
+                             record[camera_multicast_address_index] + '/32', 'dev', network_interface, 'autojoin'])
+        error_output = err.read()
+        if error_output:
+            logging.error(f"Unable to join multicast group - {error_output}")
+
+        # try all 3 methods for rtsp_transport - this means users don't need to define the transport method
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+        cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+
+        if not cap.isOpened():
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
+            cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+
+        if not cap.isOpened():
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
+            cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+
+    else:
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+        cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+
+    return cap
+
+
+def close_capture_device(record, cap):
+    if record[camera_multicast_address_index]:
+        with pipes() as (out, err):
+            subprocess.call(['sudo', 'ip', 'addr', 'del',
+                             record[camera_multicast_address_index] + '/32', 'dev', network_interface])
+        error_output = err.read()
+        if error_output:
+            logging.error(f"Unable to leave multicast group - {error_output}")
+    cap.release()
 
 
 def look_for_objects(image):
@@ -201,7 +260,7 @@ def compare_images(base, frame, r):
         try:
             ss = a_eye.movement(sub_img_base, sub_img_frame)
         except Exception as e:
-            print(e)
+            logging.error(f"Failed to get movement data {e}")
 
         # scores.append(ss)
         # print("region", count, "score", round(ss, 2))
@@ -242,15 +301,10 @@ def no_base_image(record):
     # connection = connection_pool.get_connection()
     # checkit_cursor = connection.cursor()
     logging.debug(f"No base image for {record}")
-    try:
-        capture_device = cv2.VideoCapture(record[camera_url_index])
-        if not capture_device.isOpened():
-            raise NameError()
-    except cv2.error as e:
-        logging.error(f"cv2 error {e}")
-    except NameError:
-        logging.error(f"Unable to read camera {record[camera_number_index]} - {record[camera_name_index]}")
+    capture_device = open_capture_device(record)
 
+    if not capture_device.isOpened():
+        logging.error(f"unable to open capture device {record[camera_url_index]}")
         now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
 
         connected = False
@@ -271,8 +325,10 @@ def no_base_image(record):
             except mysql.connector.Error as e:
                 logging.error(f"Database connection error {e}")
                 connected = False
+            else:
+                close_capture_device(record, capture_device)
+                return
 
-        # TODO: This looks wrong - think else captures all other exceptions
     else:
         try:
             able_to_read, frame = capture_device.read()
@@ -314,7 +370,80 @@ def no_base_image(record):
                             connected = False
 
             except OSError as error:
-                print(error)
+                logging.error(f"Unable to create base image directory/file {error}")
+    # try:
+    #     capture_device = cv2.VideoCapture(record[camera_url_index])
+    #     if not capture_device.isOpened():
+    #         raise NameError()
+    # except cv2.error as e:
+    #     logging.error(f"cv2 error {e}")
+    # except NameError:
+    #     logging.error(f"Unable to read camera {record[camera_number_index]} - {record[camera_name_index]}")
+    #
+    #     now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    #
+    #     connected = False
+    #     while not connected:
+    #         try:
+    #             connection = pool_for_checkit.get_connection()
+    #             checkit_cursor = connection.cursor()
+    #
+    #             sql_statement = "INSERT INTO main_menu_logimage " \
+    #                             "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
+    #                             "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+    #             values = (str(record[camera_id_index]), "", "0", "0", "0", "0", "Capture Error", now)
+    #
+    #             checkit_cursor.execute(sql_statement, values)
+    #             connection.commit()
+    #             connection.close()
+    #             connected = True
+    #         except mysql.connector.Error as e:
+    #             logging.error(f"Database connection error {e}")
+    #             connected = False
+    #
+    #     # TODO: This looks wrong - think else captures all other exceptions
+    # else:
+    #     try:
+    #         able_to_read, frame = capture_device.read()
+    #         if not able_to_read:
+    #             raise NameError()
+    #     except cv2.error as e:
+    #         logging.error(f"cv2 error {e}")
+    #     except NameError:
+    #         logging.error(f"Unable to read camera {record[camera_number_index]} - {record[camera_name_index]}")
+    #     else:
+    #         logging.debug(f"Able to capture base image on {record[camera_name_index]}")
+    #         time_stamp = datetime.datetime.now()
+    #         file_name = "/home/checkit/camera_checker/media/base_images/" + str(record[camera_id_index]) + "/" + \
+    #                     time_stamp.strftime('%H') + ".jpg"
+    #         directory = "/home/checkit/camera_checker/media/base_images/" + str(record[camera_id_index])
+    #
+    #         try:
+    #             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+    #             if not os.path.isfile(file_name):
+    #                 cv2.imwrite(file_name, frame)
+    #
+    #                 connected = False
+    #                 while not connected:
+    #                     try:
+    #                         connection = pool_for_checkit.get_connection()
+    #                         checkit_cursor = connection.cursor()
+    #                         sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
+    #                         sql_statement = "INSERT INTO main_menu_referenceimage " \
+    #                                         "(url_id, image, hour)" \
+    #                                         " VALUES (%s,%s,%s)"
+    #                         values = (str(record[camera_id_index]), sql_file_name, time_stamp.strftime('%H'))
+    #                         checkit_cursor.execute(sql_statement, values)
+    #
+    #                         connection.commit()
+    #                         connection.close()
+    #                         connected = True
+    #                     except mysql.connector.Error as e:
+    #                         logging.error(f"Database connection error {e}")
+    #                         connected = False
+    #
+    #         except OSError as error:
+    #             print(error)
             # increment_transaction_count()
 
 
@@ -351,6 +480,7 @@ def increment_transaction_count():
 
 def process_list(x):
     connected = False
+    current_record = None
     while not connected:
         try:
             connection = pool_for_checkit.get_connection()
@@ -363,6 +493,7 @@ def process_list(x):
         except mysql.connector.Error as e:
             logging.error(f"Database connection error {e}")
             connected = False
+
     regions = current_record[image_regions_index]
 
     if regions == '0' or regions == "[]":
@@ -399,9 +530,11 @@ def process_list(x):
             no_base_image(current_record)
         else:
             connected = False
+
             while not connected:
                 try:
                     connection = pool_for_checkit.get_connection()
+                    # TODO change lamda function to that used in views.py
                     absolute_difference_function = lambda list_value: abs(list_value - hour)
                     closest_hour = min(int_hours, key=absolute_difference_function)
                     closest_hour = str(closest_hour).zfill(2)
@@ -428,16 +561,24 @@ def process_list(x):
             base_image = "/home/checkit/camera_checker/media/" + image
             # print("reading from camera", current_record[camera_name_index],
             #       current_record[camera_number_index], "and comparing with", base_image)
-            try:
-                # capture_device = cv2.VideoCapture(current_record[camera_url_index])
-                capture_device = cv2.VideoCapture(current_record[camera_url_index], cv2.CAP_FFMPEG)
-            except cv2.error as err:
-                logging.error(f"Error reading video {err}")
-            # print("read frame")
-            ret, image_frame = capture_device.read()
-
-            if ret:
+            # try:
+            #     # capture_device = cv2.VideoCapture(current_record[camera_url_index])
+            #     capture_device = cv2.VideoCapture(current_record[camera_url_index], cv2.CAP_FFMPEG)
+            # except cv2.error as err:
+            #     logging.error(f"Error reading video {err}")
+            # # print("read frame")
+            capture_device = open_capture_device(current_record)
+            able_to_read = False
+            if capture_device.isOpened():
+                able_to_read, image_frame = capture_device.read()
+                close_capture_device(current_record, capture_device)
+            else:
+                logging.error(f"Unable to open capture device {current_record[camera_url_index]}")
+            if able_to_read:
                 image_base = cv2.imread(base_image)
+                if image_base is None:
+                    logging.error(f"Base image is logged but unable to file {base_image}")
+                    exit()
                 time_stamp = datetime.datetime.now()
                 time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S.%f")
                 directory = "/home/checkit/camera_checker/media/logs/" + str(time_stamp.year) + "/" + \
@@ -451,81 +592,87 @@ def process_list(x):
                 except OSError as error:
                     logging.error(f"Error saving log file {error}")
 
-                cv2.imwrite(log_image_file_name, image_frame)
+                able_to_write = cv2.imwrite(log_image_file_name, image_frame)
+                capture_dimensions = image_frame.shape[:2]
+                reference_dimensions = ()
+                status = "failed"
+
+                if not able_to_write:
+                    logging.error(f"Unable to write log image {log_image_file_name}")
+
                 # write the log file - create variable to store in DB
-                try:
-                    image_base_grey = cv2.cvtColor(image_base, cv2.COLOR_BGR2GRAY)
-                    image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-                    reference_dimensions = image_base_grey.shape[:2]
-                    capture_dimensions = image_frame_grey.shape[:2]
-                    status = "success"
-                except cv2.error as err:
-                    logging.error(f"Error in converting image {err}")
-                    status = "failed"
-
-
-                # print(reference_dimensions, capture_dimensions)
-                if reference_dimensions != capture_dimensions or status == "failed":
-                    logging.error(f"Image sizes don't match on camera number {current_record[camera_number_index]}")
-                    # TODO: clean up below - replicated and no need
-                    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-                    sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
-                    sql_statement = "INSERT INTO main_menu_logimage " \
-                                    "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
-                                    "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
-                    values = (str(current_record[camera_id_index]), sql_file_name,
-                              "0", "{}", "0", "0", "Image Size Error", now)
-                    connected = False
-                    while not connected:
-                        try:
-                            connection = pool_for_checkit.get_connection()
-                            checkit_cursor = connection.cursor()
-                            checkit_cursor.execute(sql_statement, values)
-                            connection.commit()
-                            connection.close()
-                            connected = True
-                        except mysql.connector.Error as e:
-                            logging.error(f"Database connection error {e}")
-                            connected = False
-
-                    increment_transaction_count()
                 else:
-                    matching_score, focus_value, region_scores = compare_images(image_base_grey,
-                                                                                image_frame_grey, regions)
-                    sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
-                    if matching_score < current_record[matching_threshold_index]:
-                        action = "Failed"
+                    try:
+                        image_base_grey = cv2.cvtColor(image_base, cv2.COLOR_BGR2GRAY)
+                        image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
+                        reference_dimensions = image_base_grey.shape[:2]
+                        capture_dimensions = image_frame_grey.shape[:2]
+                        status = "success"
+                    except cv2.error as err:
+                        logging.error(f"Error in converting image {err}")
+                        status = "failed"
+
+                    if reference_dimensions != capture_dimensions or status == "failed":
+                        logging.error(f"Image sizes don't match on camera number {current_record[camera_number_index]}")
+                        # TODO: clean up below - replicated and no need
+                        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+                        sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+                        sql_statement = "INSERT INTO main_menu_logimage " \
+                                        "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
+                                        "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                        values = (str(current_record[camera_id_index]), sql_file_name,
+                                  "0", "{}", "0", "0", "Image Size Error", now)
+                        connected = False
+                        while not connected:
+                            try:
+                                connection = pool_for_checkit.get_connection()
+                                checkit_cursor = connection.cursor()
+                                checkit_cursor.execute(sql_statement, values)
+                                connection.commit()
+                                connection.close()
+                                connected = True
+                            except mysql.connector.Error as e:
+                                logging.error(f"Database connection error {e}")
+                                connected = False
+
+                        increment_transaction_count()
                     else:
-                        action = "Pass"
+                        matching_score, focus_value, region_scores = compare_images(image_base_grey,
+                                                                                    image_frame_grey, regions)
+                        sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+                        if matching_score < current_record[matching_threshold_index]:
+                            action = "Failed"
+                        else:
+                            action = "Pass"
 
-                    connected = False
-                    while not connected:
-                        try:
-                            connection = pool_for_checkit.get_connection()
-                            sql_statement = "INSERT INTO main_menu_logimage " \
-                                            "(url_id, image, matching_score, region_scores, " \
-                                            "current_matching_threshold, " \
-                                            "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
-                            values = (str(current_record[camera_id_index]), sql_file_name, float(matching_score),
-                                      json.dumps(region_scores),
-                                      float(current_record[matching_threshold_index]), float(focus_value),
-                                      action, time_stamp_string)
-                            checkit_cursor.execute(sql_statement, values)
-                            connection.commit()
+                        connected = False
+                        while not connected:
+                            try:
+                                connection = pool_for_checkit.get_connection()
+                                sql_statement = "INSERT INTO main_menu_logimage " \
+                                                "(url_id, image, matching_score, region_scores, " \
+                                                "current_matching_threshold, " \
+                                                "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                                values = (str(current_record[camera_id_index]), sql_file_name, float(matching_score),
+                                          json.dumps(region_scores),
+                                          float(current_record[matching_threshold_index]), float(focus_value),
+                                          action, time_stamp_string)
+                                checkit_cursor.execute(sql_statement, values)
+                                connection.commit()
 
-                            sql_statement = "UPDATE main_menu_camera SET  last_check_date = " + "\"" + \
-                                            time_stamp_string + "\"" + " WHERE id = " + "\"" + str(
-                                current_record[camera_id_index]) + "\""
+                                sql_statement = "UPDATE main_menu_camera SET  last_check_date = " + "\"" + \
+                                                time_stamp_string + "\"" + " WHERE id = " + "\"" + str(
+                                    current_record[camera_id_index]) + "\""
 
-                            checkit_cursor.execute(sql_statement)
-                            connection.commit()
-                            connection.close()
-                            connected = True
-                        except mysql.connector.Error as e:
-                            logging.error(f"Database connection error {e}")
-                            connected = False
+                                checkit_cursor.execute(sql_statement)
+                                connection.commit()
+                                connection.close()
+                                connected = True
+                            except mysql.connector.Error as e:
+                                logging.error(f"Database connection error {e}")
+                                connected = False
 
-                    increment_transaction_count()
+                        increment_transaction_count()
             else:
                 # print("unable to read")
                 connected = False
@@ -561,7 +708,7 @@ def process_list(x):
 def main(list_to_process):
     logging.info(f"Processing list {list_to_process}")
     mp.set_start_method("fork")
-    with Pool(32, initializer=init_pools) as p:
+    with Pool(16, initializer=init_pools) as p:
         p.map(process_list, list_to_process)
     p.close()
     p.join()

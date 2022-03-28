@@ -31,6 +31,7 @@ class CameraURLField(models.URLField):
                                          '[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))))'
                                          '+(:\d+)?(\/.+)*)$')]
 
+
     def formfield(self, **kwargs):
         return super(CameraURLField, self).formfield(**{
             'form_class': CameraURLFormField,
@@ -39,6 +40,7 @@ class CameraURLField(models.URLField):
 
 class Camera(models.Model):
     url = models.CharField(max_length=255, unique=True, verbose_name="Camera URL")
+    multicast_address = models.GenericIPAddressField(protocol='IPv4', blank=True, null=True, unique=True, default=None)
     # image = models.ImageField(upload_to='base_images/')
     camera_number = models.IntegerField(null=False, blank=False, unique=True,
                                         validators=[MaxValueValidator(100000), MinValueValidator(1)])

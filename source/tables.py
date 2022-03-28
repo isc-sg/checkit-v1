@@ -11,6 +11,10 @@ class CameraTable(tables.Table):
         "td": {
             "width": 150, "align": "center"
         }})
+    multicast_address = tables.Column(verbose_name="Multicast Address", attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
     camera_number = tables.Column(attrs={
         "td": {
             "width": 150, "align": "center"
@@ -31,7 +35,7 @@ class CameraTable(tables.Table):
     class Meta:
         model = Camera
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("camera_number", "camera_name", "camera_location", "url", "matching_threshold",
+        fields = ("camera_number", "camera_name", "camera_location", "url", "multicast_address", "matching_threshold",
                   "last_check_date")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
 

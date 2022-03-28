@@ -25,7 +25,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     resource_class = CameraResource
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
     exclude = ('id',)
-    list_display = ('camera_name', 'camera_number', 'url',
+    list_display = ('camera_name', 'camera_number', 'url', 'multicast_address',
                     'camera_location', 'matching_threshold',)
     readonly_fields = ["creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}

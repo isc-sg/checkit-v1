@@ -5,6 +5,7 @@ import os
 import io
 import base64
 import logging
+from logging.handlers import RotatingFileHandler
 from bisect import bisect_left
 import cv2
 import numpy as np
@@ -33,14 +34,17 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor
 
-logging.basicConfig(filename='/home/checkit/camera_checker/logs/checkit.log', format='%(asctime)s %(message)s',
-                    level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
+                                               '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+                    handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
+                                                  maxBytes=10000000, backupCount=10)])
 
 error_image = np.zeros((720, 1280, 3), np.uint8)
 
 error_image = cv2.putText(error_image, "Error retrieving image",
                               (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
                               (0, 0, 255), 2, cv2.LINE_AA)
+
 
 def take_closest(my_list, my_number):
     """
@@ -218,9 +222,8 @@ def scheduler(request):
                     command = "/bin/echo 0 0 \* \* \* /home/checkit/env/bin/python " \
                               "/home/checkit/camera_checker/main_menu/start.py | crontab -"
             subprocess.Popen(command, shell=True)
-            logging.info("User {u} modified run schedule to {n} hours from {o} hours".format(u=user_name,
-                                                                                             n=new_run_schedule,
-                                                                                             o=old_run_schedule))
+            logging.info(f"User {user_name} modified run schedule to {new_run_schedule}"
+                         f" hours from {old_run_schedule} hours")
         return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'camera_check' in request.POST:
         input_number = request.POST.get('camera_check')
@@ -238,8 +241,7 @@ def scheduler(request):
         #                                           camera_number])
         process_output = subprocess.check_output(["/home/checkit/env/bin/python",
                                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number])
-        logging.info("User {u} completed camera check for camera {c}".format(u=user_name, c=camera_number))
-        # logging.info("Process Output", process_output)
+        logging.info(f"User {user_name} completed camera check for camera {camera_number}")
         if process_output.decode() == '':
             process_output = "Run Completed - No errors reported"
         logging.info("Process Output {p}".format(p=process_output))
