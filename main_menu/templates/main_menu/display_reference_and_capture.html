@@ -30,7 +30,7 @@
 <body>
 
     {% if result == "Capture Error" %}
-    <h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display</h3>
+    <h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}</h3>
     {% else %}
     <div class="container-fluid" >
     <div class="row pl-3">
@@ -40,6 +40,13 @@
             <img src="/media/{{ capture_image }}" alt="Capture" style="width:40%">
         </div>
     </div>
+                     <p></p><p></p><p></p>
+         <div class="row pl-3">
+        <h3 class="h3 m-4" style="color: #FFFFFF"> Difference </h3>
+             <div style="text-align: center;">
+                 <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:60%">
+            </div>
+         </div>
     {% endif %}
         </div>
 </body>

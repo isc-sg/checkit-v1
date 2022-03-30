@@ -104,6 +104,18 @@ def coord(x, y, h, unit=1):
     return x, y
 
 
+def get_transparent_edge(input_image, color):
+    edge_image = cv2.Canny(input_image, 100, 200)
+    edge_image = cv2.cvtColor(edge_image, cv2.COLOR_RGB2BGR)
+    edge_image[np.where((edge_image == [255, 255, 255]).all(axis=2))] = color
+    gray_image = cv2.cvtColor(edge_image, cv2.COLOR_BGR2GRAY)
+    _, alpha = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY)
+    b, g, r = cv2.split(edge_image)
+    rgba_image = [b, g, r, alpha]
+    final_image = cv2.merge(rgba_image, 4)
+    return final_image
+
+
 def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
@@ -164,8 +176,25 @@ def compare_images(request):
             closest_hour = str(closest_hour).zfill(2)
             reference_images = ReferenceImage.objects.get(url_id=camera_object.id, hour=closest_hour)
             image = reference_images.image
+            base_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(image))
+            if base_image is None:
+                context = {'result': "Capture Error", 'camera_name': camera_name, 'message': " - Unable to read BASE image"}
+                return HttpResponse(template.render(context, request))
+
+            captured_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(obj.image))
+            if captured_image is None:
+                context = {'result': "Capture Error", 'camera_name': camera_name, 'message': " - Unable to read LOG image"}
+                return HttpResponse(template.render(context, request))
+
+            captured_image_transparent = get_transparent_edge(captured_image, [0, 0, 255])
+
+            captured_image_transparent = captured_image_transparent[:, :, :3]
+
+            merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
+            merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
+            base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
             context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
-                       'camera_name': camera_name, 'camera_number': camera_number}
+                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
         else:
             context = {'result': result, 'camera_name': camera_name}
         return HttpResponse(template.render(context, request))
