@@ -44,7 +44,21 @@
          <div class="row pl-3">
         <h3 class="h3 m-4" style="color: #FFFFFF"> Difference </h3>
              <div style="text-align: center;">
+                 <a href="#" onclick="open_new_window (this)">
                  <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:60%">
+                 </a>
+
+            <script>
+
+            function open_new_window(element) {
+            var newTab = window.open();
+            setTimeout(function(){newTab.document.body.innerHTML = element.innerHTML;
+            },500);
+
+              return false;
+
+            }
+            </script>
             </div>
          </div>
     {% endif %}
