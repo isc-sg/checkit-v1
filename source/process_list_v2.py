@@ -194,7 +194,7 @@ def open_capture_device(record):
             logging.error(f"Unable to join multicast group - {error_output}")
 
         # try all 3 methods for rtsp_transport - this means users don't need to define the transport method
-        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
         cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
 
         if not cap.isOpened():
@@ -202,7 +202,7 @@ def open_capture_device(record):
             cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
 
         if not cap.isOpened():
-            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
             cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
 
     else:
@@ -284,7 +284,7 @@ def compare_images(base, frame, r):
 
     fv = cv2.Laplacian(frame, cv2.CV_64F).var()
     # print("Focus Score is %.2f" % fv)
-    if scores_average > full_ss:
+    if scores_average < full_ss:
         full_ss = scores_average
     full_ss = round(full_ss, 2)
     scores_average = round(scores_average, 2)
