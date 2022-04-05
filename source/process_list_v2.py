@@ -42,7 +42,6 @@ except configparser.NoOptionError:
 open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
-
 def create_key(em):
     hash1 = ''
     salt = ''.join(reversed("Checkit"))
