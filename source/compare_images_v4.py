@@ -352,8 +352,15 @@ def main(ids):
     sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key)
     start_state_timestamp = check_engine_state(checkit_db)
 
-    list_to_process = get_camera_ids(ids, checkit_cursor)
-    process_list_v2.main(list_to_process)
+    list_of_cameras = get_camera_ids(ids, checkit_cursor)
+    list_pointer = 0
+    incrementer = 32
+    while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:
+        list_to_process = list_of_cameras[list_pointer:list_pointer + incrementer]
+        print('Processing', list_to_process)
+        process_list_v2.start_processes(list_to_process)
+        list_pointer += incrementer
+
     tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
     failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
     shutdown_engine_state(start_state_timestamp)
