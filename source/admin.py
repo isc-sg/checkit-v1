@@ -122,8 +122,8 @@ class LogImageAdmin(SimpleHistoryAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
     def get_location(self, obj):
         return obj.url.camera_location
