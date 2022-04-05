@@ -40,8 +40,8 @@ data = s.recv(8192).decode().rstrip("\x00")
 myroot = ET.fromstring(data)
 for camera in myroot.iter('cameras'):
     for camera_detail in camera.iter('camera'):
-        id = camera_detail.find('id').text
-        print('id=' + id)
+        camera_id = camera_detail.find('id').text
+        print('id=' + camera_id)
         name = camera_detail.find('name').text
         print('name=' + name)
         description = camera_detail.find('description').text
@@ -88,6 +88,7 @@ for camera in myroot.iter('cameras'):
 # data = s.recv(8192).decode().rstrip("\x00")
 # print('data', data)
 exit()
+
 
 def get_transparent_edge(input_image, color):
     edge_image = cv2.Canny(input_image, 100, 200)
