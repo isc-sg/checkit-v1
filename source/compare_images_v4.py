@@ -354,12 +354,13 @@ def main(ids):
 
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
     list_pointer = 0
-    incrementer = 32
+    incrementer = 8
+    list_of_lists = []
     while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:
         list_to_process = list_of_cameras[list_pointer:list_pointer + incrementer]
-        print('Processing', list_to_process)
-        process_list_v2.start_processes(list_to_process)
+        list_of_lists.append(list_to_process)
         list_pointer += incrementer
+    process_list_v2.start_processes(list_of_lists)
 
     tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
     failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
