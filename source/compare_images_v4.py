@@ -11,23 +11,7 @@ from passlib.hash import sha512_crypt
 import process_list_v2
 import logging
 from logging.handlers import RotatingFileHandler
-# import argparse
-#
-#
-# parser = argparse.ArgumentParser(description='Checkit image comparison')
-# parser.add_argument('list_of_cameras', metavar='N', type=int, nargs='*')
-# parser.add_argument('--debug', action='store_true',
-#                     help='set logging to debug level')
-#
-# args = parser.parse_args()
 
-
-# if args.debug:
-#     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
-#                                                    '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-#                         handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
-#                                                       maxBytes=10000000, backupCount=10)])
-# else:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
                     handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
@@ -359,8 +343,6 @@ def main(ids):
         list_pointer += incrementer
     process_list_v2.start_processes(list_of_lists)
 
-    # tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
-    # failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
     shutdown_engine_state(start_state_timestamp)
 
 
