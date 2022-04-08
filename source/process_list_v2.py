@@ -3,7 +3,6 @@ import cython
 from mysql.connector.pooling import MySQLConnectionPool
 from mysql.connector import errorcode
 from mysql.connector.errors import Error
-import multiprocessing as mp
 import random
 import datetime
 from timeit import default_timer as timer
@@ -23,8 +22,9 @@ import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 from mysql.connector import errorcode
 from mysql.connector.errors import Error
-import multiprocessing as mp
-from multiprocessing.pool import ThreadPool as Pool
+# import multiprocessing as mp
+# from multiprocessing.pool import ThreadPool as Pool
+from pathos.pools import ProcessPool as Pool
 # use ThreadPool instead of Pool due to cython compile error see link below
 # https://stackoverflow.com/questions/8804830/python-multiprocessing-picklingerror-cant-pickle-type-function
 import subprocess
@@ -52,6 +52,9 @@ except configparser.NoOptionError:
 
 open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
+
+# list_to_process = [[4210, 4211, 4212, 4213, 4214, 4215, 4216, 4217], [4218, 4219, 4220, 4221, 4222, 4223, 4224, 4225], [4226, 4227, 4228, 4229, 4230, 4231, 4232, 4233], [4234, 4235, 4236, 4237, 4238, 4239, 4240, 4241], [4242, 4243, 4244, 4245, 4246, 4247, 4248, 4249], [4250, 4251, 4252, 4253, 4254, 4255, 4256, 4257], [4258, 4259, 4260, 4261, 4262, 4263, 4264, 4265], [4266, 4267, 4268, 4269, 4270, 4271, 4272, 4273], [4274, 4275, 4276, 4277, 4278, 4279, 4280, 4281], [4282, 4283, 4284, 4285, 4286, 4287, 4288, 4289], [4290, 4291, 4292, 4293, 4294, 4295, 4296, 4297], [4298, 4299, 4300, 4301, 4302, 4303, 4304, 4305], [4306, 4307, 4308, 4309, 4310, 4311, 4312, 4313], [4314, 4315, 4316, 4317, 4318, 4319, 4320, 4321], [4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329], [4330, 4331, 4332, 4333, 4334, 4335, 4336, 4337], [4338, 4339, 4340, 4341, 4342, 4343, 4344, 4345], [4346, 4347, 4348, 4349, 4350, 4351, 4352, 4353], [4354, 4355, 4356, 4357, 4358, 4359]]
+
 
 def take_closest(my_list, my_number):
     """
@@ -268,38 +271,24 @@ def sql_update(table, fields, where):
         connection.close()
 
 
-def clear_table():
-    checkit_cursor = my_db.cursor()
-    sql_statement = "SELECT COUNT(*) FROM connection_test"
-    checkit_cursor.execute(sql_statement)
-    count = checkit_cursor.fetchone()
-    print('Count is', count[0])
+def sql_update_adm(table, fields, where):
+    sql_statement = "UPDATE " + table + " SET " + fields + where
 
-    checkit_cursor = my_db.cursor()
-    sql_statement = "DELETE FROM connection_test"
-    checkit_cursor.execute(sql_statement)
-    my_db.commit()
-    print(checkit_cursor.rowcount, "record(s) deleted")
-    my_db.close()
-
-
-def table_insert(item):
     try:
-        connection = pool_for_checkit.get_connection()
-        checkit_cursor = connection.cursor()
-        current_process = str(mp.current_process()).strip("<ForkProcess(ForkPoolWorker-").strip(", started daemon)>")
-        sql_statement = "INSERT INTO connection_test (row1, row2, row3) VALUES (%s,%s,%s)"
-        values = (str(current_process), item, datetime.datetime.now())
-        checkit_cursor.execute(sql_statement, values)
-        connection.commit()
-        connection.close()
-    except mysql.connector.Error as e:
+        connection = pool_for_adm.get_connection()
+    except mysql.connector.PoolError as e:
         print("Error code:", e.errno)  # error number
         print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
         print("Error message:", e.msg)  # error message
         print("Error:", e)  # errno, sqlstate, msg values
         s = str(e)
         print("Error:", s)
+    finally:
+        checkit_cursor = connection.cursor()
+        checkit_cursor.execute(sql_statement)
+        connection.commit()
+        checkit_cursor.close()
+        connection.close()
 
 
 def close_pool():
@@ -519,45 +508,26 @@ def no_base_image(record):
 
 
 def increment_transaction_count():
-    connected = False
-    while not connected:
-        try:
-            connection = pool_for_checkit.get_connection()
-            checkit_cursor = connection.cursor()
-            sql = "UPDATE main_menu_licensing SET transaction_count =  transaction_count + 1 WHERE id = 1"
-            checkit_cursor.execute(sql)
-            connection.commit()
-            connection.close()
-            connected = True
-        except mysql.connector.Error as e:
-            logging.error(f"Database connection error at 488 {e}")
-            connected = False
+    table = "main_menu_licensing"
+    fields = "transaction_count =  transaction_count + 1"
+    where = " WHERE id = 1"
+    sql_update(table, fields, where)
 
-    connected = False
-    while not connected:
-        try:
-            adm_connection = pool_for_adm.get_connection()
-            admin_cursor = adm_connection.cursor()
-            sql = "UPDATE adm SET tx_count =  tx_count + 1 WHERE id = 1"
-            admin_cursor.execute(sql)
-            adm_connection.commit()
-            adm_connection.close()
-
-            connected = True
-        except mysql.connector.Error as e:
-            logging.error(f"Database connection error at 503 {e}")
-            connected = False
+    table = "adm"
+    fields = "tx_count =  tx_count + 1"
+    where = " WHERE id = 1"
+    sql_update_adm(table, fields, where)
 
 
-def process_list(x):
-    for camera in x:
+def process_list(list_of_cameras):
+    init_pools()
+    for camera in list_of_cameras:
         fields = "*"
         table = "main_menu_camera"
         where = "WHERE id = " + "\"" + str(camera) + "\""
         long_sql = None
         current_record = sql_select(fields, table, where, long_sql, fetch_all=False)
         regions = current_record[image_regions_index]
-
         if regions == '0' or regions == "[]":
             regions = []
             regions.extend(range(1, 65))
@@ -704,12 +674,11 @@ def process_list(x):
 
 
 def start_processes(list_to_process):
-    mp.set_start_method("fork")
+    # mp.set_start_method("spawn")
 
     start = timer()
-    with mp.Pool(8, initializer=init_pools) as p:
+    with Pool(8) as p:
         p.map(process_list, list_to_process)
         p.close()
         p.join()
-
     end = timer()

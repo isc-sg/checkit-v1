@@ -2,6 +2,7 @@ import datetime
 import os
 
 from sys import exit
+import cython
 
 import mysql.connector
 from mysql.connector import errorcode
@@ -107,7 +108,6 @@ def get_camera_ids(camera_numbers, checkit_cursor):
         sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
     else:
         sql_statement = "SELECT id FROM main_menu_camera"
-
 
     try:
         # checkit_cursor = checkit_db.cursor()
@@ -224,7 +224,6 @@ def check_engine_state(checkit_db):
         checkit_cursor.execute(sql_statement, values)
         checkit_db.commit()
 
-
     else:
 
         state = checkit_result[state_index]
@@ -265,7 +264,6 @@ def check_engine_state(checkit_db):
         checkit_cursor.execute(sql_statement, values)
         checkit_db.commit()
 
-
     # now insert a STARTED state for this process
     start_state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
     state = "STARTED"
@@ -276,7 +274,6 @@ def check_engine_state(checkit_db):
                     "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
                     " VALUES (%s,%s,%s,%s,%s)"
     values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0)
-
 
     # checkit_cursor = checkit_db.cursor()
     checkit_cursor.execute(sql_statement, values)
@@ -362,8 +359,8 @@ def main(ids):
         list_pointer += incrementer
     process_list_v2.start_processes(list_of_lists)
 
-    tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
-    failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
+    # tr = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
+    # failed_transactions = count_failed(checkit_cursor, start_state_timestamp)
     shutdown_engine_state(start_state_timestamp)
 
 
@@ -395,8 +392,6 @@ if __name__ == '__main__':
 
 # insert records for proper shutdown
 # time.sleep(10)
-
-
 
 #
 # image_a = cv2.imread(args.file1)
