@@ -1,6 +1,7 @@
 import datetime
 import os
-
+import multiprocessing
+import math
 from sys import exit
 import cython
 
@@ -335,7 +336,9 @@ def main(ids):
 
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
     list_pointer = 0
-    incrementer = 8
+
+    number_of_cores = multiprocessing.cpu_count()*2
+    incrementer = math.ceil(len(list_of_cameras)/number_of_cores)
     list_of_lists = []
     while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:
         list_to_process = list_of_cameras[list_pointer:list_pointer + incrementer]

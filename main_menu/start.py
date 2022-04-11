@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import sys
-
 import cython
 import compare_images_v4
 import argparse
