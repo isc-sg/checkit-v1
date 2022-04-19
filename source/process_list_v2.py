@@ -432,11 +432,16 @@ def compare_images(base, frame, r, base_color, frame_color):
     scores_average = round(scores_average, 2)
     fv = round(fv, 2)
 
-    if is_low_contrast(frame, 0.25):
-        print("Log image is of poor quality")
+    blur = cv2.blur(frame, (5, 5))
+    frame_brightness = cv2.mean(blur)[0]
+    blur = cv2.blur(base, (5, 5))
+    base_brightness = cv2.mean(blur)[0]
+
+    if is_low_contrast(frame, 0.25) or frame_brightness < 50:
+        logging.info("Log image is of poor quality")
         full_ss = 0
-    if is_low_contrast(base, 0.25):
-        print("Base image is of poor quality")
+    if is_low_contrast(base, 0.25) or base_brightness < 50:
+        logging.info("Base image is of poor quality")
         full_ss = 0
 
     logging.debug(f"Match Score for full image is {full_ss}")
@@ -444,7 +449,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     logging.debug(f"Focus value is {fv}")
     logging.debug(f"All region scores are {region_scores}")
 
-    return full_ss, fv, region_scores
+    return full_ss, fv, region_scores, frame_brightness
 
 
 def no_base_image(record):
@@ -482,10 +487,14 @@ def no_base_image(record):
                 pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
                 if not os.path.isfile(file_name):
                     cv2.imwrite(file_name, frame)
+                    img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    blur = cv2.blur(img_gray, (5, 5))
+                    base_brightness = cv2.mean(blur)[0]
+
                     sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
                     table = "main_menu_referenceimage"
-                    fields = "(url_id, image, hour) VALUES (%s,%s,%s)"
-                    values = (str(record[camera_id_index]), sql_file_name, time_stamp.strftime('%H'))
+                    fields = "(url_id, image, hour, light_level) VALUES (%s,%s,%s,%s)"
+                    values = (str(record[camera_id_index]), sql_file_name, time_stamp.strftime('%H'), base_brightness)
                     sql_insert(table, fields, values)
             except OSError as error:
                 logging.error(f"Unable to create base image directory/file {error}")
@@ -612,11 +621,13 @@ def process_list(list_of_cameras):
 
                             increment_transaction_count()
                         else:
-                            matching_score, focus_value, region_scores = compare_images(image_base_grey,
-                                                                                        image_frame_grey,
-                                                                                        regions, image_base,
-                                                                                        image_frame)
+                            matching_score, focus_value, \
+                             region_scores, frame_brightness = compare_images(image_base_grey,
+                                                                              image_frame_grey,
+                                                                              regions, image_base,
+                                                                              image_frame)
                             sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+
                             if matching_score < current_record[matching_threshold_index]:
                                 action = "Failed"
                             else:
@@ -624,12 +635,12 @@ def process_list(list_of_cameras):
 
                             table = "main_menu_logimage"
                             fields = "(url_id, image, matching_score, region_scores, " \
-                                                    "current_matching_threshold, " \
-                                                    "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                                     "current_matching_threshold, light_level, " \
+                                     "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
                             values = (str(current_record[camera_id_index]), sql_file_name, float(matching_score),
                                       json.dumps(region_scores),
-                                      float(current_record[matching_threshold_index]), float(focus_value),
-                                      action, time_stamp_string)
+                                      float(current_record[matching_threshold_index]), float(frame_brightness),
+                                      float(focus_value), action, time_stamp_string)
                             sql_insert(table, fields, values)
 
                             table = "main_menu_camera"

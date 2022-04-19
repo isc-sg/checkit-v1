@@ -31,7 +31,6 @@ class CameraURLField(models.URLField):
                                          '[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))))'
                                          '+(:\d+)?(\/.+)*)$')]
 
-
     def formfield(self, **kwargs):
         return super(CameraURLField, self).formfield(**{
             'form_class': CameraURLFormField,
@@ -77,6 +76,7 @@ class ReferenceImage(models.Model):
     url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
+    light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -90,6 +90,7 @@ class LogImage(models.Model):
     region_scores = models.JSONField(default=dict)
     current_matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     focus_value = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
     action = models.CharField(max_length=20, null=True)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     history = HistoricalRecords()
