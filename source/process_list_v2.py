@@ -486,16 +486,22 @@ def no_base_image(record):
             try:
                 pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
                 if not os.path.isfile(file_name):
-                    cv2.imwrite(file_name, frame)
-                    img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    blur = cv2.blur(img_gray, (5, 5))
-                    base_brightness = cv2.mean(blur)[0]
+                    try:
+                        able_to_write = cv2.imwrite(file_name, frame)
+                        if not able_to_write:
+                            raise OSError
+                        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        blur = cv2.blur(img_gray, (5, 5))
+                        base_brightness = cv2.mean(blur)[0]
 
-                    sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
-                    table = "main_menu_referenceimage"
-                    fields = "(url_id, image, hour, light_level) VALUES (%s,%s,%s,%s)"
-                    values = (str(record[camera_id_index]), sql_file_name, time_stamp.strftime('%H'), base_brightness)
-                    sql_insert(table, fields, values)
+                        sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
+                        table = "main_menu_referenceimage"
+                        fields = "(url_id, image, hour, light_level) VALUES (%s,%s,%s,%s)"
+                        values = (str(record[camera_id_index]), sql_file_name,
+                                  time_stamp.strftime('%H'), base_brightness)
+                        sql_insert(table, fields, values)
+                    except OSError:
+                        logging.error(f"Unable to save reference image {file_name}")
             except OSError as error:
                 logging.error(f"Unable to create base image directory/file {error}")
 
@@ -621,8 +627,7 @@ def process_list(list_of_cameras):
 
                             increment_transaction_count()
                         else:
-                            matching_score, focus_value, \
-                             region_scores, frame_brightness = compare_images(image_base_grey,
+                            matching_score, focus_value, region_scores, frame_brightness = compare_images(image_base_grey,
                                                                               image_frame_grey,
                                                                               regions, image_base,
                                                                               image_frame)
