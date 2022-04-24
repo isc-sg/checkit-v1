@@ -237,6 +237,8 @@ def scheduler(request):
         if new_run_schedule != old_run_schedule:
             license_obj.run_schedule = new_run_schedule
             license_obj.save()
+            tmp_file_name = "/tmp/" + str(uuid.uuid4())
+
             if int(new_run_schedule) == 0:
                 command = "/usr/bin/crontab -r"
                 logging.info("User {u} set scheduler to not running".format(u=user_name))
@@ -244,21 +246,21 @@ def scheduler(request):
 
                 # command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
                 #           " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
-                if int(new_run_schedule) < 24:
-                    tmp_file_name = "/tmp/" + str(uuid.uuid4())
-                    tmp_file = open(tmp_file_name, "w")
-                    tmp_file.write("0 */" + new_run_schedule +
-                                   " * * * /home/checkit/env/bin/python /home/checkit/camera_checker/main_menu/start.py \n")
-                    tmp_file.close()
-                    # command = "/bin/echo 0 *" + "/" + new_run_schedule + \
-                    #           " \* \* \* /home/checkit/env/bin/python " \
-                    #           "/home/checkit/camera_checker/main_menu/start.py | sudo -n crontab -u www-data "
-                    command = "crontab " + tmp_file_name
-                else:
-                    logging.error("Attempt to create a schedule beyond 24 hours")
+                tmp_file = open(tmp_file_name, "w")
+                tmp_file.write("0 */" + new_run_schedule +
+                               " * * * /home/checkit/env/bin/python /home/checkit/camera_checker/main_menu/start.py \n")
+                tmp_file.close()
+                # command = "/bin/echo 0 *" + "/" + new_run_schedule + \
+                #           " \* \* \* /home/checkit/env/bin/python " \
+                #           "/home/checkit/camera_checker/main_menu/start.py | sudo -n crontab -u www-data "
+                command = "crontab " + tmp_file_name
+
             subprocess.Popen(command, shell=True)
             command = "rm " + tmp_file_name
-            subprocess.Popen(command, shell=True)
+            try:
+                subprocess.Popen(command, shell=True)
+            except:
+                pass
             logging.info(f"User {user_name} modified run schedule to {new_run_schedule}"
                          f" hours from {old_run_schedule} hours")
         return HttpResponseRedirect(reverse(scheduler))
