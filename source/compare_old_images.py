@@ -7,6 +7,8 @@ from skimage.exposure import is_low_contrast
 import select_region
 from bisect import bisect_left
 import datetime
+from termcolor import colored
+from sewar.full_ref import mse, rmse, psnr, uqi, ssim, ergas, scc, rase, sam, msssim, vifp
 
 
 # base_image_file_name = sys.argv[0]
@@ -61,7 +63,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     cv2.moveWindow("Base Fixed", 1590, 0)
 
     full_ss = a_eye.movement(based_equalised, frame_equalised)
-    full_ss_bilateral = round(a_eye.movement(based_bilateral, frame_bilateral),2)
+    full_ss_bilateral = round(a_eye.movement(based_bilateral, frame_bilateral), 2)
     count = 0
     for i in coordinates:
         (x, y), (qw, qh) = i
@@ -106,21 +108,40 @@ def compare_images(base, frame, r, base_color, frame_color):
 
     if is_low_contrast(frame, 0.25):
         print("Log image is of poor quality")
-        full_ss = 0
+        wait_time = 0
     if is_low_contrast(base, 0.25):
         print("Base image is of poor quality")
-        full_ss = 0
+        wait_time = 0
+
+    blur = cv2.blur(frame, (5, 5))
+    brightness = cv2.mean(blur)
+    hsldark = cv2.cvtColor(frame_color, cv2.COLOR_BGR2HLS)
+    Lchanneld = hsldark[:, :, 1]
+    lvalueld = cv2.mean(Lchanneld)[0]
+    print("L values", lvalueld, brightness)
+    if brightness[0] < 50:
+        print(colored(f'Base brightness is {brightness}', "red"))
+        wait_time = 0
+
+    blur = cv2.blur(frame, (5, 5))
+    brightness = cv2.mean(blur)
+
+    if brightness[0] < 50:
+        print(colored(f'Log brightness is {brightness}', "red"))
+        wait_time = 0
 
     print(f"Match Score for full image is {full_ss}")
     print(f"Match Score for full image bilateral is {full_ss_bilateral}")
-
-    print(f"Match Score for regions is {scores_average}")
+    # print("VIF: ", vifp(base, frame))
+    # print("SSIM: ", ssim(base, frame))
+    # print("MSSSIM: ", msssim(base, frame))
+    # print(f"Match Score for regions is {scores_average}")
     print(f"Focus value is {fv}")
-    print(f"All region scores are {region_scores}")
+    # print(f"All region scores are {region_scores}")
 
     if full_ss_bilateral < .6:
         wait_time = 0
-    cv2.waitKey(wait_time)
+    cv2.waitKey(0)
 
     return full_ss, fv, region_scores
 
