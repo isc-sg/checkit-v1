@@ -462,9 +462,9 @@ def no_base_image(record):
         logging.error(f"unable to open capture device {record[camera_url_index]}")
         now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
         table = "main_menu_logimage"
-        fields = "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
-                 "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
-        values = (str(record[camera_id_index]), "", "0", "0", "0", "0", "Capture Error", now)
+        fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
+                 "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        values = (str(record[camera_id_index]), "", "0", "0", "0", "0", "0", "Capture Error", now)
         sql_insert(table, fields, values)
         close_capture_device(record, capture_device)
         return
@@ -619,10 +619,10 @@ def process_list(list_of_cameras):
                             now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
                             sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
                             table = "main_menu_logimage"
-                            fields = "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
-                                     "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                            fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
+                                     "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
                             values = (str(current_record[camera_id_index]), sql_file_name,
-                                      "0", "{}", "0", "0", "Image Size Error", now)
+                                      "0", "0", "{}", "0", "0", "Image Size Error", now)
                             sql_insert(table, fields, values)
 
                             increment_transaction_count()
@@ -675,7 +675,7 @@ def process_list(list_of_cameras):
 
 def start_processes(list_to_process):
     # mp.set_start_method("spawn")
-    print(list_to_process)
+    # print(list_to_process)
     number_of_cores = pathos.multiprocessing.cpu_count()*2
     start = timer()
     with Pool(number_of_cores) as p:
