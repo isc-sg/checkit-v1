@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'fontawesomefree',
     'main_menu',
     'simple_history',
+    'rangefilter',
 ]
 
 MIDDLEWARE = [

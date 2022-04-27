@@ -13,6 +13,7 @@ from django.contrib.admin.models import LogEntry, DELETION
 from django.utils.html import escape
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from rangefilter.filters import DateRangeFilter
 
 import os
 
@@ -101,7 +102,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
-    list_filter = ['creation_date', 'url__camera_location']
+    list_filter = [('creation_date', DateRangeFilter), 'url__camera_location']
 
     def log_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
