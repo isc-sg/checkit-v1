@@ -28,7 +28,6 @@ class CameraTable(tables.Table):
             "width": 200, "align": "left"
         }})
 
-
     def render_url(self, value):
         return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
 
@@ -63,6 +62,11 @@ class LogTable(tables.Table):
             "width": 140, "align": "center"
         }})
 
+    region_scores = tables.Column(verbose_name="Region Analysis", attrs={
+        "td": {
+            "width": 140, "align": "center"
+        }})
+
     matching_threshold = tables.Column(accessor='url.matching_threshold')
 
     action = tables.Column(visible=True, verbose_name="Status", attrs={
@@ -77,11 +81,23 @@ class LogTable(tables.Table):
             "width": 150, "align": "center"
         }})
 
+    def render_light_level(self, value):
+        if value > 50:
+            return "OK"
+        else:
+            return "Dark"
+
+    def render_region_scores(self, value):
+        sorted_keys = sorted(value, key=value.get)
+        display = "Low " + ','.join(str(y) for y in sorted_keys[:8]) + " - " + "High " +\
+                  ','.join(str(y) for y in sorted_keys[-8:])
+        return display
+
     class Meta:
         model = LogImage
         template_name = "django_tables2/bootstrap4.html"
         fields = ('camera_number', 'camera_name', 'camera_location', 'image', 'matching_score',
-                  'focus_value', 'action', 'creation_date')
+                  'focus_value', 'light_level', 'action', 'creation_date', 'region_scores')
         exclude = (['matching_threshold'])
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = '-creation_date'
