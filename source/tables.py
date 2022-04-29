@@ -88,7 +88,10 @@ class LogTable(tables.Table):
             return "Dark"
 
     def render_region_scores(self, value):
-        sorted_keys = sorted(value, key=value.get)
+        try:
+            sorted_keys = sorted(value, key=value.get)
+        except:
+            sorted_keys = []
         display = "Low " + ','.join(str(y) for y in sorted_keys[:8]) + " - " + "High " +\
                   ','.join(str(y) for y in sorted_keys[-8:])
         return display
