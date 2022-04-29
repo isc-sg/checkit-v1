@@ -154,6 +154,7 @@ def compare_images(request):
     if request.method == 'POST':
         record_id = request.POST.get('record')
         obj = LogImage.objects.get(id=record_id)
+        region_scores = obj.region_scores
         result = obj.action
         hour = obj.creation_date.hour
         cam = obj.url_id
@@ -194,8 +195,15 @@ def compare_images(request):
             merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
             merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
             base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
+            regions = []
+            scores = []
+            for k, v in region_scores.items():
+                regions.append(int(k))
+                scores.append(v)
+            scores_field = {'regions': [regions], 'scores': [scores]}
             context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
-                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
+                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image,
+                       'scores_field': scores_field}
         else:
             context = {'result': result, 'camera_name': camera_name}
         return HttpResponse(template.render(context, request))

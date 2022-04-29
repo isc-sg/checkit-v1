@@ -6,48 +6,69 @@
 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
+    <!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
 
     <!--     Fonts and icons     -->
 
     <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
     <!-- Nucleo Icons -->
-        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
-        <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
-        <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
-        <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
-        <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
-        <link rel="manifest" href="{% static '/site.webmanifest' %}">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-<!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
+    <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
+    <link rel="manifest" href="{% static '/site.webmanifest' %}">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+    <!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
     <!-- CSS Files -->
     <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
     <!-- CSS Just for demo purpose, don't include it in your project -->
+    <style>
+    table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 80%;
+}
+
+td, th {
+  border: 1px solid #ffffff;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #dddddd;
+}
+
+    </style>
     <title>Images</title>
 </head>
 <body>
 
-    {% if result == "Capture Error" %}
-    <h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}</h3>
-    {% else %}
-    <div class="container-fluid" >
+{% if result == "Capture Error" %}
+<h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}
+</h3>
+{% else %}
+<div class="container-fluid">
     <div class="row pl-3">
         <div class="column">
-            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>{{ camera_name }} / #{{ camera_number }} </u></h3>
-            <img src="/media/{{ reference_image }}" alt="Base" style="width:40%">
-            <img src="/media/{{ capture_image }}" alt="Capture" style="width:40%">
+            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>{{ camera_name }} / #{{ camera_number
+                }} </u></h3>
+            <img src="/media/{{ reference_image }}" alt="Base" style="width:30%">
+            <img src="/media/{{ capture_image }}" alt="Capture" style="width:30%">
         </div>
     </div>
-                     <p></p><p></p><p></p>
-         <div class="row pl-3">
+    <p></p>
+    <p></p>
+    <p></p>
+    <div class="row pl-3">
         <h3 class="h3 m-4" style="color: #FFFFFF"> Difference </h3>
-             <div style="text-align: center;">
-                 <a href="#" onclick="open_new_window (this)">
-                 <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:60%">
-                 </a>
-
+        <div style="text-align: left;">
+            <a href="#" onclick="open_new_window (this)">
+                <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:50%">
+            </a>
             <script>
 
             function open_new_window(element) {
@@ -58,10 +79,73 @@
               return false;
 
             }
+
             </script>
-            </div>
-         </div>
-    {% endif %}
         </div>
+        <div class="row pl-3">
+            <h3 class="h3 m-4" style="color: #FFFFFF"> Region Scores </h3>
+            <table>
+                <!--                 <tr>-->
+                <!--                {% for header in scores_field.headers %}-->
+                <!--                    <th>{{ header }}</th>-->
+
+                <!--                {% endfor %}-->
+                <!--                     <br>-->
+                <!--                </tr>-->
+                <tr>
+
+                    {% for row in scores_field.regions %}
+
+                    {% for value in row %}
+                    {% if forloop.counter < 33 %}
+                    <td>{{value}}</td>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for row in scores_field.scores %}
+
+                    {% for value in row %}
+                    {% if forloop.counter < 33 %}
+                    <td>{{value}}</td>
+                    {% endif %}
+
+                    {% endfor %}
+
+                    {% endfor %}
+                </tr>
+                <tr>
+
+                    {% for row in scores_field.regions %}
+
+                    {% for value in row %}
+                    {% if forloop.counter > 32 %}
+                    <td>{{value}}</td>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for row in scores_field.scores %}
+
+                    {% for value in row %}
+                    {% if forloop.counter > 32 %}
+                    <td>{{value}}</td>
+                    {% endif %}
+
+                    {% endfor %}
+
+                    {% endfor %}
+                </tr>
+            </table>
+
+        </div>
+    </div>
+    {% endif %}
+</div>
+</div>
 </body>
 </html>
