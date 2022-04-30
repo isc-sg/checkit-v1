@@ -87,8 +87,10 @@ class LogTable(tables.Table):
     def render_light_level(self, value):
         if value > 50:
             return "OK"
-        else:
+        elif 50 >= value > 0:
             return "Dark"
+        else:
+            return "-"
 
     def render_region_scores(self, value):
         try:
