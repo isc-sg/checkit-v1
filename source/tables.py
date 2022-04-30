@@ -61,11 +61,14 @@ class LogTable(tables.Table):
         "td": {
             "width": 140, "align": "center"
         }})
-
-    region_scores = tables.Column(verbose_name="Region Analysis", attrs={
+    light_level = tables.Column(attrs={
         "td": {
             "width": 140, "align": "center"
         }})
+    # region_scores = tables.Column(verbose_name="Region Analysis", attrs={
+    #     "td": {
+    #         "width": 140, "align": "center"
+    #     }})
 
     matching_threshold = tables.Column(accessor='url.matching_threshold')
 
@@ -100,7 +103,7 @@ class LogTable(tables.Table):
         model = LogImage
         template_name = "django_tables2/bootstrap4.html"
         fields = ('camera_number', 'camera_name', 'camera_location', 'image', 'matching_score',
-                  'focus_value', 'light_level', 'action', 'creation_date', 'region_scores')
+                  'focus_value', 'light_level', 'action', 'creation_date',)
         exclude = (['matching_threshold'])
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = '-creation_date'
