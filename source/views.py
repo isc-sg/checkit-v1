@@ -17,7 +17,7 @@ from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
 from django_tables2 import SingleTableMixin
 from django_filters.views import FilterView
-from django.core.exceptions import *
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
@@ -180,12 +180,14 @@ def compare_images(request):
             image = reference_images.image
             base_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(image))
             if base_image is None:
-                context = {'result': "Capture Error", 'camera_name': camera_name, 'message': " - Unable to read BASE image"}
+                context = {'result': "Capture Error", 'camera_name': camera_name,
+                           'message': " - Unable to read BASE image"}
                 return HttpResponse(template.render(context, request))
 
             captured_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(obj.image))
             if captured_image is None:
-                context = {'result': "Capture Error", 'camera_name': camera_name, 'message': " - Unable to read LOG image"}
+                context = {'result': "Capture Error", 'camera_name': camera_name,
+                           'message': " - Unable to read LOG image"}
                 return HttpResponse(template.render(context, request))
 
             captured_image_transparent = get_transparent_edge(captured_image, [0, 0, 255])
@@ -195,17 +197,10 @@ def compare_images(request):
             merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
             merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
             base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
-            regions = []
-            scores = []
-            for k, v in region_scores.items():
-                regions.append(int(k))
-                scores.append(v)
-            scores_field = {'regions': [regions], 'scores': [scores]}
             context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
-                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image,
-                       'scores_field': scores_field}
+                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
         else:
-            context = {'result': result, 'camera_name': camera_name}
+            context = {'result': result, 'camera_name': camera_name, 'camera_number': camera_number}
         return HttpResponse(template.render(context, request))
     else:
         return redirect('logs')
@@ -542,6 +537,7 @@ def input_camera_for_regions(request):
         try:
             camera_number = request.POST.get('camera_number')
             camera_object = Camera.objects.get(camera_number=camera_number)
+
             regions = camera_object.image_regions
             if regions == "":
                 regions = "[]"
@@ -557,10 +553,37 @@ def input_camera_for_regions(request):
         reference_images = ReferenceImage.objects.filter(url_id=url_id)
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
+            try:
+                log_obj = LogImage.objects.filter(url_id=url_id, action="Failed").last()
+                if not log_obj:
+                    raise ObjectDoesNotExist
+                else:
+                    region_scores = log_obj.region_scores
+                    creation_date = log_obj.creation_date
+                    regions = []
+                    scores = []
+                    for k, v in region_scores.items():
+                        regions.append(int(k))
+                        scores.append(v)
+                    sorted_regions = sorted(region_scores, key=region_scores.get)
+                    low_regions = sorted_regions[:8]
+                    for i in range(0, len(low_regions)):
+                        low_regions[i] = int(low_regions[i])
+                    high_regions = sorted_regions[-8:]
+                    for i in range(0, len(high_regions)):
+                        high_regions[i] = int(high_regions[i])
+                    scores_field = {'regions': [regions], 'scores': [scores], 'low_regions': low_regions,
+                                    'high_regions': high_regions}
+            except ObjectDoesNotExist:
+                scores_field = {}
+                creation_date = ""
+
             context = {
                 'form': form,
                 'camera_number': camera_number,
-                'image': base64_image
+                'image': base64_image,
+                'scores_field': scores_field,
+                'creation_date': creation_date
                       }
             return render(request, 'main_menu/regions_main_form.html', context=context)
         else:

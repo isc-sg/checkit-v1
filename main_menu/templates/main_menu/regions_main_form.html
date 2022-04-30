@@ -1,6 +1,6 @@
 <!doctype html>
 {% load bootstrap4 %}
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
 
 <head>
     {% load static %}
@@ -35,6 +35,22 @@
   display:inline-block;
   width:4em;
 }
+    table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 60%;
+}
+
+td, th {
+  border: 1px solid #e3e3e3;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #383c3c;
+}
+
 
 
     </style>
@@ -167,6 +183,77 @@
                                 <input type="hidden" id="camera_number" name="camera_number" value={{camera_number}}>
                             </form>
                         </div>
+                    </div>
+                </div>
+            </div>
+                                    <div class="row pl-2">
+                                        {% if creation_date %}
+                            <h5 class="title">Last log date/time {{creation_date}}</h5>
+                                        {% endif %}
+                                    </div>
+                                                    <div class="row pl-2">
+
+                                <table>
+            <tr class="even">
+                {% for row in scores_field.regions %}
+                {% for value in row %}
+                {% if forloop.counter < 33 %}
+                {% if value in scores_field.low_regions %}
+                <td style="background: #f5365c; color: #000000">{{value}}</td>
+                {% elif value in scores_field.high_regions %}
+                <td style="background: #5e72e4; color: #000000">{{value}}</td>
+                {% else %}
+                <td>{{value}}</td>
+                {% endif %}
+                {% endif %}
+                {% endfor %}
+                {% endfor %}
+            </tr>
+
+            <tr>
+                {% for row in scores_field.scores %}
+
+                {% for value in row %}
+                {% if forloop.counter < 33 %}
+                <td style="color: #ffffff">{{value}}</td>
+                {% endif %}
+
+                {% endfor %}
+                {% endfor %}
+            </tr>
+
+            <tr>
+
+                {% for row in scores_field.regions %}
+
+                {% for value in row %}
+                {% if forloop.counter > 32 %}
+                {% if value in scores_field.low_regions %}
+                <td style="background: #f5365c; color: #000000">{{value}}</td>
+                {% elif value in scores_field.high_regions %}
+                <td style="background: #5e72e4; color: #000000">{{value}}</td>
+                {% else %}
+                <td>{{value}}</td>
+                {% endif %}
+                {% endif %}
+                {% endfor %}
+
+                {% endfor %}
+            </tr>
+
+            <tr>
+                {% for row in scores_field.scores %}
+
+                {% for value in row %}
+                {% if forloop.counter > 32 %}
+                <td style="color: #ffffff">{{value}}</td>
+                {% endif %}
+
+                {% endfor %}
+
+                {% endfor %}
+            </tr>
+        </table>
                     </div>
 
                 </div>

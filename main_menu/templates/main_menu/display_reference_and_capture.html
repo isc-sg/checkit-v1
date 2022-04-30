@@ -29,18 +29,19 @@
     table {
   font-family: arial, sans-serif;
   border-collapse: collapse;
-  width: 80%;
+  width: 60%;
 }
 
 td, th {
-  border: 1px solid #ffffff;
+  border: 1px solid #e3e3e3;
   text-align: left;
   padding: 8px;
 }
 
 tr:nth-child(even) {
-  background-color: #dddddd;
+  background-color: #383c3c;
 }
+
 
     </style>
     <title>Images</title>
@@ -52,10 +53,10 @@ tr:nth-child(even) {
 </h3>
 {% else %}
 <div class="container-fluid">
-    <div class="row pl-3">
+    <div class="row pl-2">
         <div class="column">
-            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>{{ camera_name }} / #{{ camera_number
-                }} </u></h3>
+            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>
+                {{ camera_name }} / #{{ camera_number }} </u></h3>
             <img src="/media/{{ reference_image }}" alt="Base" style="width:30%">
             <img src="/media/{{ capture_image }}" alt="Capture" style="width:30%">
         </div>
@@ -63,11 +64,11 @@ tr:nth-child(even) {
     <p></p>
     <p></p>
     <p></p>
-    <div class="row pl-3">
+    <div class="row pl-2">
         <h3 class="h3 m-4" style="color: #FFFFFF"> Difference </h3>
-        <div style="text-align: left;">
+        <div style="text-align: center;">
             <a href="#" onclick="open_new_window (this)">
-                <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:50%">
+                <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:60%">
             </a>
             <script>
 
@@ -80,71 +81,13 @@ tr:nth-child(even) {
 
             }
 
+
             </script>
         </div>
-        <div class="row pl-3">
-            <h3 class="h3 m-4" style="color: #FFFFFF"> Region Scores </h3>
-            <table>
-                <!--                 <tr>-->
-                <!--                {% for header in scores_field.headers %}-->
-                <!--                    <th>{{ header }}</th>-->
-
-                <!--                {% endfor %}-->
-                <!--                     <br>-->
-                <!--                </tr>-->
-                <tr>
-
-                    {% for row in scores_field.regions %}
-
-                    {% for value in row %}
-                    {% if forloop.counter < 33 %}
-                    <td>{{value}}</td>
-                    {% endif %}
-                    {% endfor %}
-
-                    {% endfor %}
-                </tr>
-                <tr>
-                    {% for row in scores_field.scores %}
-
-                    {% for value in row %}
-                    {% if forloop.counter < 33 %}
-                    <td>{{value}}</td>
-                    {% endif %}
-
-                    {% endfor %}
-
-                    {% endfor %}
-                </tr>
-                <tr>
-
-                    {% for row in scores_field.regions %}
-
-                    {% for value in row %}
-                    {% if forloop.counter > 32 %}
-                    <td>{{value}}</td>
-                    {% endif %}
-                    {% endfor %}
-
-                    {% endfor %}
-                </tr>
-                <tr>
-                    {% for row in scores_field.scores %}
-
-                    {% for value in row %}
-                    {% if forloop.counter > 32 %}
-                    <td>{{value}}</td>
-                    {% endif %}
-
-                    {% endfor %}
-
-                    {% endfor %}
-                </tr>
-            </table>
-
-        </div>
     </div>
-    {% endif %}
+
+</div>
+{% endif %}
 </div>
 </div>
 </body>
