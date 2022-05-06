@@ -41,6 +41,7 @@
 
 
 
+
     </style>
 </head>
 <body class="">
@@ -163,67 +164,67 @@
 
                                 </form>
                             </div>
-                            </div>
-                        </div>
-                        <p></p>
-                        <h3></h3>
-                        <h3>Current run schedule</h3>
-                        <div class="col-md-3 pr-md-1">
-                            <div class="form-group">
-                                <div class="alert alert-info">
-
-                                    {% if run_schedule == 0 %}
-                                    <span>The scheduler is not running</span>
-                                    {% endif %}
-                                    {% if run_schedule == 1 %}
-                                    <span>The system will run hourly</span>
-                                    {% endif %}
-                                    {% if run_schedule > 1 %}
-                                    <span>The system will run every {{ run_schedule }} hours</span>
-                                    {% endif %}
-
-                                </div>
-                                <form method="post">
-                                    {% csrf_token %}
-
-                                    <label>Enter new hourly interval for run</label>
-                                    <input type="number" class="form-control" required min="0" max="24" name="new_run"/>
-                                    <h3></h3>
-                                </form>
-                            </div>
-                        </div>
-                        <h3>Run on a single camera</h3>
-                        <div class="col-md-3 pr-md-1">
-                            <div class="form-group">
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <label>Enter camera to check</label>
-                                    {% if camera_does_not_exist %}
-                                    <input type="number" style="::placeholder {color: red;};"
-                                           placeholder="Camera does not exist" class="form-control"
-                                           name="camera_check"/>
-                                    {% else %}
-                                    <input type="number" class="form-control" min=1 required name="camera_check"/>
-                                    {% endif %}
-
-                                </form>
-                            </div>
                         </div>
                     </div>
-                    <div id="row2" class="row">
-                        <div class="col-md-4">
+                    <p></p>
+                    <h3></h3>
+                    <h3>Current run schedule</h3>
+                    <div class="col-md-3 pr-md-1">
+                        <div class="form-group">
+                            <div class="alert alert-info">
 
+                                {% if run_schedule == 0 %}
+                                <span>The scheduler is not running</span>
+                                {% endif %}
+                                {% if run_schedule == 1 %}
+                                <span>The system will run hourly</span>
+                                {% endif %}
+                                {% if run_schedule > 1 %}
+                                <span>The system will run every {{ run_schedule }} hours</span>
+                                {% endif %}
+
+                            </div>
+                            <form method="post">
+                                {% csrf_token %}
+
+                                <label>Enter new hourly interval for run</label>
+                                <input type="number" class="form-control" required min="0" max="24" name="new_run"/>
+                                <h3></h3>
+                            </form>
+                        </div>
+                    </div>
+                    <h3>Run on a single camera</h3>
+                    <div class="col-md-3 pr-md-1">
+                        <div class="form-group">
+                            <form method="post">
+                                {% csrf_token %}
+                                <label>Enter camera to check</label>
+                                {% if camera_does_not_exist %}
+                                <input type="number" style="::placeholder {color: red;};"
+                                       placeholder="Camera does not exist" class="form-control"
+                                       name="camera_check"/>
+                                {% else %}
+                                <input type="number" class="form-control" min=1 required name="camera_check"/>
+                                {% endif %}
+
+                            </form>
                         </div>
                     </div>
                 </div>
+                <div id="row2" class="row">
+                    <div class="col-md-4">
 
+                    </div>
+                </div>
             </div>
 
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
-                    integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
-                    crossorigin="anonymous"></script>
         </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+                crossorigin="anonymous"></script>
     </div>
+</div>
 </div>
 </div>
 </body>
