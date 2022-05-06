@@ -377,7 +377,6 @@ def look_for_objects(image):
 
 
 def compare_images(base, frame, r, base_color, frame_color):
-    # r = ['1', '3', '5', '29', '8', '11', '24', '44', '55', '64']
     h, w = frame.shape[:2]
     all_regions = []
     all_regions.extend(range(1, 65))
@@ -413,23 +412,21 @@ def compare_images(base, frame, r, base_color, frame_color):
     for i in r:
         ss = region_scores[int(i)]
         scores.append(ss)
-    # scores_average = mean(scores)
-
-    # print("Scores list is ", scores)
+    logging.info(scores)
     number_of_regions = len(r)
-    # print('number of regions ', number_of_regions)
     scores.sort(reverse=True)
     sum_scores = sum(scores)
 
     scores_average = sum_scores / number_of_regions
-    # print("scores", scores)
 
-    fv = cv2.Laplacian(frame_color, cv2.CV_64F).var()
-    # print("Focus Score is %.2f" % fv)
-    if scores_average < full_ss:
+    if len(r) > 0:
         full_ss = scores_average
+    # if scores_average < full_ss:
+    #     full_ss = scores_average
     full_ss = round(full_ss, 2)
     scores_average = round(scores_average, 2)
+
+    fv = cv2.Laplacian(frame_color, cv2.CV_64F).var()
     fv = round(fv, 2)
 
     blur = cv2.blur(frame, (5, 5))
