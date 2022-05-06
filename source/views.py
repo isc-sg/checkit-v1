@@ -598,27 +598,58 @@ def input_camera_for_regions(request):
 def display_regions(request):
     if request.method == "POST":
         form = RegionsForm(request.POST)
-        if form.is_valid():
+
+        if form.is_valid() and 'reset' in request.POST:
+            regions = '[]'
+        else:
             regions = str(form.cleaned_data['regions'])
-            camera_number = request.POST.get('camera_number')
-            camera_object = Camera.objects.get(camera_number=camera_number)
-            camera_object.image_regions = regions
-            camera_object.save()
 
-            initial_data = {'regions': eval(regions)}
-            form = RegionsForm(initial=initial_data)
+        camera_number = request.POST.get('camera_number')
+        camera_object = Camera.objects.get(camera_number=camera_number)
+        camera_object.image_regions = regions
+        camera_object.save()
 
-            url_id = camera_object.id
-            reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
+        initial_data = {'regions': eval(regions)}
+        form = RegionsForm(initial=initial_data)
 
-            if reference_images:
-                base64_image = get_base_image(reference_images, url_id, regions)
-                context = {
-                    'form': form,
-                    'camera_number': camera_number,
-                    'image': base64_image
-                }
-                return render(request, 'main_menu/regions_main_form.html', context=context)
+        url_id = camera_object.id
+        reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
+
+        if reference_images:
+            base64_image = get_base_image(reference_images, url_id, regions)
+            try:
+                log_obj = LogImage.objects.filter(url_id=url_id, action="Failed").last()
+                if not log_obj:
+                    raise ObjectDoesNotExist
+                else:
+                    region_scores = log_obj.region_scores
+                    creation_date = log_obj.creation_date
+                    regions = []
+                    scores = []
+                    for k, v in region_scores.items():
+                        regions.append(int(k))
+                        scores.append(v)
+                    sorted_regions = sorted(region_scores, key=region_scores.get)
+                    low_regions = sorted_regions[:8]
+                    for i in range(0, len(low_regions)):
+                        low_regions[i] = int(low_regions[i])
+                    high_regions = sorted_regions[-8:]
+                    for i in range(0, len(high_regions)):
+                        high_regions[i] = int(high_regions[i])
+                    scores_field = {'regions': [regions], 'scores': [scores], 'low_regions': low_regions,
+                                    'high_regions': high_regions}
+            except ObjectDoesNotExist:
+                scores_field = {}
+                creation_date = ""
+
+            context = {
+                'form': form,
+                'camera_number': camera_number,
+                'image': base64_image,
+                'scores_field': scores_field,
+                'creation_date': creation_date
+            }
+            return render(request, 'main_menu/regions_main_form.html', context=context)
 
     else:
         message = ""

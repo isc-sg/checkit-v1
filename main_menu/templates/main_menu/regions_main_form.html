@@ -7,7 +7,7 @@
 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
+    <!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
 
     <title>
         Check IT
@@ -16,15 +16,15 @@
 
     <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
     <!-- Nucleo Icons -->
-        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
-        <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
-        <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
-        <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
-        <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
-        <link rel="manifest" href="{% static '/site.webmanifest' %}">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-<!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
+    <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
+    <link rel="manifest" href="{% static '/site.webmanifest' %}">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+    <!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
     <!-- CSS Files -->
     <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
@@ -38,18 +38,19 @@
     table {
   font-family: arial, sans-serif;
   border-collapse: collapse;
-  width: 60%;
+  width: 50%;
 }
 
 td, th {
-  border: 1px solid #e3e3e3;
-  text-align: left;
-  padding: 8px;
+  border: 1px solid #2E3E64;
+  text-align: center;
+  padding: 6px;
 }
 
 tr:nth-child(even) {
-  background-color: #383c3c;
+  background-color: rgb(80, 80, 80, 0.3);
 }
+
 
 
 
@@ -180,87 +181,102 @@ tr:nth-child(even) {
                                 {% csrf_token %}
                                 {{ form.as_p }}
                                 <input type="submit" class="btn btn-secondary" value="Submit">
+                                <input type="submit" class="btn btn-secondary" name="reset" value="Reset">
                                 <input type="hidden" id="camera_number" name="camera_number" value={{camera_number}}>
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
-                                    <div class="row pl-2">
-                                        {% if creation_date %}
-                            <h5 class="title">Last log date/time {{creation_date}}</h5>
-                                        {% endif %}
-                                    </div>
-                                                    <div class="row pl-2">
+            <button class="btn btn-secondary" onclick="myFunction()">Last log</button>
+            <script>
+            function myFunction() {
+                                  var x = document.getElementById("log_history");
+                                  if (x.style.display === "none") {
+                                    x.style.display = "block";
+                                  } else {
+                                    x.style.display = "none";
+                                  }
+}
 
-                                <table>
-            <tr class="even">
-                {% for row in scores_field.regions %}
-                {% for value in row %}
-                {% if forloop.counter < 33 %}
-                {% if value in scores_field.low_regions %}
-                <td style="background: #f5365c; color: #000000">{{value}}</td>
-                {% elif value in scores_field.high_regions %}
-                <td style="background: #5e72e4; color: #000000">{{value}}</td>
-                {% else %}
-                <td>{{value}}</td>
-                {% endif %}
-                {% endif %}
-                {% endfor %}
-                {% endfor %}
-            </tr>
-
-            <tr>
-                {% for row in scores_field.scores %}
-
-                {% for value in row %}
-                {% if forloop.counter < 33 %}
-                <td style="color: #ffffff">{{value}}</td>
-                {% endif %}
-
-                {% endfor %}
-                {% endfor %}
-            </tr>
-
-            <tr>
-
-                {% for row in scores_field.regions %}
-
-                {% for value in row %}
-                {% if forloop.counter > 32 %}
-                {% if value in scores_field.low_regions %}
-                <td style="background: #f5365c; color: #000000">{{value}}</td>
-                {% elif value in scores_field.high_regions %}
-                <td style="background: #5e72e4; color: #000000">{{value}}</td>
-                {% else %}
-                <td>{{value}}</td>
-                {% endif %}
-                {% endif %}
-                {% endfor %}
-
-                {% endfor %}
-            </tr>
-
-            <tr>
-                {% for row in scores_field.scores %}
-
-                {% for value in row %}
-                {% if forloop.counter > 32 %}
-                <td style="color: #ffffff">{{value}}</td>
-                {% endif %}
-
-                {% endfor %}
-
-                {% endfor %}
-            </tr>
-        </table>
-                    </div>
-
+            </script>
+            <div id="log_history" style="display: none;">
+                <div class="row pl-2">
+                    {% if creation_date %}
+                    <h5 class="title">Last log date/time {{creation_date}}</h5>
+                    {% endif %}
                 </div>
+                <div class="row pl-2">
 
+                    <table>
+                        <tr class="even">
+                            {% for row in scores_field.regions %}
+                            {% for value in row %}
+                            {% if forloop.counter < 33 %}
+                            {% if value in scores_field.low_regions %}
+                            <td style="background: #E14ECA; background: radial-gradient(#ff0000, #493240); color: #000000">{{value}}</td>
+                            {% elif value in scores_field.high_regions %}
+                            <td style="background: #0F75E0; background: radial-gradient(#0575E6, #021B79); color: #000000">{{value}}</td>
+                            {% else %}
+                            <td>{{value}}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% endfor %}
+                            {% endfor %}
+                        </tr>
+
+                        <tr>
+                            {% for row in scores_field.scores %}
+
+                            {% for value in row %}
+                            {% if forloop.counter < 33 %}
+                            <td style="color: #ffffff">{{value}}</td>
+                            {% endif %}
+
+                            {% endfor %}
+                            {% endfor %}
+                        </tr>
+
+                        <tr>
+
+                            {% for row in scores_field.regions %}
+
+                            {% for value in row %}
+                            {% if forloop.counter > 32 %}
+                            {% if value in scores_field.low_regions %}
+                            <td style="background: #E14ECA; background: radial-gradient(#ff0000, #493240); color: #000000">{{value}}</td>
+                            {% elif value in scores_field.high_regions %}
+                            <td style="background: #0F75E0; background: radial-gradient(#0575E6, #021B79); color: #000000">{{value}}</td>
+                            {% else %}
+                            <td>{{value}}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% endfor %}
+
+                            {% endfor %}
+                        </tr>
+
+                        <tr>
+                            {% for row in scores_field.scores %}
+
+                            {% for value in row %}
+                            {% if forloop.counter > 32 %}
+                            <td style="color: #ffffff">{{value}}</td>
+                            {% endif %}
+
+                            {% endfor %}
+
+                            {% endfor %}
+                        </tr>
+                    </table>
+                </div>
             </div>
+
         </div>
+
     </div>
+</div>
+</div>
 </div>
 
 
