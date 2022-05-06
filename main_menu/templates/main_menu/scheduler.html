@@ -1,6 +1,6 @@
 <!doctype html>
 {% load bootstrap4 %}
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
 
 <head>
     {% load static %}
@@ -141,7 +141,7 @@
                 </div>
                 <div class="container-fluid">
 
-                    <h1 id="heading1">System Status</h1>
+                    <h3 id="heading1">System Status</h3>
 
                     <div id="container1">
                         <div id="row1" class="row">
@@ -187,7 +187,10 @@
                                     <h3></h3>
                                 </form>
                             </div>
+                        </div>
                             <h3>Run on a single camera</h3>
+                         <div class="col-md-3 pr-md-1">
+                            <div class="form-group">
                             <form method="post">
                                 {% csrf_token %}
 
@@ -201,6 +204,8 @@
                                 {% endif %}
 
                             </form>
+                            </div>
+                         </div>
                         </div>
                         <div id="row2" class="row">
                             <div class="col-md-4">
