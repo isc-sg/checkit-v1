@@ -1,14 +1,14 @@
 <!doctype html>
 {% load render_table from django_tables2 %}
 {% load bootstrap4 %}
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
 
 <head>
     {% load static %}
 
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
+    <!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
 
     <title>
         Check IT
@@ -17,19 +17,20 @@
 
     <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
     <!-- Nucleo Icons -->
-        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
-        <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
-        <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
-        <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
-        <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
-        <link rel="manifest" href="{% static '/site.webmanifest' %}">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-<!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
+    <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
+    <link rel="manifest" href="{% static '/site.webmanifest' %}">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+    <!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
     <!-- CSS Files -->
     <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
     <!-- CSS Just for demo purpose, don't include it in your project -->
+    <script src="{% static 'main_menu/chartjs.min.js' %}"></script>
 </head>
 <body>
 
@@ -72,7 +73,7 @@
                         {% else %}
                         <li>
                             <a href="/status/">
-<!--                                <i class="tim-icons icon-user-run"></i>-->
+                                <!--                                <i class="tim-icons icon-user-run"></i>-->
                                 <i class="fas fa-person-running"></i>
                                 <p>System Status</p>
                             </a>
@@ -80,7 +81,7 @@
                         {% endif %}
                         <li>
                             <a href="/cameras/">
-<!--                                <i class="tim-icons icon-video-66"></i>-->
+                                <!--                                <i class="tim-icons icon-video-66"></i>-->
                                 <i class="fas fa-video"></i>
 
                                 <p>Cameras</p>
@@ -112,9 +113,9 @@
                                 <p>Scheduler</p>
                             </a>
                         </li>
-                                                                        <li>
+                        <li>
                             <a href="/regions/">
-                                    <i class="fas fa-th"></i>
+                                <i class="fas fa-th"></i>
 
                                 <p>Regions</p>
                             </a>
@@ -137,40 +138,76 @@
                 </div>
             </div>
         </div>
-            <div class="main-panel">
-                    <div class="content">
-                                    <div class="row">
-        {% if user.is_authenticated %}
-        <div class="col-sm-10">
+        <div class="main-panel">
+            <div class="content">
+                <div class="row">
+                    {% if user.is_authenticated %}
+                    <div class="col-sm-10">
 
-            <div class="container-fluid">
+                        <div class="container-fluid">
 
-                <h1 id="heading1">System Status</h1>
+                            <h1 id="heading1">System Status</h1>
+                            <h3>Engine State</h3>
 
-                <div id="container1">
-                    <div id="row1" class="row">
 
-                        <div class="col-md-4">
-                            <i style="font-size:2em"> {{ system_state }}&nbsp;&nbsp;</i>
-                            {% if system_state == "STARTED" %}
-                            <i class="fa fa-traffic-light" style="color:green;font-size:4em;"></i>
-                            {% else %}
-                            <i class="fa fa-traffic-light" style="color:red;font-size:4em;"></i>
-                            {% endif %}
+                            <div id="container1">
+                                <div id="row1" class="row">
+                                    <div class="col-md-4">
+                                        <i style="font-size:2em"> {{ system_state }}&nbsp;&nbsp;</i>
+                                        {% if system_state == "STARTED" %}
+                                        <i class="fa fa-traffic-light" style="color:green;font-size:4em;"></i>
+                                        {% else %}
+                                        <i class="fa fa-traffic-light" style="color:red;font-size:4em;"></i>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                                                <p></p>
+                    <h3></h3>
+                    <h3>Disk Space</h3>
+                             <div class="col-md-4">
+                                <canvas id="myChart" style="width:100%;max-width:800px"></canvas>
+
+                                <script>
+                    var xValues = ["Used", "Free"];
+                    var yValues = [{{used}}, {{free}}];
+                    var barColors = [
+                      "red",
+                      "green",
+
+                    ];
+
+                    new Chart("myChart", {
+                      type: "doughnut",
+                      data: {
+                        labels: xValues,
+                        datasets: [{
+                          backgroundColor: barColors,
+                          borderColor: "#201F2C",
+                          data: yValues
+                        }]
+                      },
+                      options: {
+                        title: {
+                          display: true,
+                          text: "Usage / GB",
+                          fontSize: 14,
+                        }
+                      }
+                    });
+
+                                </script>
+                            </div>
                         </div>
                     </div>
-                </div>
+                    {% endif %}
 
+                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+                            integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+                            crossorigin="anonymous"></script>
+                </div>
             </div>
         </div>
-        {% endif %}
-
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
-                integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
-                crossorigin="anonymous"></script>
-    </div>
-</div>
-            </div>
     </div>
 </div>
 </body>
