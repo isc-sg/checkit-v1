@@ -31,7 +31,7 @@ from .filters import CameraFilter, LogFilter, EngineStateFilter
 import main_menu.select_region as select_region
 
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor
 
@@ -43,8 +43,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lin
 error_image = np.zeros((720, 1280, 3), np.uint8)
 
 error_image = cv2.putText(error_image, "Error retrieving image",
-                              (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
-                              (0, 0, 255), 2, cv2.LINE_AA)
+                          (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
+                          (0, 0, 255), 2, cv2.LINE_AA)
 
 
 def take_closest(my_list, my_number):
@@ -64,8 +64,8 @@ def take_closest(my_list, my_number):
         return after
     else:
         return before
-    
-    
+
+
 def get_base_image(reference_images_list, url_id, regions):
     time_stamp = datetime.datetime.now()
     hour = time_stamp.strftime('%H')
@@ -120,13 +120,19 @@ def get_transparent_edge(input_image, color):
 def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
+    statvfs = os.statvfs('/home/checkit')
+    total_disk_giga_bytes = statvfs.f_frsize * statvfs.f_blocks / (1024 * 1024 * 1024)
+    total_disk_giga_bytes_free = round(statvfs.f_frsize * statvfs.f_bavail / (1024 * 1024 * 1024), 2)
+    total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
     if obj is not None:
         state = obj.state
-        context = {'system_state': state}
+        context = {'system_state': state, 'used': total_disk_giga_bytes_used, 'free': total_disk_giga_bytes_free,
+                   'total': total_disk_giga_bytes}
     else:
-        context = {'system_state': "RUN COMPLETED"}
+        context = {'system_state': "RUN COMPLETED", 'used': total_disk_giga_bytes_used,
+                   'free': total_disk_giga_bytes_free, 'total': total_disk_giga_bytes}
     return HttpResponse(template.render(context, request))
 
 
@@ -408,6 +414,8 @@ def export_logs_to_csv(request):
 
         elif request.POST.get('action') == "Export PDF":
             image_list = []
+            log = []
+            base_image = ""
             for log in logs:
                 if log.action == "Failed":
                     camera_name = log.url.camera_name
@@ -419,71 +427,65 @@ def export_logs_to_csv(request):
                     for c in camera:
                         base_image = settings.MEDIA_ROOT + "/base_images/" + str(c.id) + "/" + hour + ".jpg"
                     matching_score = log.matching_score
-                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
-                                       log.action, log_image))
-            buffer = io.BytesIO()
-            c = canvas.Canvas(buffer, pagesize=A4)
+                    focus_value = log.focus_value
 
-            page_width, page_height = A4
+                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
+                                       focus_value, log_image))
+            buffer = io.BytesIO()
+            c = canvas.Canvas(buffer, pagesize=landscape(A4))
+
+            page_width, page_height = landscape(A4)
             if image_list:
                 while len(image_list) > 0:
                     left_margin_pos = 20
-                    top_margin_text_pos = 25
-                    top_margin_image_pos = 70
-                    second_image_pos = 90
+                    top_margin_text_pos = 23
+                    top_margin_image_pos = 67
+                    second_image_pos = 85
                     count = 0
                     c.setFillColor(HexColor("#a2a391"))
                     c.setStrokeColor(HexColor("#a2a391"))
 
-                    path = c.beginPath()
-                    path.moveTo(0 * cm, 0 * cm)
-                    path.lineTo(0 * cm, 30 * cm)
-                    path.lineTo(25 * cm, 30 * cm)
-                    path.lineTo(25 * cm, 0 * cm)
+                    c.rect(0, 0, page_width, page_height, stroke=1, fill=1)
                     # this creates a rectangle the size of the sheet
-                    c.drawPath(path, True, True)
                     c.setFillColor(HexColor("#000000"))
                     c.setStrokeColor(HexColor("#000000"))
 
                     c.setFont("Helvetica-BoldOblique", 18, )
-                    c.drawString(*coord(60, 10, page_height, mm),
-                                 text="Failed Images Report")
-                    # c.line(*coord(60, 12, page_height, mm), *coord(125, 12, page_height, mm))
+                    c.drawString(*coord(110, 10, page_height, mm), text="Failed Images Report")
+
                     c.setFont("Helvetica", 10)
-                    c.drawString(*coord(180, 10, page_height, mm),
-                                 text="Page " + str(c.getPageNumber()))
-                    for i in image_list[:4]:
-                        # print(i)
-                        camera_name, camera_number, creation_time, base_image, matching_score, log.action, log_image = i
-                        creation_time = creation_time
+                    c.drawString(*coord(270, 10, page_height, mm), text="Page " + str(c.getPageNumber()))
+                    for i in image_list[:3]:
+                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image = i
 
                         c.drawString(
-                            *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5, page_height,
-                                   mm),
-                            text=camera_name + " - Camera Number: " + str(camera_number))
-
+                            *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                                   page_height, mm), text="Camera Name: " + camera_name)
                         c.drawString(
-                            *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos), page_height, mm),
-                            text="Time: " + creation_time.strftime("%d-%b-%Y %H:%M:%S"))
-                        c.drawString(
-                            *coord(left_margin_pos + 90, top_margin_text_pos + (count * top_margin_image_pos), page_height,
-                                   mm),
-                            text="Matching Score: " + str(matching_score))
+                            *coord(left_margin_pos + 88, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                                   page_height, mm), text="Camera Number: " + str(camera_number))
+                        c.drawString(*coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos),
+                                            page_height, mm),
+                                     text="Capture: " + creation_time.strftime("%d-%b-%Y %H:%M %p"))
+                        c.drawString(*coord(left_margin_pos + 88, top_margin_text_pos + (count * top_margin_image_pos),
+                                            page_height, mm), text="Matching Score: " + str(matching_score) +
+                                                                   "            Focus Value: " + str(focus_value))
 
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
-                        scaling_factor = image_width / page_width
+                        scaling_factor = (image_width / page_width) * 1.3
                         c.setLineWidth(2)
                         c.setStrokeColor(HexColor("#b9b6a9"))
                         c.roundRect(left_margin_pos + 11,
                                     page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 139,
-                                    width=518, height=168, radius=4, stroke=1, fill=0)
+                                    width=773, height=168, radius=4, stroke=1, fill=0)
                         c.setStrokeColor(HexColor("#767368"))
                         c.roundRect(left_margin_pos + 10,
                                     page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 140,
-                                    width=520, height=170, radius=4, stroke=1, fill=0)
+                                    width=775, height=170, radius=4, stroke=1, fill=0)
                         c.drawImage(image_rl,
-                                    *coord(left_margin_pos, top_margin_image_pos + (count * top_margin_image_pos),
+                                    *coord(left_margin_pos - 2,
+                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
                                            page_height, mm),
                                     width=image_width / (mm * scaling_factor),
                                     height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
@@ -491,14 +493,27 @@ def export_logs_to_csv(request):
                         image_width, image_height = image_rl.getSize()
 
                         c.drawImage(image_rl2,
-                                    *coord(left_margin_pos + second_image_pos,
-                                           top_margin_image_pos + (count * top_margin_image_pos),
+                                    *coord(left_margin_pos + 2 + second_image_pos,
+                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
+                                           page_height, mm), width=image_width / (mm * scaling_factor),
+                                    height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+                        log_image_cv2 = cv2.imread(log_image)
+                        log_image_edges = get_transparent_edge(log_image_cv2, (0, 0, 255))
+                        log_image_edges = log_image_edges[:, :, :3]
+                        reference_image_cv2 = cv2.imread(base_image)
+                        merged_image = cv2.addWeighted(reference_image_cv2, 1, log_image_edges, 1, 0)
+                        cv2.imwrite("/tmp/merged_image.jpg", merged_image)
+                        image_rl3 = canvas.ImageReader("/tmp/merged_image.jpg")
+
+                        c.drawImage(image_rl3,
+                                    *coord(left_margin_pos + 2 + (2 * second_image_pos) + 5,
+                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
                                            page_height, mm), width=image_width / (mm * scaling_factor),
                                     height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
 
                         count += 1
                     c.showPage()
-                    del image_list[:4]
+                    del image_list[:3]
                 c.save()
                 buffer.seek(0)
 
@@ -584,7 +599,7 @@ def input_camera_for_regions(request):
                 'image': base64_image,
                 'scores_field': scores_field,
                 'creation_date': creation_date
-                      }
+            }
             return render(request, 'main_menu/regions_main_form.html', context=context)
         else:
             message = "No reference images for this camera"
