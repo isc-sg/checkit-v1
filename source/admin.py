@@ -21,6 +21,10 @@ import os
 from .models import Camera, ReferenceImage, LogImage
 from .resources import CameraResource, ReferenceImageResource
 
+admin.site.site_title = "CheckIT"
+admin.site.site_header = "CheckIT"
+admin.site.index_title = "CheckIT Admin"
+
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     resource_class = CameraResource
