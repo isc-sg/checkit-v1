@@ -428,9 +428,10 @@ def export_logs_to_csv(request):
                         base_image = settings.MEDIA_ROOT + "/base_images/" + str(c.id) + "/" + hour + ".jpg"
                     matching_score = log.matching_score
                     focus_value = log.focus_value
+                    light_level = log.light_level
 
                     image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
-                                       focus_value, log_image))
+                                       focus_value, log_image, light_level))
             buffer = io.BytesIO()
             c = canvas.Canvas(buffer, pagesize=landscape(A4))
 
@@ -456,7 +457,7 @@ def export_logs_to_csv(request):
                     c.setFont("Helvetica", 10)
                     c.drawString(*coord(270, 10, page_height, mm), text="Page " + str(c.getPageNumber()))
                     for i in image_list[:3]:
-                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image = i
+                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image, light_level = i
 
                         c.drawString(
                             *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5,
@@ -470,6 +471,8 @@ def export_logs_to_csv(request):
                         c.drawString(*coord(left_margin_pos + 88, top_margin_text_pos + (count * top_margin_image_pos),
                                             page_height, mm), text="Matching Score: " + str(matching_score) +
                                                                    "            Focus Value: " + str(focus_value))
+                        c.drawString(*coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos),
+                                            page_height, mm), text="Light Level: " + str(light_level))
 
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
