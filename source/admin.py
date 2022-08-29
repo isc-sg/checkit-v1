@@ -18,7 +18,8 @@ from rangefilter.filters import DateRangeFilter
 import os
 
 # Register your models here.
-from .models import Camera, ReferenceImage, LogImage
+# from .models import Camera, ReferenceImage, LogImage
+from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay
 from .resources import CameraResource, ReferenceImageResource
 
 admin.site.site_title = "CheckIT"
@@ -27,6 +28,9 @@ admin.site.index_title = "CheckIT Admin"
 
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
+    massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
+                         'slug']
+    filter_horizontal = ('scheduled_hours', 'scheduled_days')
     resource_class = CameraResource
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
     exclude = ('id',)
