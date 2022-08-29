@@ -37,6 +37,35 @@ class CameraURLField(models.URLField):
         })
 
 
+class DaysOfWeek(models.Model):
+
+    # DAY_MONDAY = 'Monday'
+    # DAY_TUESDAY = 'Tuesday'
+    # DAY_WEDNESDAY = 'Wednesday'
+    # DAY_THURSDAY = 'Thursday'
+    # DAY_FRIDAY = 'Friday'
+    # DAY_SATURDAY = 'Saturday'
+    # DAY_SUNDAY = 'Sunday'
+    # DAYS_CHOICES = [(DAY_MONDAY, 'Monday'),
+    #                 (DAY_TUESDAY, 'Tuesday'),
+    #                 (DAY_WEDNESDAY, 'Wednesday'),
+    #                 (DAY_THURSDAY, 'Thursday'),
+    #                 (DAY_FRIDAY, 'Friday'),
+    #                 (DAY_SATURDAY, 'Saturday'),
+    #                 (DAY_SUNDAY, 'Sunday')]
+    day_of_the_week = models.CharField("Days in the week", max_length=12)
+
+    def __str__(self):
+        return self.day_of_the_week
+
+
+class HoursInDay(models.Model):
+    hour_in_the_day = models.IntegerField("Hours in the Day")
+
+    def __str__(self):
+        return str(self.hour_in_the_day)
+
+
 class Camera(models.Model):
     url = models.CharField(max_length=255, unique=True, verbose_name="Camera URL")
     multicast_address = models.GenericIPAddressField(protocol='IPv4', blank=True, null=True, unique=True, default=None)
@@ -52,6 +81,8 @@ class Camera(models.Model):
                                              default=0.5)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
+    scheduled_hours = models.ManyToManyField(HoursInDay)
+    scheduled_days = models.ManyToManyField(DaysOfWeek)
     history = HistoricalRecords()
 
     def __str__(self):

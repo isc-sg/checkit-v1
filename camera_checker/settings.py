@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'main_menu',
     'simple_history',
     'rangefilter',
+    'massadmin',
 ]
 
 MIDDLEWARE = [
