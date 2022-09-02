@@ -58,7 +58,7 @@ close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
 def take_closest(my_list, my_number):
     """
-    Assumes my_list is sorted. Returns closest value to my_number.
+    Assumes my_list is sorted. Returns the closest value to my_number.
 
     If two numbers are equally close, return the smallest number.
     """
@@ -412,7 +412,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     for i in r:
         ss = region_scores[int(i)]
         scores.append(ss)
-    logging.info(scores)
+    # logging.info(scores)
     number_of_regions = len(r)
     scores.sort(reverse=True)
     sum_scores = sum(scores)

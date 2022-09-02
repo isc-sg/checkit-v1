@@ -14,6 +14,8 @@ from django.utils.html import escape
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from rangefilter.filters import DateRangeFilter
+from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDropdownFilter, ChoiceDropdownFilter
+
 
 import os
 
@@ -38,7 +40,8 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
                     'camera_location', 'matching_threshold',)
     readonly_fields = ["creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
-    list_filter = ['camera_location']
+    list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
+                   ('scheduled_days', RelatedDropdownFilter))
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -83,8 +86,8 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
     exclude = ('id',)
     list_display = ['url', 'hour', 'reference_image', 'get_location']
-    readonly_fields = ['hour', 'get_regions', 'reference_image', ]
-    list_filter = ['hour', 'url__camera_location']
+    readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level']
+    list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter))
 
     def get_regions(self, obj):
         return obj.url.image_regions
@@ -110,7 +113,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
-    list_filter = [('creation_date', DateRangeFilter), 'url__camera_location']
+    list_filter = (('creation_date', DateRangeFilter), ('url__camera_location', DropdownFilter))
 
     def log_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(

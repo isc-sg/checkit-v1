@@ -92,18 +92,34 @@ def get_camera_ids(camera_numbers, checkit_cursor):
         joined_string = ' '.join(map(str, camera_numbers))
         sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
     else:
-        sql_statement = "SELECT id FROM main_menu_camera"
+        # sql_statement = "SELECT id FROM main_menu_camera"
+
+        current_hour = datetime.datetime.now().hour
+        current_day = datetime.datetime.now().strftime("%A")
+
+        sql_statement = """select id from main_menu_daysofweek where day_of_the_week = """ + "\"" + current_day + "\""
+        checkit_cursor.execute(sql_statement)
+        day_index = checkit_cursor.fetchone()[0]
+
+        sql_statement = """select id from main_menu_hoursinday where hour_in_the_day = """ + str(current_hour)
+        checkit_cursor.execute(sql_statement)
+        hour_index = checkit_cursor.fetchone()[0]
+
+        sql_statement = "SELECT main_menu_camera_scheduled_hours.camera_id FROM main_menu_camera_scheduled_hours " \
+                        "JOIN main_menu_camera_scheduled_days " \
+                        "ON main_menu_camera_scheduled_days.camera_id = main_menu_camera_scheduled_hours.camera_id " \
+                        "WHERE main_menu_camera_scheduled_days.daysofweek_id = " + str(day_index) + \
+                        " AND main_menu_camera_scheduled_hours.hoursinday_id = " + str(hour_index)
 
     try:
         # checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement)
         z = checkit_cursor.fetchall()
         ids = [x[0] for x in z]
-        # print(list_to_process)
+        print(ids)
     except mysql.connector.Error as e:
         logging.error(f"Database connection error {e}")
         exit(1)
-
     return ids
 
 

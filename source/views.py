@@ -128,10 +128,10 @@ def index(request):
     obj = EngineState.objects.last()
     if obj is not None:
         state = obj.state
-        context = {'system_state': state, 'used': total_disk_giga_bytes_used, 'free': total_disk_giga_bytes_free,
+        context = {'system_state': state.title(), 'used': total_disk_giga_bytes_used, 'free': total_disk_giga_bytes_free,
                    'total': total_disk_giga_bytes}
     else:
-        context = {'system_state': "RUN COMPLETED", 'used': total_disk_giga_bytes_used,
+        context = {'system_state': "Run Completed", 'used': total_disk_giga_bytes_used,
                    'free': total_disk_giga_bytes_free, 'total': total_disk_giga_bytes}
     return HttpResponse(template.render(context, request))
 
@@ -221,15 +221,73 @@ def scheduler(request):
     # get the actual state from the engine here and pass it to context
     obj = EngineState.objects.last()
     if obj is not None:
-        state = obj.state
+        state = obj.state.title()
     else:
-        state = "RUN COMPLETED"
+        state = "Run Completed"
     license_obj = Licensing.objects.last()
     run_schedule = license_obj.run_schedule
-    context = {'system_state': state, 'run_schedule': run_schedule}
+    tmp_file_name = "/tmp/" + str(uuid.uuid4())
+    command = "/usr/bin/crontab -l"
+    tmp_file = open(tmp_file_name, "w")
+    tmp_file.write(command)
+    tmp_file.close()
+    try:
+        # logging.info("process")
+        process = subprocess.Popen(command,  stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        out, err = process.communicate()
+        # logging.info(out, err)
+
+        if err == b"no crontab for www-data\n":
+            scheduler_status = "Scheduler Off"
+        else:
+            scheduler_status = "Scheduler Running"
+    except:
+        logging.error("crontab look up failed")
+    context = {'system_state': state, 'run_schedule': run_schedule, "scheduler_status": scheduler_status}
 
     # can use pid method to check if actually running. see compare_images_v2
+    if request.method == 'POST' and 'toggle_scheduler' in request.POST:
+        # logging.info("toggle scheduler")
+        try:
+            tmp_file_name = "/tmp/" + str(uuid.uuid4())
+            command = "/usr/bin/crontab -l"
+            tmp_file = open(tmp_file_name, "w")
+            tmp_file.write(command)
+            tmp_file.close()
+            # logging.info("about to proc")
 
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            # process.wait()
+            out, err = process.communicate()
+            # logging.info("done proc", process.returncode)
+
+            # logging.info("out,err", out, err)
+            # logging.info("error on communicate")
+            if err == b"no crontab for www-data\n":
+                # logging.info("Turning on")
+                tmp_file_name = "/tmp/" + str(uuid.uuid4())
+                command = "0 */1 * * * /home/checkit/env/bin/python " \
+                          "/home/checkit/camera_checker/main_menu/start.py \n"
+                tmp_file = open(tmp_file_name, "w")
+                tmp_file.write(command)
+                command = "/usr/bin/crontab " + tmp_file_name
+                # logging.info(command)
+                tmp_file.close()
+                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                return HttpResponseRedirect(reverse(scheduler))
+            else:
+                # logging.info("Turning off")
+                tmp_file_name = "/tmp/" + str(uuid.uuid4())
+                command = "/usr/bin/crontab -r"
+                tmp_file = open(tmp_file_name, "w")
+                tmp_file.write(command)
+                tmp_file.close()
+                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                # out, err = process.communicate()
+                # logging.info("did cron")
+                return HttpResponseRedirect(reverse(scheduler))
+        except:
+            logging.error("crontab look up failed")
     if request.method == 'POST' and 'start_engine' in request.POST:
         logging.info("User {u} started engine".format(u=user_name))
         # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
@@ -240,39 +298,39 @@ def scheduler(request):
         logging.info("Process Output {p}".format(p=process_output))
 
         return HttpResponseRedirect(reverse(index))
-    if request.method == 'POST' and 'new_run' in request.POST:
-        new_run_schedule = request.POST.get('new_run')
-        old_run_schedule = license_obj.run_schedule
-        if new_run_schedule != old_run_schedule:
-            license_obj.run_schedule = new_run_schedule
-            license_obj.save()
-            tmp_file_name = "/tmp/" + str(uuid.uuid4())
-
-            if int(new_run_schedule) == 0:
-                command = "/usr/bin/crontab -r"
-                logging.info("User {u} set scheduler to not running".format(u=user_name))
-            else:
-
-                # command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
-                #           " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
-                tmp_file = open(tmp_file_name, "w")
-                tmp_file.write("0 */" + new_run_schedule +
-                               " * * * /home/checkit/env/bin/python /home/checkit/camera_checker/main_menu/start.py \n")
-                tmp_file.close()
-                # command = "/bin/echo 0 *" + "/" + new_run_schedule + \
-                #           " \* \* \* /home/checkit/env/bin/python " \
-                #           "/home/checkit/camera_checker/main_menu/start.py | sudo -n crontab -u www-data "
-                command = "crontab " + tmp_file_name
-
-            subprocess.Popen(command, shell=True)
-            command = "rm " + tmp_file_name
-            try:
-                subprocess.Popen(command, shell=True)
-            except:
-                pass
-            logging.info(f"User {user_name} modified run schedule to {new_run_schedule}"
-                         f" hours from {old_run_schedule} hours")
-        return HttpResponseRedirect(reverse(scheduler))
+    # if request.method == 'POST' and 'new_run' in request.POST:
+    #     new_run_schedule = request.POST.get('new_run')
+    #     old_run_schedule = license_obj.run_schedule
+    #     if new_run_schedule != old_run_schedule:
+    #         license_obj.run_schedule = new_run_schedule
+    #         license_obj.save()
+    #         tmp_file_name = "/tmp/" + str(uuid.uuid4())
+    #
+    #         if int(new_run_schedule) == 0:
+    #             command = "/usr/bin/crontab -r"
+    #             logging.info("User {u} set scheduler to not running".format(u=user_name))
+    #         else:
+    #
+    #             # command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
+    #             #           " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
+    #             tmp_file = open(tmp_file_name, "w")
+    #             tmp_file.write("0 */" + new_run_schedule +
+    #                            " * * * /home/checkit/env/bin/python /home/checkit/camera_checker/main_menu/start.py \n")
+    #             tmp_file.close()
+    #             # command = "/bin/echo 0 *" + "/" + new_run_schedule + \
+    #             #           " \* \* \* /home/checkit/env/bin/python " \
+    #             #           "/home/checkit/camera_checker/main_menu/start.py | sudo -n crontab -u www-data "
+    #             command = "crontab " + tmp_file_name
+    #
+    #         subprocess.Popen(command, shell=True)
+    #         command = "rm " + tmp_file_name
+    #         try:
+    #             subprocess.Popen(command, shell=True)
+    #         except:
+    #             pass
+    #         logging.info(f"User {user_name} modified run schedule to {new_run_schedule}"
+    #                      f" hours from {old_run_schedule} hours")
+    #     return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'camera_check' in request.POST:
         input_number = request.POST.get('camera_check')
         try:

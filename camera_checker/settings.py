@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'simple_history',
     'rangefilter',
     'massadmin',
+    'django_admin_listfilter_dropdown',
 ]
 
 MIDDLEWARE = [

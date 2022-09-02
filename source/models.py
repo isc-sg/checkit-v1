@@ -79,10 +79,16 @@ class Camera(models.Model):
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
                                              validators=[MaxValueValidator(1), MinValueValidator(0)],
                                              default=0.5)
+    focus_value_threshold = models.DecimalField(max_digits=6, decimal_places=2,
+                                                validators=[MaxValueValidator(9999), MinValueValidator(0)],
+                                                default=200)
+    light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
+                                                validators=[MaxValueValidator(255), MinValueValidator(0)],
+                                                default=120)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
-    scheduled_hours = models.ManyToManyField(HoursInDay)
-    scheduled_days = models.ManyToManyField(DaysOfWeek)
+    scheduled_hours = models.ManyToManyField(HoursInDay, blank=True)
+    scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True)
     history = HistoricalRecords()
 
     def __str__(self):
