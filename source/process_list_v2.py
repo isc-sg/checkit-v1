@@ -457,7 +457,7 @@ def no_base_image(record):
 
     if not capture_device.isOpened():
         logging.error(f"unable to open capture device {record[camera_url_index]}")
-        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
         table = "main_menu_logimage"
         fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
                  "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
@@ -577,7 +577,7 @@ def process_list(list_of_cameras):
                         logging.error(f"Base image is logged but unable to file {base_image}")
                         exit()
                     time_stamp = datetime.datetime.now()
-                    time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S.%f")
+                    time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S")
                     directory = "/home/checkit/camera_checker/media/logs/" + str(time_stamp.year) + "/" + \
                                 str(time_stamp.month) + "/" + str(time_stamp.day)
                     log_image_file_name = directory + "/" + str(current_record[camera_id_index]) + \
@@ -653,7 +653,7 @@ def process_list(list_of_cameras):
                             increment_transaction_count()
                 else:
                     # print("unable to read")
-                    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+                    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
 
                     table = "main_menu_logimage"
                     fields = "(url_id, image, matching_score, region_scores, " \
