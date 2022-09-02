@@ -613,7 +613,7 @@ def process_list(list_of_cameras):
 
                         if reference_dimensions != capture_dimensions or status == "failed":
                             logging.error(f"Image sizes don't match on camera number {current_record[camera_number_index]}")
-                            now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+                            now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
                             sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
                             table = "main_menu_logimage"
                             fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
