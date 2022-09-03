@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import uuid
 
-from django.http import HttpResponse, HttpResponseRedirect, FileResponse
+from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
@@ -35,6 +35,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor
+
+from zipfile import ZipFile, ZIP_DEFLATED
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -133,13 +135,37 @@ def index(request):
     total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
+    if request.user.is_superuser:
+        print("is super")
+        admin_user = "True"
+    else:
+        admin_user = "False"
+    if request.method == 'POST' and 'download_logs' in request.POST:
+        log_files = ["/home/checkit/camera_checker/logs/checkit.log",
+                     "/var/log/monit.log",
+                     "/var/log/syslog",
+                     "/var/log/kern.log",
+                     "/var/log/auth.log",
+                     "/var/log/apache2/access.log",
+                     "/var/log/apache2/error.log",
+                     ]
+        log_file_zipped = "/tmp/logs.zip"
+        with ZipFile(log_file_zipped, "w", ZIP_DEFLATED) as archive:
+            for log_file in log_files:
+                archive.write(log_file)
+        if os.path.exists(log_file_zipped):
+            with open(log_file_zipped, 'rb') as fh:
+                response = HttpResponse(fh.read(), content_type="application/octet-stream")
+                response['Content-Disposition'] = 'inline; filename=' + os.path.basename(log_file_zipped)
+                return response
+        raise Http404
     if obj is not None:
         state = obj.state
         context = {'system_state': state.title(), 'used': total_disk_giga_bytes_used, 'free': total_disk_giga_bytes_free,
-                   'total': total_disk_giga_bytes}
+                   'total': total_disk_giga_bytes, "admin_user": admin_user}
     else:
         context = {'system_state': "Run Completed", 'used': total_disk_giga_bytes_used,
-                   'free': total_disk_giga_bytes_free, 'total': total_disk_giga_bytes}
+                   'free': total_disk_giga_bytes_free, 'total': total_disk_giga_bytes, "admin_user": admin_user}
     return HttpResponse(template.render(context, request))
 
 
@@ -225,7 +251,6 @@ def scheduler(request):
     # permissions = get_user_permissions(request.user)
     # print(permissions)
     if request.user.is_superuser:
-        print("is super")
         admin_user = "True"
     else:
         admin_user = "False"
@@ -438,6 +463,11 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
+def download_system_logs(request):
+    response = HttpResponse(
+        content_type='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
+    )
 
 def export_logs_to_csv(request):
     selection = request.POST.getlist("selection")
