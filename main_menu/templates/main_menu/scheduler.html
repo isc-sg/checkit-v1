@@ -174,7 +174,10 @@
 
                                 <form method="post">
                                     {% csrf_token %}
+                                                        {% if admin_user == "True" %}
                                     <button class="btn" type="submit" name="toggle_scheduler">Toggle Scheduler</button>
+                                                        {% endif %}
+
                                     <br>
 
                                     <i style="font-size:2em"> {{ scheduler_status }} &nbsp;&nbsp;</i>

@@ -22,6 +22,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.views.decorators.cache import cache_control
+from django.contrib.auth.models import Permission
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage
@@ -103,6 +104,12 @@ def get_base_image(reference_images_list, url_id, regions):
 def coord(x, y, h, unit=1):
     x, y = x * unit, h - y * unit
     return x, y
+
+
+def get_user_permissions(user):
+    if user.is_superuser:
+        return Permission.objects.all()
+    return user.user_permissions.all() | Permission.objects.filter(group__user=user)
 
 
 def get_transparent_edge(input_image, color):
@@ -212,9 +219,17 @@ def compare_images(request):
         return redirect('logs')
 
 
-@permission_required('camera_checker.main_menu')
+# @permission_required('camera_checker.main_menu')
 def scheduler(request):
     user_name = request.user.username
+    # permissions = get_user_permissions(request.user)
+    # print(permissions)
+    if request.user.is_superuser:
+        print("is super")
+        admin_user = "True"
+    else:
+        admin_user = "False"
+
     logging.info("User {u} access to Scheduler".format(u=user_name))
 
     template = loader.get_template('main_menu/scheduler.html')
@@ -243,7 +258,8 @@ def scheduler(request):
             scheduler_status = "Scheduler Running"
     except:
         logging.error("crontab look up failed")
-    context = {'system_state': state, 'run_schedule': run_schedule, "scheduler_status": scheduler_status}
+    context = {'system_state': state, 'run_schedule': run_schedule,
+               "scheduler_status": scheduler_status, "admin_user": admin_user}
 
     # can use pid method to check if actually running. see compare_images_v2
     if request.method == 'POST' and 'toggle_scheduler' in request.POST:
