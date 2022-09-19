@@ -569,10 +569,12 @@ def licensing(request):
     if request.FILES:
         uploaded_file = request.FILES['myfile'].read()
         f = Fernet(key)
-        decrypted_file = f.decrypt(uploaded_file).decode()
-        print(decrypted_file)
+        try:
+            decrypted_file = f.decrypt(uploaded_file).decode()
+        except InvalidToken:
+            context['status'] = "ERROR: Invalid file"
+            return HttpResponse(template.render(context, request))
         license_details = ast.literal_eval(decrypted_file)
-        print(license_details['machine_uuid'])
         uploaded_end_date = license_details['end_date']
         uploaded_purchased_cameras = license_details['purchased_cameras']
         uploaded_purchased_transactions = license_details['purchased_transactions']
@@ -589,7 +591,6 @@ def licensing(request):
             return HttpResponse(template.render(context, request))
 
         else:
-            print("MATCH _ save license now")
             adm_db_config = {
                 "host": "localhost",
                 "user": "root",
@@ -607,12 +608,9 @@ def licensing(request):
                 sql_statement = "SELECT * from adm ORDER BY id DESC LIMIT 1"
                 admin_cursor.execute(sql_statement)
                 result = admin_cursor.fetchone()
-                print('result', result)
                 remaining_transactions = 0
                 if result:
-                    print("stuff in it", result[2], result[1])
                     remaining_transactions = result[1] - result[2]
-                    print(remaining_transactions)
                     new_license_key = get_hash("{}{}{}{}".format(uploaded_purchased_transactions, uploaded_end_date,
                                                result[4], uploaded_purchased_cameras))
                     if new_license_key != uploaded_license_key:
@@ -620,8 +618,7 @@ def licensing(request):
                         context['status'] = "ERROR: License keys mismatch"
                         return HttpResponse(template.render(context, request))
                 else:
-                    print("its empty")
-                print(uploaded_customer_name, uploaded_site_name)
+                    pass
                 sql_statement = """INSERT INTO adm (tx_count, tx_limit, end_date, license_key, camera_limit, 
                                    customer_name, site_name) VALUES (%s,%s,%s,%s,%s,%s,%s)"""
                 values = (remaining_transactions, uploaded_purchased_transactions, uploaded_end_date,
