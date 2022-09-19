@@ -36,6 +36,7 @@ import requests
 import configparser
 import select_region
 from bisect import bisect_left
+import hashlib
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -54,6 +55,41 @@ open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
 # list_to_process = [[4210, 4211, 4212, 4213, 4214, 4215, 4216, 4217], [4218, 4219, 4220, 4221, 4222, 4223, 4224, 4225], [4226, 4227, 4228, 4229, 4230, 4231, 4232, 4233], [4234, 4235, 4236, 4237, 4238, 4239, 4240, 4241], [4242, 4243, 4244, 4245, 4246, 4247, 4248, 4249], [4250, 4251, 4252, 4253, 4254, 4255, 4256, 4257], [4258, 4259, 4260, 4261, 4262, 4263, 4264, 4265], [4266, 4267, 4268, 4269, 4270, 4271, 4272, 4273], [4274, 4275, 4276, 4277, 4278, 4279, 4280, 4281], [4282, 4283, 4284, 4285, 4286, 4287, 4288, 4289], [4290, 4291, 4292, 4293, 4294, 4295, 4296, 4297], [4298, 4299, 4300, 4301, 4302, 4303, 4304, 4305], [4306, 4307, 4308, 4309, 4310, 4311, 4312, 4313], [4314, 4315, 4316, 4317, 4318, 4319, 4320, 4321], [4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329], [4330, 4331, 4332, 4333, 4334, 4335, 4336, 4337], [4338, 4339, 4340, 4341, 4342, 4343, 4344, 4345], [4346, 4347, 4348, 4349, 4350, 4351, 4352, 4353], [4354, 4355, 4356, 4357, 4358, 4359]]
+
+
+checkit_secret = "Checkit65911760424"[::-1].encode()
+
+key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+
+def get_encrypted(password):
+    h = hashlib.blake2b(digest_size=64, key=checkit_secret)
+    h.update(password.encode())
+    h_in_hex = h.hexdigest().upper()
+    return h_in_hex
+
+
+def get_mysql_password():
+    fd = open("/etc/machine-id", "r")
+    machine_id = fd.read()
+    machine_id = machine_id.strip("\n")
+
+    shell_output = subprocess.check_output("/bin/df", shell=True)
+    l1 = shell_output.decode('utf-8').split("\n")
+    command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+
+    command = "/sbin/blkid | grep " + root_dev
+    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+
+    command = "sudo dmidecode | grep -i uuid"
+    product_uuid = subprocess.check_output(command, shell=True).decode(). \
+        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
+
+    finger_print = (root_fs_uuid + machine_id + product_uuid)
+    fingerprint_encrypted = get_encrypted(finger_print)
+    mysql_password = fingerprint_encrypted[10:42][::-1]
+    return mysql_password
 
 
 def take_closest(my_list, my_number):
@@ -118,16 +154,17 @@ def create_key(em):
 license_file = open("/etc/checkit/checkit.lic", "r")
 registered_key = license_file.readline().strip('\n')
 email = license_file.readline().strip('\n')
-license_key, password = create_key(email)
+license_key, old_password = create_key(email)
+password = get_mysql_password()
 if license_key != registered_key:
     logging.error("Licensing error")
     exit(0)
 
 
-my_db = mysql.connector.connect(host="localhost",
-                                user="checkit",
-                                password="checkit",
-                                database="checkit")
+# my_db = mysql.connector.connect(host="localhost",
+#                                 user="checkit",
+#                                 password="checkit",
+#                                 database="checkit")
 
 
 def init_pools():
@@ -506,12 +543,12 @@ def no_base_image(record):
 def increment_transaction_count():
     table = "main_menu_licensing"
     fields = "transaction_count =  transaction_count + 1"
-    where = " WHERE id = 1"
+    where = " ORDER BY id DESC LIMIT 1"
     sql_update(table, fields, where)
 
     table = "adm"
     fields = "tx_count =  tx_count + 1"
-    where = " WHERE id = 1"
+    where = " ORDER BY id DESC LIMIT 1"
     sql_update_adm(table, fields, where)
 
 
@@ -674,12 +711,12 @@ def start_processes(list_to_process):
     # mp.set_start_method("spawn")
     # print(list_to_process)
     number_of_cores = pathos.multiprocessing.cpu_count()*2
-    start = timer()
+    # start = timer()
     with Pool(number_of_cores) as p:
         p.map(process_list, list_to_process)
         p.close()
         p.join()
-    end = timer()
+    # end = timer()
 #
 #
 # if __name__ == "__main__":

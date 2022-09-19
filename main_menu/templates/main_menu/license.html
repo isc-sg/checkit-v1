@@ -29,6 +29,22 @@
     <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
     <!-- CSS Just for demo purpose, don't include it in your project -->
+    <style>
+input {
+    margin-top: 1rem;
+}
+
+input::file-selector-button {
+    font-weight: normal;
+    background: none;
+    color: white;
+    padding: 0em;
+    border: none;
+    border-radius: 0px;
+}
+
+
+</style>
 </head>
 <body>
 
@@ -218,13 +234,30 @@
                                                             <span> {{ transaction_count }}</span>
                                                         </div>
                                                     </div>
+                                                    <form method="post">
+                                    {% csrf_token %}
+                                    <button class="btn btn-round" formmethod="post" type="submit" name="download_license">Download License</button>
+                                    <br>
+                                                    </form>
                                                 </div>
+
                                             </div>
+
                                         </div>
+
                                     </form>
+
                                 </div>
 
                             </div>
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="file" class="btn btn-round" name="myfile">
+                                <button class="btn btn-round" type="submit">Upload License</button>
+                            </form>
+                            <br>
+                                                                               <h2> {{ status }} </h2>
+
                         </div>
 
                     </div>

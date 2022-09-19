@@ -1,5 +1,7 @@
+import ast
 import datetime
 import subprocess
+from subprocess import PIPE, Popen
 import csv
 import os
 import io
@@ -10,6 +12,7 @@ from bisect import bisect_left
 import cv2
 import numpy as np
 import uuid
+import mysql.connector
 
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404
 from django.template import loader
@@ -35,6 +38,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor
+import hashlib
+import json
+from cryptography.fernet import Fernet, InvalidToken
 
 from zipfile import ZipFile, ZIP_DEFLATED
 
@@ -49,10 +55,112 @@ error_image = cv2.putText(error_image, "Error retrieving image",
                           (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
                           (0, 0, 255), 2, cv2.LINE_AA)
 
+checkit_secret = "Checkit65911760424"[::-1].encode()
+
+key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+
+def get_hash(key_string):
+    h = hashlib.blake2b(digest_size=64, key=checkit_secret)
+    h.update(key_string.encode())
+    return h.hexdigest().upper()
+
+
+def check_adm_database(password):
+    adm_db_config = {
+        "host": "localhost",
+        "user": "root",
+        "password": password,
+        "database": "adm"
+    }
+
+    adm_db = mysql.connector.connect(**adm_db_config)
+
+    try:
+        admin_cursor = adm_db.cursor()
+        sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
+        admin_cursor.execute(sql_statement)
+        result = admin_cursor.fetchone()
+        if result:
+            field_names = [i[0] for i in admin_cursor.description]
+
+            current_transaction_count_index = field_names.index('tx_count')
+            current_transaction_limit_index = field_names.index('tx_limit')
+            current_end_date_index = field_names.index('end_date')
+            current_camera_limit_index = field_names.index('camera_limit')
+            current_license_key = field_names.index('license_key')
+
+            current_transaction_count = result[current_transaction_count_index]
+            current_transaction_limit = result[current_transaction_limit_index]
+            current_end_date = result[current_end_date_index]
+            current_camera_limit = result[current_camera_limit_index]
+            current_license_key = result[current_license_key]
+        else:
+            current_transaction_count = 0
+            current_transaction_limit = 0
+            current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_camera_limit = 0
+            current_license_key = ""
+        # TODO clean up long lines by making this list of variables a dictionary. Helps creating long lines.
+        adm_db.close()
+
+    except mysql.connector.Error as e:
+        current_transaction_count = 0
+        current_transaction_limit = 0
+        current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+        current_camera_limit = 0
+        current_license_key = ""
+    return current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key
+
+
+def get_encrypted(password):
+    h = hashlib.blake2b(digest_size=64, key=checkit_secret)
+    h.update(password.encode())
+    h_in_hex = h.hexdigest().upper()
+    return h_in_hex
+
+
+def get_license_details():
+    f = Fernet(key)
+
+    fd = open("/etc/machine-id", "r")
+    machine_uuid = fd.read()
+    machine_uuid = machine_uuid.strip("\n")
+
+    shell_output = subprocess.check_output("/bin/df", shell=True)
+    l1 = shell_output.decode('utf-8').split("\n")
+    command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+
+    command = "/sbin/blkid | grep " + root_dev
+    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+
+    command = "sudo dmidecode | grep -i uuid"
+    product_uuid = subprocess.check_output(command, shell=True).decode(). \
+        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
+
+    finger_print = (root_fs_uuid + machine_uuid + product_uuid)
+    fingerprint_encrypted = get_encrypted(finger_print)
+    mysql_password = fingerprint_encrypted[10:42][::-1]
+    current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key = check_adm_database(mysql_password)
+
+    # check adm DB if license details exist - if so load them.  Need to modify compare_images_v4 and process_list
+    # with new logic to get password license details.
+
+    license_dict = {"end_date": current_end_date,
+                    "purchased_transactions": current_transaction_limit,
+                    "purchased_cameras": current_camera_limit,
+                    "license_key": current_license_key,
+                    "machine_uuid": machine_uuid,
+                    "root_fs_uuid": root_fs_uuid,
+                    "product_uuid": product_uuid}
+    encoded_string = f.encrypt(str(license_dict).encode())
+    return machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password
+
 
 def take_closest(my_list, my_number):
     """
-    Assumes my_list is sorted. Returns closest value to my_number.
+    Assumes my_list is sorted. Returns the closest value to my_number.
 
     If two numbers are equally close, return the smallest number.
     """
@@ -161,7 +269,8 @@ def index(request):
         raise Http404
     if obj is not None:
         state = obj.state
-        context = {'system_state': state.title(), 'used': total_disk_giga_bytes_used, 'free': total_disk_giga_bytes_free,
+        context = {'system_state': state.title(), 'used': total_disk_giga_bytes_used,
+                   'free': total_disk_giga_bytes_free,
                    'total': total_disk_giga_bytes, "admin_user": admin_user}
     else:
         context = {'system_state': "Run Completed", 'used': total_disk_giga_bytes_used,
@@ -265,7 +374,7 @@ def scheduler(request):
     else:
         state = "Run Completed"
     license_obj = Licensing.objects.last()
-    run_schedule = license_obj.run_schedule
+    # run_schedule = license_obj.run_schedule
     tmp_file_name = "/tmp/" + str(uuid.uuid4())
     command = "/usr/bin/crontab -l"
     tmp_file = open(tmp_file_name, "w")
@@ -273,7 +382,7 @@ def scheduler(request):
     tmp_file.close()
     try:
         # logging.info("process")
-        process = subprocess.Popen(command,  stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out, err = process.communicate()
         # logging.info(out, err)
 
@@ -283,7 +392,7 @@ def scheduler(request):
             scheduler_status = "Scheduler Running"
     except:
         logging.error("crontab look up failed")
-    context = {'system_state': state, 'run_schedule': run_schedule,
+    context = {'system_state': state,
                "scheduler_status": scheduler_status, "admin_user": admin_user}
 
     # can use pid method to check if actually running. see compare_images_v2
@@ -332,13 +441,28 @@ def scheduler(request):
     if request.method == 'POST' and 'start_engine' in request.POST:
         logging.info("User {u} started engine".format(u=user_name))
         # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
-        process_output = subprocess.check_output(["/home/checkit/env/bin/python",
-                                                  "/home/checkit/camera_checker/main_menu/start.py"])
-        if process_output.decode() == '':
+        # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
+        #                                           "/home/checkit/camera_checker/main_menu/start.py"])
+        process = Popen(["/home/checkit/env/bin/python",
+                         "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        return_code = process.returncode
+        print('return_code', return_code)
+        if return_code == 33:
+            context = {"error": "Licensing Error"}
+            return HttpResponse(template.render(context, request))
+        elif return_code == 0:
+            logging.info(f"User {user_name} completed camera check for all cameras")
             process_output = "Run Completed - No errors reported"
-        logging.info("Process Output {p}".format(p=process_output))
+            logging.info("Process Output {p}".format(p=process_output))
+            return HttpResponseRedirect(reverse(index))
+            # if process_output.decode() == '':
+            #     process_output = "Run Completed - No errors reported"
+        else:
+            logging.error("Error in camera check for all cameras - {}".format(stderr))
+            context = {"error": "Error Checking Camera"}
+            return HttpResponse(template.render(context, request))
 
-        return HttpResponseRedirect(reverse(index))
     # if request.method == 'POST' and 'new_run' in request.POST:
     #     new_run_schedule = request.POST.get('new_run')
     #     old_run_schedule = license_obj.run_schedule
@@ -386,13 +510,27 @@ def scheduler(request):
         camera_number = str(camera_object.camera_number)
         # process_output = subprocess.check_output(["/home/checkit/camera_checker/main_menu/compare_images_v2.bin",
         #                                           camera_number])
-        process_output = subprocess.check_output(["/home/checkit/env/bin/python",
-                                                  "/home/checkit/camera_checker/main_menu/start.py", camera_number])
-        logging.info(f"User {user_name} completed camera check for camera {camera_number}")
-        if process_output.decode() == '':
+        # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
+        #                                           "/home/checkit/camera_checker/main_menu/start.py", camera_number])
+        child_process = Popen(["/home/checkit/env/bin/python",
+                              "/home/checkit/camera_checker/main_menu/start.py", camera_number],
+                              stdout=PIPE, stderr=PIPE)
+        stdout, stderr = child_process.communicate()
+        return_code = child_process.returncode
+        print('return_code', return_code)
+        if return_code == 33:
+            pass
+            context = {"error": "Licensing Error"}
+            return HttpResponse(template.render(context, request))
+        elif return_code == 0:
+            logging.info(f"User {user_name} completed camera check for camera {camera_number}")
             process_output = "Run Completed - No errors reported"
-        logging.info("Process Output {p}".format(p=process_output))
-        return HttpResponseRedirect(reverse(index))
+            logging.info("Process Output {p}".format(p=process_output))
+            return HttpResponseRedirect(reverse(index))
+        else:
+            logging.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+            context = {"error": "Error Checking Camera"}
+            return HttpResponse(template.render(context, request))
     return HttpResponse(template.render(context, request))
 
 
@@ -403,17 +541,100 @@ def licensing(request):
     template = loader.get_template('main_menu/license.html')
     # get the actual state from the engine here and pass it to context
     obj = Licensing.objects.last()
-    start_date = obj.start_date
-    start_date = datetime.datetime.strftime(start_date, "%d-%B-%Y")
-    end_date = obj.end_date
-    end_date = datetime.datetime.strftime(end_date, "%d-%B-%Y")
-    transaction_limit = obj.transaction_limit
-    transaction_count = obj.transaction_count
-    license_owner = obj.license_owner
-    site_name = obj.site_name
-    context = {'start_date': start_date, 'end_date': end_date, 'site_name': site_name,
-               'transaction_limit': transaction_limit, 'license_owner': license_owner,
-               'transaction_count': transaction_count}
+    start_date = ""
+    current_end_date = ""
+    current_transaction_limit = ""
+    current_transaction_count = ""
+    license_owner = ""
+    site_name = ""
+
+    if obj:
+        start_date = obj.start_date
+        start_date = datetime.datetime.strftime(start_date, "%d-%B-%Y")
+        current_end_date = obj.end_date
+        current_end_date = datetime.datetime.strftime(current_end_date, "%d-%B-%Y")
+        current_transaction_limit = obj.transaction_limit
+        current_transaction_count = obj.transaction_count
+        license_owner = obj.license_owner
+        site_name = obj.site_name
+    context = {'start_date': start_date, 'end_date': current_end_date, 'site_name': site_name,
+               'transaction_limit': current_transaction_limit, 'license_owner': license_owner,
+               'transaction_count': current_transaction_count}
+
+    if request.method == 'POST' and 'download_license' in request.POST:
+        machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
+        response = HttpResponse(encoded_string, content_type="application/octet-stream")
+        response['Content-Disposition'] = 'inline; filename=' + os.path.basename("license_details.bin")
+        return response
+    if request.FILES:
+        uploaded_file = request.FILES['myfile'].read()
+        f = Fernet(key)
+        decrypted_file = f.decrypt(uploaded_file).decode()
+        print(decrypted_file)
+        license_details = ast.literal_eval(decrypted_file)
+        print(license_details['machine_uuid'])
+        uploaded_end_date = license_details['end_date']
+        uploaded_purchased_cameras = license_details['purchased_cameras']
+        uploaded_purchased_transactions = license_details['purchased_transactions']
+        uploaded_license_key = license_details['license_key']
+        uploaded_machine_uuid = license_details['machine_uuid']
+        uploaded_root_fs_uuid = license_details['root_fs_uuid']
+        uploaded_product_uuid = license_details['product_uuid']
+        uploaded_customer_name = license_details['customer_name']
+        uploaded_site_name = license_details['site_name']
+        machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
+        if machine_uuid != uploaded_machine_uuid and root_fs_uuid != uploaded_root_fs_uuid \
+                and product_uuid != uploaded_product_uuid:
+            context['status'] = "ERROR: License details don't match"
+            return HttpResponse(template.render(context, request))
+
+        else:
+            print("MATCH _ save license now")
+            adm_db_config = {
+                "host": "localhost",
+                "user": "root",
+                "password": mysql_password,
+                "database": "adm"
+            }
+
+            adm_db = mysql.connector.connect(**adm_db_config)
+
+            try:
+                admin_cursor = adm_db.cursor()
+
+                # Need logic to check if license record exists - if it does then get prev tx_limit MINUS
+                # the tx_count ( left over transactions ) and set tx_count = 0 - left over transactions
+                sql_statement = "SELECT * from adm ORDER BY id DESC LIMIT 1"
+                admin_cursor.execute(sql_statement)
+                result = admin_cursor.fetchone()
+                print('result', result)
+                remaining_transactions = 0
+                if result:
+                    print("stuff in it", result[2], result[1])
+                    remaining_transactions = result[1] - result[2]
+                    print(remaining_transactions)
+                    new_license_key = get_hash("{}{}{}{}".format(uploaded_purchased_transactions, uploaded_end_date,
+                                               result[4], uploaded_purchased_cameras))
+                    if new_license_key != uploaded_license_key:
+                        print("keys dont match", new_license_key, uploaded_license_key)
+                        context['status'] = "ERROR: License keys mismatch"
+                        return HttpResponse(template.render(context, request))
+                else:
+                    print("its empty")
+                print(uploaded_customer_name, uploaded_site_name)
+                sql_statement = """INSERT INTO adm (tx_count, tx_limit, end_date, license_key, camera_limit, 
+                                   customer_name, site_name) VALUES (%s,%s,%s,%s,%s,%s,%s)"""
+                values = (remaining_transactions, uploaded_purchased_transactions, uploaded_end_date,
+                          uploaded_license_key, uploaded_purchased_cameras, uploaded_customer_name, uploaded_site_name)
+                admin_cursor.execute(sql_statement, values)
+                adm_db.commit()
+                adm_db.close()
+                context['status'] = "SUCCESS: License details saved"
+                return HttpResponse(template.render(context, request))
+            except:
+                context['status'] = "ERROR: Unable to save license details"
+                return HttpResponse(template.render(context, request))
+
     return HttpResponse(template.render(context, request))
 
 
@@ -463,11 +684,13 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
+
 def download_system_logs(request):
     response = HttpResponse(
         content_type='text/csv',
         headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
     )
+
 
 def export_logs_to_csv(request):
     selection = request.POST.getlist("selection")
@@ -676,7 +899,7 @@ def input_camera_for_regions(request):
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id, action="Failed").last()
+                log_obj = LogImage.objects.filter(url_id=url_id).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:
@@ -736,11 +959,10 @@ def display_regions(request):
 
         url_id = camera_object.id
         reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
-
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id, action="Failed").last()
+                log_obj = LogImage.objects.filter(url_id=url_id).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:

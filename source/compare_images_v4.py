@@ -12,11 +12,46 @@ from passlib.hash import sha512_crypt
 import process_list_v2
 import logging
 from logging.handlers import RotatingFileHandler
+import hashlib
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
                     handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
                                                   maxBytes=10000000, backupCount=10)])
+
+checkit_secret = "Checkit65911760424"[::-1].encode()
+
+key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+
+def get_encrypted(password):
+    h = hashlib.blake2b(digest_size=64, key=checkit_secret)
+    h.update(password.encode())
+    h_in_hex = h.hexdigest().upper()
+    return h_in_hex
+
+
+def get_mysql_password():
+    fd = open("/etc/machine-id", "r")
+    machine_id = fd.read()
+    machine_id = machine_id.strip("\n")
+
+    shell_output = subprocess.check_output("/bin/df", shell=True)
+    l1 = shell_output.decode('utf-8').split("\n")
+    command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+
+    command = "/sbin/blkid | grep " + root_dev
+    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+
+    command = "sudo dmidecode | grep -i uuid"
+    product_uuid = subprocess.check_output(command, shell=True).decode(). \
+        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
+
+    finger_print = (root_fs_uuid + machine_id + product_uuid)
+    fingerprint_encrypted = get_encrypted(finger_print)
+    mysql_password = fingerprint_encrypted[10:42][::-1]
+    return mysql_password
 
 
 def create_key(em):
@@ -59,6 +94,8 @@ def create_key(em):
 
 
 def check_license():
+    # replace below with code to open adm
+    # get fingerprint data from machine use this along with 3 parameters to create license
     license_file = open("/etc/checkit/checkit.lic", "r")
     registered_key = license_file.readline().strip('\n')
     email = license_file.readline().strip('\n')
@@ -130,7 +167,6 @@ def check_adm_database(password):
         "password": password,
         "database": "adm"
     }
-
     adm_db = mysql.connector.connect(**adm_db_config)
 
     try:
@@ -138,20 +174,29 @@ def check_adm_database(password):
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
         admin_cursor.execute(sql_statement)
         result = admin_cursor.fetchone()
+        if not result:
+            logging.error("License not setup")
+            exit(33)
         field_names = [i[0] for i in admin_cursor.description]
 
         transaction_count_index = field_names.index('tx_count')
         transaction_limit_index = field_names.index('tx_limit')
         end_date_index = field_names.index('end_date')
         camera_limit_index = field_names.index('camera_limit')
+        customer_name_index = field_names.index('customer_name')
+        site_name_index = field_names.index('site_name')
+        license_key_index = field_names.index('license_key')
 
         transaction_count = result[transaction_count_index]
         transaction_limit = result[transaction_limit_index]
         end_date = result[end_date_index]
         camera_limit = result[camera_limit_index]
+        customer_name = result[customer_name_index]
+        site_name = result[site_name_index]
+        license_key = result[license_key_index]
 
         adm_db.close()
-        return transaction_count, transaction_limit, end_date, camera_limit
+        return transaction_count, transaction_limit, end_date, camera_limit, customer_name, site_name, license_key
 
     except mysql.connector.Error as e:
         logging.error(f"Database connection error {e}")
@@ -161,14 +206,24 @@ def check_adm_database(password):
 # sync up checkit and adm data - in case checkit has been manually modified.
 
 
-def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key):
+def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key, customer_name, site_name):
     try:
         checkit_cursor = checkit_db.cursor()
-        sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
-              "transaction_limit = " + str(transaction_limit) + " , " + \
-              "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
-              "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
+        sql = "SELECT * FROM main_menu_licensing"
         checkit_cursor.execute(sql)
+        result = checkit_cursor.fetchone()
+        if result:
+            sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
+                  "transaction_limit = " + str(transaction_limit) + " , " + \
+                  "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
+                  "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
+            print(sql)
+            checkit_cursor.execute(sql)
+        else:
+            sql = """INSERT INTO main_menu_licensing (transaction_count, transaction_limit, end_date, license_key, license_owner, site_name, start_date, run_schedule) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
+            values = (transaction_count, transaction_limit, str(end_date), license_key, customer_name, site_name, datetime.datetime.now().strftime("%Y-%m-%d"), 0)
+            print(sql, values)
+            checkit_cursor.execute(sql, values)
         checkit_db.commit()
     except mysql.connector.Error as e:
         logging.error(f"Database connection error {e}")
@@ -342,12 +397,11 @@ def shutdown_engine_state(start_state_timestamp):
 
 
 def main(ids):
-    license_key, password = check_license()
     checkit_db = check_main_databases_initialised()
     checkit_cursor = checkit_db.cursor()
-
-    transaction_count, transaction_limit, end_date, camera_limit = check_adm_database(password)
-    sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key)
+    mysql_password = get_mysql_password()
+    transaction_count, transaction_limit, end_date, camera_limit, customer_name, site_name, license_key = check_adm_database(mysql_password)
+    sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit, end_date, camera_limit, license_key, customer_name, site_name)
     start_state_timestamp = check_engine_state(checkit_db)
 
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
@@ -360,6 +414,7 @@ def main(ids):
         list_to_process = list_of_cameras[list_pointer:list_pointer + incrementer]
         list_of_lists.append(list_to_process)
         list_pointer += incrementer
+    #
     process_list_v2.start_processes(list_of_lists)
 
     shutdown_engine_state(start_state_timestamp)

@@ -145,7 +145,7 @@ class Licensing(models.Model):
                                                 MinValueValidator(1)
                                                        ]
                                             )
-    transaction_count = models.PositiveIntegerField(null=False, blank=False, default=0)
+    transaction_count = models.IntegerField(null=False, blank=False, default=0)
     license_key = models.CharField(max_length=256, null=False, blank=False, default="None")
     license_owner = models.CharField(max_length=256, null=False, blank=False, default="None")
     site_name = models.CharField(max_length=256, null=False, blank=False, default="None")

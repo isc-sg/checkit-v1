@@ -180,7 +180,7 @@
 
                                     <br>
 
-                                    <i style="font-size:2em"> {{ scheduler_status }} &nbsp;&nbsp;</i>
+                                    <i style="font-size:2em"> {{ scheduler_status }} {{error}} &nbsp;&nbsp;</i>
                                     {% if scheduler_status == "Scheduler Running" %}
                                     <i class="fa-sharp fa-solid fa-calendar-check" style="color:green;font-size:4em;"></i>
                                     {% else %}
