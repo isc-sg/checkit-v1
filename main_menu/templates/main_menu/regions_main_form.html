@@ -136,9 +136,15 @@ tr:nth-child(even) {
                 </li>
                 <li class="active">
                     <a href="/regions/">
+<<<<<<< HEAD
                         <i class="fas fa-th" style="color:#5603ad"></i>
 
                         <p style="color:#5603ad">Regions</p>
+=======
+                        <i class="fas fa-th" style="color:#4890fe"></i>
+
+                        <p style="color:#4890fe">Regions</p>
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                     </a>
                 </li>
                 <li>
@@ -174,12 +180,51 @@ tr:nth-child(even) {
                 </div>
                 <div class="col-md-4">
                     <div class="card card-user">
+<<<<<<< HEAD
                         <div class="card-body">
                         </div>
                         <div class="list-group list-group-horizontal">
                             <form action="/display_regions/" method="post">
                                 {% csrf_token %}
                                 {{ form.as_p }}
+=======
+
+                        <div class="list-group list-group-horizontal">
+                            <form action="/display_regions/" method="post">
+                                {% csrf_token %}
+<fieldset>
+    <legend>{{ form.regions.label }}</legend>
+    {% for choice in form.regions %}
+    <li class="list-group list-group-horizontal" style="font-family:courier; display: inline-flex; justify-content: stretch; height: 25px; width: 25px;  padding: 20px; margin-top: 5px; margin-bottom: 5px; font-size: 30px;">
+        {{ choice }}
+    </li>
+    {% if forloop.counter  == 8 %}
+    <div></div>
+    {% endif %}
+        {% if  forloop.counter  == 16 %}
+    <div></div>
+    {% endif %}
+        {% if forloop.counter == 24 %}
+    <div></div>
+    {% endif %}
+        {% if forloop.counter  == 32 %}
+    <div></div>
+    {% endif %}
+            {% if forloop.counter  == 40 %}
+    <div></div>
+    {% endif %}
+            {% if forloop.counter  == 48 %}
+    <div></div>
+    {% endif %}
+            {% if forloop.counter  == 56 %}
+    <div></div>
+    {% endif %}
+    {% endfor %}
+</fieldset>
+
+                                <p></p>
+                                <br>
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                                 <input type="submit" class="btn btn-secondary" value="Submit">
                                 <input type="submit" class="btn btn-secondary" name="reset" value="Reset">
                                 <input type="hidden" id="camera_number" name="camera_number" value={{camera_number}}>

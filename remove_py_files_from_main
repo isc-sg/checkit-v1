@@ -1,0 +1,15 @@
+rm main_menu/*.c
+rm main_menu/a_eye.py
+rm main_menu/admin.py
+rm main_menu/apps.py
+rm main_menu/compare_images_v4.py
+rm main_menu/create_license_keys.py
+rm main_menu/filters.py
+rm main_menu/forms.py
+rm main_menu/models.py
+rm main_menu/process_list_v2.py
+rm main_menu/resources.py
+rm main_menu/select_region.py
+rm main_menu/tables.py
+rm main_menu/urls.py
+rm main_menu/views.py

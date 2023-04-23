@@ -1,0 +1,8 @@
+CREATE USER 'checkit'@'localhost' IDENTIFIED BY 'checkit';
+GRANT ALL PRIVILEGES ON checkit.* TO 'checkit'@'localhost';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
+FLUSH PRIVILEGES;
+CREATE DATABASE checkit;
+CREATE DATABASE adm;
+USE adm;
+CREATE TABLE adm (id SMALLINT NOT NULL AUTO_INCREMENT, tx_count INT, tx_limit INT, end_date DATE, license_key VARCHAR(256), customer_name VARCHAR(255), camera_limit SMALLINT, site_name VARCHAR(255), PRIMARY KEY (id));

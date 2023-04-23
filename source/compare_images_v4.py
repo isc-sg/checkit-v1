@@ -1,6 +1,11 @@
 import datetime
 import os
+<<<<<<< HEAD
 import multiprocessing
+=======
+# import multiprocessing
+import pathos
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 import math
 from sys import exit
 import cython
@@ -41,10 +46,17 @@ def get_mysql_password():
     command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
 
+<<<<<<< HEAD
     command = "/sbin/blkid | grep " + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
     command = "sudo dmidecode | grep -i uuid"
+=======
+    command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+
+    command = "/usr/bin/sudo dmidecode | grep -i uuid"
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     product_uuid = subprocess.check_output(command, shell=True).decode(). \
         strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
@@ -68,7 +80,11 @@ def create_key(em):
     for i in l1:
         line = i.split(" ")
         if line[-1] == "/":
+<<<<<<< HEAD
             command = "/sbin/blkid | grep " + line[0]
+=======
+            command = "/usr/bin/sudo /sbin/blkid | grep " + line[0]
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
             try:
                 shell_output = subprocess.check_output(command, shell=True)
             except subprocess.CalledProcessError as error:
@@ -155,7 +171,11 @@ def get_camera_ids(camera_numbers, checkit_cursor):
         ids = [x[0] for x in z]
         print(ids)
     except mysql.connector.Error as e:
+<<<<<<< HEAD
         logging.error(f"Database connection error {e}")
+=======
+        logging.error(f"Database connection error {e} {sql_statement}")
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         exit(1)
     return ids
 
@@ -407,7 +427,11 @@ def main(ids):
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
     list_pointer = 0
 
+<<<<<<< HEAD
     number_of_cores = multiprocessing.cpu_count()*2
+=======
+    number_of_cores = pathos.multiprocessing.cpu_count()*2
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     incrementer = math.ceil(len(list_of_cameras)/number_of_cores)
     list_of_lists = []
     while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:

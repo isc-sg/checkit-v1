@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import pathos.multiprocessing
 
 import mysql.connector
@@ -9,13 +10,26 @@ import random
 import datetime
 from timeit import default_timer as timer
 
+=======
+# from pathos.multiprocessing import ProcessingPool as Pool
+from pathos.multiprocessing import ProcessingPool, cpu_count
+
+import pathos
+import math
+import numpy as np
+import uuid
+import mysql.connector
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 import datetime
 import json
 import os
 import pathlib
+<<<<<<< HEAD
 import time
 import uuid
 
+=======
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 from sys import exit
 import a_eye
 import cv2
@@ -23,10 +37,13 @@ from skimage.exposure import is_low_contrast
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 from mysql.connector import errorcode
+<<<<<<< HEAD
 from mysql.connector.errors import Error
 from pathos.pools import ProcessPool as Pool
 # use ThreadPool instead of Pool due to cython compile error see link below
 # https://stackoverflow.com/questions/8804830/python-multiprocessing-picklingerror-cant-pickle-type-function
+=======
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 import subprocess
 from wurlitzer import pipes
 from passlib.hash import sha512_crypt
@@ -37,6 +54,22 @@ import configparser
 import select_region
 from bisect import bisect_left
 import hashlib
+<<<<<<< HEAD
+=======
+import itertools
+import socket
+
+
+checkit_secret = "Checkit65911760424"[::-1].encode()
+
+key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+
+open_file_name = '/tmp/' + str(uuid.uuid4().hex)
+close_file_name = '/tmp/' + str(uuid.uuid4().hex)
+
+
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -47,10 +80,17 @@ config = configparser.ConfigParser()
 config.read('/home/checkit/camera_checker/main_menu/config/config.cfg')
 try:
     network_interface = config['DEFAULT']['network_interface']
+<<<<<<< HEAD
+=======
+    HOST = config['DEFAULT']['synergy_host']
+    PORT = int(config['DEFAULT']['synergy_port'])
+    CHECKIT_HOST = config['DEFAULT']['checkit_host']
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 except configparser.NoOptionError:
     logging.error("Unable to read config file")
     exit(0)
 
+<<<<<<< HEAD
 open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
@@ -60,6 +100,10 @@ close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 checkit_secret = "Checkit65911760424"[::-1].encode()
 
 key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+=======
+
+cpus = cpu_count()
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 
 def get_encrypted(password):
@@ -79,7 +123,11 @@ def get_mysql_password():
     command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
 
+<<<<<<< HEAD
     command = "/sbin/blkid | grep " + root_dev
+=======
+    command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
     command = "sudo dmidecode | grep -i uuid"
@@ -111,6 +159,7 @@ def take_closest(my_list, my_number):
         return before
 
 
+<<<<<<< HEAD
 def create_key(em):
     hash1 = ''
     salt = ''.join(reversed("Checkit"))
@@ -165,6 +214,92 @@ if license_key != registered_key:
 #                                 user="checkit",
 #                                 password="checkit",
 #                                 database="checkit")
+=======
+def get_transparent_edge(input_image, color):
+    edge_image = cv2.Canny(input_image, 100, 200)
+    edge_image = cv2.cvtColor(edge_image, cv2.COLOR_RGB2BGR)
+    edge_image[np.where((edge_image == [255, 255, 255]).all(axis=2))] = color
+    gray_image = cv2.cvtColor(edge_image, cv2.COLOR_BGR2GRAY)
+    _, alpha = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY)
+    b, g, r = cv2.split(edge_image)
+    rgba_image = [b, g, r, alpha]
+    final_image = cv2.merge(rgba_image, 4)
+    return final_image
+
+
+def send_alarms(list_of_cameras):
+    # print("sending alarm to synergy")
+    checkit_db = mysql.connector.connect(
+                    host="localhost",
+                    user="checkit",
+                    password="checkit",
+                    database="checkit"
+            )
+    cursor = checkit_db.cursor()
+    # sql_statement = "SELECT url_id FROM main_menu_logimage WHERE action != 'Pass' AND url_id IN (201,200,199) AND creation_date >= '2023-04-17 12:48:24.035230'"
+    sql_statement = "select state_timestamp  from main_menu_enginestate where state = 'STARTED'  ORDER BY id DESC LIMIT 1"
+    cursor.execute(sql_statement)
+    timestamp = cursor.fetchone()[0]
+    timestamp = datetime.datetime.strftime(timestamp,"%Y-%m-%d %H:%M:%S")
+    # print(timestamp)
+    combined_list = list(itertools.chain.from_iterable(list_of_cameras))
+    sql_statement = "SELECT url_id, creation_date, action, image, matching_score, focus_value, light_level " \
+                    "FROM main_menu_logimage " \
+                    "WHERE action != 'Pass' AND url_id IN ({}) " \
+                    "AND creation_date >= '{}'".format(','.join(map(str, combined_list)), timestamp)
+    cursor = checkit_db.cursor()
+    cursor.execute(sql_statement)
+    f = cursor.fetchall()
+    # print(len(f))
+    for i in f:
+        url_id = i[0]
+        creation_date = datetime.datetime.strftime(i[1], "%Y-%m-%d %H:%M:%S")
+        action = i[2]
+        log_image: str = i[3]
+        matching_score = i[4]
+        focus_value = i[5]
+        light_level = i[6]
+        sql_statement = "SELECT * FROM main_menu_camera WHERE id = {}".format(url_id)
+        cursor.execute(sql_statement)
+        camera_details = cursor.fetchone()
+        # print(camera_details)
+        camera_url = camera_details[1]
+        camera_number = camera_details[3]
+        camera_name = camera_details[4]
+        camera_location = camera_details[6]
+        image = "http://" + CHECKIT_HOST + "/media/" + log_image
+        # log_image = cv2.imread("/home/checkit/camera_checker/media/" + log_image)
+        # base_image = cv2.imread("/home/checkit/camera_checker/media/" + "base_images/" \
+        #              + str(url_id) + "/" + log_image.split("-")[1].split(":")[0].zfill(2) + ".jpg")
+        # log_transparent_edges = get_transparent_edge(log_image, [0, 0, 255])
+        # log_transparent_edges = log_transparent_edges[:, :, :3]
+        # merged_image = cv2.addWeighted(log_transparent_edges, 1, base_image, 1, 0)
+        # cv2.imwrite("/tmp/.tmp_image.jpg", merged_image)
+
+        # cv2.imshow("log", image)
+        # cv2.waitKey(0)
+        # print(url_id, camera_number, camera_name, camera_url, camera_location,
+        #       creation_date, action, log_image, matching_score, focus_value, light_level)
+        message = "Error detected on camera " + camera_url \
+                  + "|with matching score result " + str(matching_score) \
+                  + "|at location " + camera_location
+        send_alarm = """<?xml version="1.0" encoding="UTF-8"?><Request command="sendAlarm" id="123">""" \
+                     + "<message>" + "Checkit Alarm" + "</message> " \
+                     + "<text>" + message + "</text>" \
+                     + "<camera>" + camera_name + "</camera>" \
+                     + "<param1>" + camera_location + "</param1>" \
+                     + "<param2>" + str(camera_number) + "</param2>" \
+                     + "<param3>" + str(camera_url) + "</param3>" \
+                     + "<alarmType>" + "Checkit Alarm" + "</alarmType> " \
+                     + "<delimiter>|</delimiter><sourceId>2600</sourceId>" \
+                     + "<jpeg>" + image + "</jpeg>" \
+                     + "<autoClose>true</autoClose></Request>""" + "\x00"
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((HOST, PORT))
+        s.send(send_alarm.encode())
+        reply = s.recv(8192).decode().rstrip("\x00")
+        # print(reply)
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 
 def init_pools():
@@ -226,7 +361,11 @@ def init_pools():
             exit(0)
 
     try:
+<<<<<<< HEAD
 
+=======
+        password = get_mysql_password()
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         adm_db_config = {
             "host": "localhost",
             "user": "root",
@@ -475,7 +614,11 @@ def compare_images(base, frame, r, base_color, frame_color):
         logging.info("Log image is of poor quality")
         full_ss = 0
     if is_low_contrast(base, 0.25) or base_brightness < 50:
+<<<<<<< HEAD
         logging.info("Base image is of poor quality")
+=======
+        logging.info("Base image is of poor quality - please review reference images")
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         full_ss = 0
 
     logging.debug(f"Match Score for full image is {full_ss}")
@@ -552,6 +695,7 @@ def increment_transaction_count():
     sql_update_adm(table, fields, where)
 
 
+<<<<<<< HEAD
 def process_list(list_of_cameras):
     init_pools()
     for camera in list_of_cameras:
@@ -721,3 +865,182 @@ def start_processes(list_to_process):
 #
 # if __name__ == "__main__":
 #     start_processes([[6933]])
+=======
+def get_factorial():
+    math.factorial(300000)
+
+
+class ProcessCameras(object):
+
+    def process_list(self, list_of_c):
+        # logging.info(f"processing {list_of_c}, {pathos.helpers.mp.current_process()}")
+        init_pools()
+
+        for camera in list_of_c:
+            fields = "*"
+            table = "main_menu_camera"
+            where = "WHERE id = " + "\"" + str(camera) + "\""
+            long_sql = None
+            current_record = sql_select(fields, table, where, long_sql, fetch_all=False)
+            regions = current_record[image_regions_index]
+            if regions == '0' or regions == "[]":
+                regions = []
+                regions.extend(range(1, 65))
+            else:
+                regions = eval(regions)
+
+            current_time = datetime.datetime.now()
+            hour = current_time.strftime('%H')
+            fields = "hour"
+            table = "main_menu_referenceimage"
+            where = "WHERE url_id = " + "\"" + str(current_record[camera_id_index]) + "\""
+            long_sql = None
+            hours = sql_select(fields, table, where, long_sql, fetch_all=True)
+            int_hours = []
+
+            if hours:
+                for i in range(0, len(hours)):
+                    int_hours.append(hours[i][0])
+                    int_hours[i] = int(int_hours[i])
+                hour = int(hour)
+                if hour not in int_hours:
+                    no_base_image(current_record)
+                else:
+                    closest_hour = take_closest(int_hours, hour)
+                    closest_hour = str(closest_hour).zfill(2)
+                    fields = "image"
+                    table = "main_menu_referenceimage"
+                    where = "WHERE url_id = " + "\"" + str(current_record[camera_id_index]) + \
+                            "\"" + " AND hour = " + "\"" + closest_hour + "\""
+                    long_sql = None
+                    image = sql_select(fields, table, where, long_sql, fetch_all=False)
+                    image = image[0]
+
+                    base_image = "/home/checkit/camera_checker/media/" + image
+                    if not os.path.isfile(base_image):
+                        logging.error(f'Base image missing for {base_image}')
+                        return
+
+                    capture_device = open_capture_device(current_record)
+
+                    able_to_read = False
+
+                    if capture_device.isOpened():
+                        able_to_read, image_frame = capture_device.read()
+                        close_capture_device(current_record, capture_device)
+                    else:
+                        logging.error(f"Unable to open capture device {current_record[camera_url_index]}")
+                    if able_to_read:
+                        image_base = cv2.imread(base_image)
+                        if image_base is None:
+                            logging.error(f"Base image is logged but unable to file {base_image}")
+                            exit()
+                        time_stamp = datetime.datetime.now()
+                        time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S")
+                        directory = "/home/checkit/camera_checker/media/logs/" + str(time_stamp.year) + "/" + \
+                                    str(time_stamp.month) + "/" + str(time_stamp.day)
+                        log_image_file_name = directory + "/" + str(current_record[camera_id_index]) + \
+                                              "-" + str(time_stamp.hour) + ":" + str(time_stamp.minute) + ":" + \
+                                              str(time_stamp.second) + ".jpg"
+
+                        try:
+                            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+                        except OSError as error:
+                            logging.error(f"Error saving log file {error}")
+
+                        able_to_write = cv2.imwrite(log_image_file_name, image_frame)
+                        capture_dimensions = image_frame.shape[:2]
+                        reference_dimensions = ()
+                        status = "failed"
+
+                        if not able_to_write:
+                            logging.error(f"Unable to write log image {log_image_file_name}")
+
+                        # write the log file - create variable to store in DB
+                        else:
+                            try:
+                                image_base_grey = cv2.cvtColor(image_base, cv2.COLOR_BGR2GRAY)
+                                image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
+                                reference_dimensions = image_base_grey.shape[:2]
+                                capture_dimensions = image_frame_grey.shape[:2]
+                                status = "success"
+                            except cv2.error as err:
+                                logging.error(f"Error in converting image {err}")
+                                status = "failed"
+                                # need to test this return with cv2 error
+                                return
+
+                            if reference_dimensions != capture_dimensions or status == "failed":
+                                logging.error(
+                                    f"Image sizes don't match on camera number {current_record[camera_number_index]}")
+                                now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
+                                sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+                                table = "main_menu_logimage"
+                                fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
+                                         "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                                values = (str(current_record[camera_id_index]), sql_file_name,
+                                          "0", "0", "{}", "0", "0", "Image Size Error", now)
+                                sql_insert(table, fields, values)
+
+                                increment_transaction_count()
+                            else:
+                                matching_score, focus_value, region_scores, frame_brightness = compare_images(
+                                    image_base_grey,
+                                    image_frame_grey,
+                                    regions, image_base,
+                                    image_frame)
+                                sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+
+                                if matching_score < current_record[matching_threshold_index]:
+                                    action = "Failed"
+                                else:
+                                    action = "Pass"
+
+                                table = "main_menu_logimage"
+                                fields = "(url_id, image, matching_score, region_scores, " \
+                                         "current_matching_threshold, light_level, " \
+                                         "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                                values = (str(current_record[camera_id_index]), sql_file_name, float(matching_score),
+                                          json.dumps(region_scores),
+                                          float(current_record[matching_threshold_index]), float(frame_brightness),
+                                          float(focus_value), action, time_stamp_string)
+                                sql_insert(table, fields, values)
+
+                                table = "main_menu_camera"
+                                fields = "last_check_date = " + "\"" + time_stamp_string + "\""
+                                where = " WHERE id = " + "\"" + str(current_record[camera_id_index]) + "\""
+                                sql_update(table, fields, where)
+
+                                increment_transaction_count()
+                    else:
+                        # print("unable to read")
+                        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
+
+                        table = "main_menu_logimage"
+                        fields = "(url_id, image, matching_score, region_scores, " \
+                                 "current_matching_threshold, light_level, focus_value, action, creation_date) " \
+                                 "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                        values = (
+                        str(current_record[camera_id_index]), "", "0", "{}", "0", "0", "0", "Capture Error", now)
+                        sql_insert(table, fields, values)
+                        increment_transaction_count()
+            else:
+                # only gets here with new camera
+                logging.info(f"No base image for camera number {current_record[camera_number_index]} - "
+                             f"{current_record[camera_name_index]}")
+                no_base_image(current_record)
+                increment_transaction_count()
+
+
+def start_processes(list_of_cameras):
+    pool = ProcessingPool(cpus*2)
+    p = ProcessCameras()
+    logging.info(f"list {list_of_cameras}")
+    pool.imap(p.process_list, list_of_cameras)
+    pool.close()
+    pool.join()
+    send_alarms(list_of_cameras)
+
+# if __name__ == '__main__':
+#     start_processes()
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin

@@ -94,13 +94,18 @@
 </div>
 <div class="container-fluid">
 
+<<<<<<< HEAD
 	    <h1 id="heading1">Date</h1>
+=======
+	    <h1 id="heading1">Regions</h1>
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 			<div id="container1">
 			<div id="row1" class="row">
 
 
                 <!-- input with datetimepicker -->
+<<<<<<< HEAD
               <div class="form-group">
                   <label class="label-control">Select date for export</label>
                   <input type="text" class="form-control datetimepicker" name="date"/>
@@ -124,6 +129,32 @@
               <div class="col-md-4">
               <form method="post">
                 {% csrf_token %}
+=======
+<!--              <div class="form-group">-->
+<!--                  <label class="label-control">Select date for export</label>-->
+<!--                  <input type="text" class="form-control datetimepicker" name="date"/>-->
+<!--              </div>-->
+			</div>
+<!--              <script>-->
+<!--                  $('.datetimepicker').datetimepicker({-->
+<!--                      icons: {-->
+<!--                        time: "tim-icons icon-watch-time",-->
+<!--                        date: "tim-icons icon-calendar-60",-->
+<!--                        up: "fa fa-chevron-up",-->
+<!--                        down: "fa fa-chevron-down",-->
+<!--                        previous: 'tim-icons icon-minimal-left',-->
+<!--                        next: 'tim-icons icon-minimal-right',-->
+<!--                        today: 'fa fa-screenshot',-->
+<!--                        clear: 'fa fa-trash',-->
+<!--                        close: 'fa fa-remove'-->
+<!--                      }-->
+<!--                  });-->
+<!--              </script>-->
+              <div class="list-group list-group-horizontal">
+              <form method="post">
+                {% csrf_token %}
+                {{ form.as_ul }}
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                 <button class="btn" type="submit">Submit</button>
               </form>
               </div>

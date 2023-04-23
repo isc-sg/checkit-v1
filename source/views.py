@@ -74,8 +74,25 @@ def check_adm_database(password):
         "database": "adm"
     }
 
+<<<<<<< HEAD
     adm_db = mysql.connector.connect(**adm_db_config)
 
+=======
+    try:
+        adm_db = mysql.connector.connect(**adm_db_config)
+    except mysql.connector.Error:
+        try:
+            adm_db_config = {
+                "host": "localhost",
+                "user": "root",
+                "password": "",
+                "database": "adm"
+            }
+            adm_db = mysql.connector.connect(**adm_db_config)
+
+        except mysql.connector.Error as e:
+            print("Failed all attempts at accessing database", e)
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     try:
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
@@ -132,10 +149,17 @@ def get_license_details():
     command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
 
+<<<<<<< HEAD
     command = "/sbin/blkid | grep " + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
     command = "sudo dmidecode | grep -i uuid"
+=======
+    command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+
+    command = "/usr/bin/sudo dmidecode | grep -i uuid"
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     product_uuid = subprocess.check_output(command, shell=True).decode(). \
         strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
@@ -244,7 +268,11 @@ def index(request):
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
     if request.user.is_superuser:
+<<<<<<< HEAD
         print("is super")
+=======
+        # print("is super")
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         admin_user = "True"
     else:
         admin_user = "False"
@@ -260,7 +288,14 @@ def index(request):
         log_file_zipped = "/tmp/logs.zip"
         with ZipFile(log_file_zipped, "w", ZIP_DEFLATED) as archive:
             for log_file in log_files:
+<<<<<<< HEAD
                 archive.write(log_file)
+=======
+                try:
+                    archive.write(log_file)
+                except FileNotFoundError:
+                    logging.info("Logfile {f} does not exist".format(f=log_file))
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         if os.path.exists(log_file_zipped):
             with open(log_file_zipped, 'rb') as fh:
                 response = HttpResponse(fh.read(), content_type="application/octet-stream")
@@ -388,6 +423,11 @@ def scheduler(request):
 
         if err == b"no crontab for www-data\n":
             scheduler_status = "Scheduler Off"
+<<<<<<< HEAD
+=======
+        elif out == b"":
+            scheduler_status = "Scheduler Off"
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         else:
             scheduler_status = "Scheduler Running"
     except:
@@ -598,7 +638,24 @@ def licensing(request):
                 "database": "adm"
             }
 
+<<<<<<< HEAD
             adm_db = mysql.connector.connect(**adm_db_config)
+=======
+            try:
+                adm_db = mysql.connector.connect(**adm_db_config)
+            except mysql.connector.Error:
+                try:
+                    adm_db_config = {
+                        "host": "localhost",
+                        "user": "root",
+                        "password": "",
+                        "database": "adm"
+                    }
+                    adm_db = mysql.connector.connect(**adm_db_config)
+
+                except mysql.connector.Error as e:
+                    print("Failed all attempts at accessing database", e)
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
             try:
                 admin_cursor = adm_db.cursor()
@@ -619,6 +676,10 @@ def licensing(request):
                         return HttpResponse(template.render(context, request))
                 else:
                     pass
+<<<<<<< HEAD
+=======
+                start_date = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d")
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                 sql_statement = """INSERT INTO adm (tx_count, tx_limit, end_date, license_key, camera_limit, 
                                    customer_name, site_name) VALUES (%s,%s,%s,%s,%s,%s,%s)"""
                 values = (remaining_transactions, uploaded_purchased_transactions, uploaded_end_date,
@@ -626,6 +687,21 @@ def licensing(request):
                 admin_cursor.execute(sql_statement, values)
                 adm_db.commit()
                 adm_db.close()
+<<<<<<< HEAD
+=======
+
+                license_record = Licensing(start_date=start_date, end_date=uploaded_end_date,
+                                           transaction_limit=uploaded_purchased_transactions,
+                                           transaction_count=remaining_transactions,
+                                           license_key=uploaded_license_key,
+                                           license_owner=uploaded_customer_name,
+                                           site_name=uploaded_site_name,
+                                           run_schedule=1)
+                try:
+                    license_record.save()
+                except Exception as e:
+                    print(e)
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                 context['status'] = "SUCCESS: License details saved"
                 return HttpResponse(template.render(context, request))
             except:
@@ -668,9 +744,15 @@ def get_date(request):
 
     # if a GET (or any other method) we'll create a blank form
     else:
+<<<<<<< HEAD
         form = DateForm()
 
     return render(request, '/main_menu/date.html', {'form': form})
+=======
+        form = RegionsForm()
+
+    return render(request, 'main_menu/date.html', {'form': form})
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 
 class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -746,10 +828,22 @@ def export_logs_to_csv(request):
                     camera_number = log.url.camera_number
                     hour = str(log.creation_date.hour).zfill(2)
                     log_image = settings.MEDIA_ROOT + "/" + str(log.image)
+<<<<<<< HEAD
+=======
+                    if not os.path.exists(log_image):
+                        logging.error(f"missing logfile {log_image}")
+                        continue
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                     camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
                     for c in camera:
                         base_image = settings.MEDIA_ROOT + "/base_images/" + str(c.id) + "/" + hour + ".jpg"
+<<<<<<< HEAD
+=======
+                    if not os.path.exists(base_image):
+                        logging.error(f"missing baseimage for logs {base_image}")
+                        continue
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                     matching_score = log.matching_score
                     focus_value = log.focus_value
                     light_level = log.light_level
@@ -901,6 +995,11 @@ def input_camera_for_regions(request):
                     raise ObjectDoesNotExist
                 else:
                     region_scores = log_obj.region_scores
+<<<<<<< HEAD
+=======
+                    if not isinstance(region_scores, dict):
+                        region_scores = {}
+>>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
                     creation_date = log_obj.creation_date
                     regions = []
                     scores = []
