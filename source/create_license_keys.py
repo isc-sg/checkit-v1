@@ -38,11 +38,8 @@ def create_key(em):
     for i in l1:
         line = i.split(" ")
         if line[-1] == "/":
-<<<<<<< HEAD
-            command = "/sbin/blkid | grep " + line[0]
-=======
+
             command = "/usr/bin/sudo /sbin/blkid | grep " + line[0]
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
             try:
                 shell_output = subprocess.check_output(command, shell=True)
             except subprocess.CalledProcessError as error:
@@ -81,11 +78,8 @@ keyring_file_data=/var/lib/mysql/keyring-data/keyring
 innodb_file_per_table=ON
 
 """
-<<<<<<< HEAD
 
-=======
 create_key("sam.corbo@isc.sg")
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 transaction_limit = 0
 end_date_string = ""
 # TODO: check if adm exists and password set - this may have occurred after failed license
@@ -113,11 +107,8 @@ try:
     print("key", license_key, "passwd", password)
     admin_cursor = admin_db.cursor()
 
-<<<<<<< HEAD
-    sql_statement = "SET PASSWORD FOR root@localhost=PASSWORD(" + "\'" + password + "\'" + ");"
-=======
+
     sql_statement = "ALTER USER 'root'@'localhost' IDENTIFIED BY " + "\'" + password + "\'"
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     admin_cursor.execute(sql_statement)
     sql_statement = "CREATE DATABASE adm"
     admin_cursor.execute(sql_statement)
@@ -125,12 +116,8 @@ try:
     admin_cursor.execute(sql_statement)
     sql_statement = "CREATE TABLE adm (id SMALLINT NOT NULL AUTO_INCREMENT, " \
                     "tx_count INT, tx_limit INT, end_date DATE, " \
-<<<<<<< HEAD
-                    "license_key VARCHAR(256), email VARCHAR(128), PRIMARY KEY (id), camera_limit SMALLINT)"
-=======
                     "license_key VARCHAR(256), customer_name VARCHAR(255), camera_limit SMALLINT," \
                     " site_name VARCHAR(255), email VARCHAR(255), PRIMARY KEY (id))"
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     admin_cursor.execute(sql_statement)
     sql_statement = "ALTER TABLE adm ENCRYPTION = \'Y\'"
     admin_cursor.execute(sql_statement)
@@ -165,10 +152,6 @@ try:
         except ValueError:
             print("Please enter a number greater than 1")
 
-<<<<<<< HEAD
-
-=======
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     try:
         sql_statement = "INSERT INTO adm (tx_limit, tx_count, end_date, license_key, email, " \
                         "camera_limit) VALUES (%s, %s, %s, %s, %s, %s)"
@@ -199,14 +182,11 @@ try:
                         "(state,transaction_rate, state_timestamp, engine_process_id, number_failed_images) VALUES (%s, %s, %s, %s, %s)"
         checkit_cursor.execute(sql_statement, ("RUN COMPLETED", "0", start_date, "0", 0))
         checkit_db.commit()
-<<<<<<< HEAD
-=======
         sql_statement = "UPDATE adm SET customer_name = " + "\"" + license_owner + "\", " +\
                         "site_name = " + "\"" + site_name + "\" WHERE id=1"
         admin_cursor.execute(sql_statement)
         admin_db.commit()
 
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Invalid password on main database")

@@ -18,11 +18,8 @@ class CameraResource(resources.ModelResource):
         import_id_fields = ('url', 'camera_number', 'camera_name',
                             'camera_location', 'image_regions', 'matching_threshold')
 
-<<<<<<< HEAD
-    def save_instance(self, instance, using_transactions=True, dry_run=False):
-=======
+
     def save_instance(self, instance, is_created=True, using_transactions=True, dry_run=False):
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         try:
             super(CameraResource, self).save_instance(instance, using_transactions, dry_run)
         except IntegrityError:
