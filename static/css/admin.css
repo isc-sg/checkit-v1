@@ -2,12 +2,9 @@
 :root {
     --primary: #1f85f7;
     --primary-fg: #eee;
-<<<<<<< HEAD
-    --secondary: #1f85f7;
-=======
+
     --secondary: #2a2a2a;
     --accent: #ffffff
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 
     --body-fg: #eeeeee;
@@ -32,11 +29,7 @@
 
     --darkened-bg: #212121;
     --selected-bg: #1b1b1b;
-<<<<<<< HEAD
-    --selected-row: #00363a;
-=======
     --selected-row: #59595c;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
     --close-button-bg: #333333;
     --close-button-hover-bg: #666666;

@@ -18,13 +18,9 @@
 /*     brand Colors              */
 /* navbar color */
 :root {
-<<<<<<< HEAD
-  --blue: #5e72e4;
-  --indigo: #5603ad;
-=======
+
   --blue: #2a2a2a;
   --indigo: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   --purple: #8965e0;
   --pink: #f3a4b5;
   --red: #f5365c;
@@ -38,11 +34,7 @@
   --gray-dark: #32325d;
   --light: #ced4da;
   --lighter: #e9ecef;
-<<<<<<< HEAD
-  --primary: #e14eca;
-=======
   --primary: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   --secondary: #f4f5f7;
   --success: #00f2c3;
   --info: #1d8cf8;
@@ -95,15 +87,10 @@ body {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.5;
-<<<<<<< HEAD
-  color: #525f7f;
-  text-align: left;
-  background-color: #1e1e2f;
-=======
+
   color: #2a2a2a;
   text-align: left;
   background-color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 [tabindex="-1"]:focus {
@@ -199,11 +186,8 @@ sup {
 }
 
 a {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-decoration: none;
   background-color: transparent;
 }
@@ -555,11 +539,8 @@ mark,
 
 .img-thumbnail {
   padding: 0.25rem;
-<<<<<<< HEAD
-  background-color: #1e1e2f;
-=======
+
   background-color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border: 0.0625rem solid #e3e3e3;
   border-radius: 0.25rem;
   box-shadow: 0 1px 2px rgba(34, 42, 66, 0.075);
@@ -1665,11 +1646,8 @@ pre code {
 .table {
   width: 100%;
   margin-bottom: 1rem;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: transparent;
 }
 
@@ -1720,11 +1698,8 @@ pre code {
 }
 
 .table-hover tbody tr:hover {
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: rgba(34, 42, 66, 0.075);
 }
 
@@ -2008,31 +1983,19 @@ pre code {
 }
 
 .table .thead-dark th {
-<<<<<<< HEAD
-  color: #1e1e2f;
-=======
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: #212529;
   border-color: #32383e;
 }
 
 .table .thead-light th {
-<<<<<<< HEAD
-  color: #525f7f;
-=======
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: #e9ecef;
   border-color: #e3e3e3;
 }
 
 .table-dark {
-<<<<<<< HEAD
-  color: #1e1e2f;
-=======
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: #212529;
 }
 
@@ -2051,11 +2014,8 @@ pre code {
 }
 
 .table-dark.table-hover tbody tr:hover {
-<<<<<<< HEAD
-  color: #1e1e2f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: rgba(255, 255, 255, 0.075);
 }
 
@@ -2209,11 +2169,8 @@ select.form-control:focus::-ms-value {
   padding-bottom: 0.5rem;
   margin-bottom: 0;
   line-height: 1.428571;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: transparent;
   border: solid transparent;
   border-width: 1px 0;
@@ -2660,11 +2617,8 @@ textarea.form-control.is-invalid {
 .btn {
   display: inline-block;
   font-weight: 600;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-align: center;
   vertical-align: middle;
   user-select: none;
@@ -2684,11 +2638,8 @@ textarea.form-control.is-invalid {
 }
 
 .btn:hover {
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-decoration: none;
 }
 
@@ -2721,13 +2672,9 @@ fieldset:disabled a.btn {
 
     .btn-primary {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -2745,13 +2692,8 @@ fieldset:disabled a.btn {
 .btn-primary.disabled,
 .btn-primary:disabled {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-primary:not(:disabled):not(.disabled):active,
@@ -3198,24 +3140,16 @@ fieldset:disabled a.btn {
 }
 
 .btn-outline-primary {
-<<<<<<< HEAD
-  color: #e14eca;
-  border-color: #e14eca;
-=======
+
   color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-outline-primary:hover {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-outline-primary:focus,
@@ -3225,11 +3159,8 @@ fieldset:disabled a.btn {
 
 .btn-outline-primary.disabled,
 .btn-outline-primary:disabled {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: transparent;
 }
 
@@ -3237,13 +3168,9 @@ fieldset:disabled a.btn {
 .btn-outline-primary:not(:disabled):not(.disabled).active,
 .show>.btn-outline-primary.dropdown-toggle {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-outline-primary:not(:disabled):not(.disabled):active:focus,
@@ -3650,11 +3577,8 @@ fieldset:disabled a.btn {
 
 .btn-link {
   font-weight: 400;
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-decoration: none;
 }
 
@@ -3774,11 +3698,8 @@ input[type="button"].btn-block {
   padding: 0.5rem 0;
   margin: 0.125rem 0 0;
   font-size: 0.875rem;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-align: left;
   list-style: none;
   background-color: #ffffff;
@@ -3971,11 +3892,8 @@ input[type="button"].btn-block {
 .dropdown-item:active {
   color: #ffffff;
   text-decoration: none;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .dropdown-item.disabled,
@@ -4341,13 +4259,9 @@ input[type="button"].btn-block {
 
 .custom-control-input:checked~.custom-control-label::before {
   color: #ffffff;
-<<<<<<< HEAD
-  border-color: #e14eca;
-  background-color: #e14eca;
-=======
+
   border-color: #4890FE;
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: none;
 }
 
@@ -4361,13 +4275,9 @@ input[type="button"].btn-block {
 
 .custom-control-input:not(:disabled):active~.custom-control-label::before {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: none;
 }
 
@@ -4419,13 +4329,9 @@ input[type="button"].btn-block {
 }
 
 .custom-checkbox .custom-control-input:indeterminate~.custom-control-label::before {
-<<<<<<< HEAD
-  border-color: #e14eca;
-  background-color: #e14eca;
-=======
+
   border-color: #4890FE;
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: none;
 }
 
@@ -4510,11 +4416,8 @@ input[type="button"].btn-block {
 .custom-select:focus {
   border-color: rgba(50, 151, 211, 0.25);
   outline: 0;
-<<<<<<< HEAD
-  box-shadow: inset 0 1px 2px rgba(34, 42, 66, 0.075), 0 0 0 0 #e14eca;
-=======
+
   box-shadow: inset 0 1px 2px rgba(34, 42, 66, 0.075), 0 0 0 0 #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .custom-select:focus::-ms-value {
@@ -4646,17 +4549,7 @@ input[type="button"].btn-block {
 }
 
 .custom-range:focus::-webkit-slider-thumb {
-<<<<<<< HEAD
-  box-shadow: 0 0 0 1px #1e1e2f, none;
-}
 
-.custom-range:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 1px #1e1e2f, none;
-}
-
-.custom-range:focus::-ms-thumb {
-  box-shadow: 0 0 0 1px #1e1e2f, none;
-=======
   box-shadow: 0 0 0 1px #2a2a2a, none;
 }
 
@@ -4666,7 +4559,6 @@ input[type="button"].btn-block {
 
 .custom-range:focus::-ms-thumb {
   box-shadow: 0 0 0 1px #2a2a2a, none;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .custom-range::-moz-focus-outer {
@@ -4677,11 +4569,8 @@ input[type="button"].btn-block {
   width: 1rem;
   height: 1rem;
   margin-top: -0.25rem;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border: 0;
   border-radius: 1rem;
   box-shadow: 0 0.1rem 0.25rem rgba(34, 42, 66, 0.1);
@@ -4713,11 +4602,8 @@ input[type="button"].btn-block {
 .custom-range::-moz-range-thumb {
   width: 1rem;
   height: 1rem;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border: 0;
   border-radius: 1rem;
   box-shadow: 0 0.1rem 0.25rem rgba(34, 42, 66, 0.1);
@@ -4752,11 +4638,7 @@ input[type="button"].btn-block {
   margin-top: 0;
   margin-right: 0;
   margin-left: 0;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border: 0;
   border-radius: 1rem;
   box-shadow: 0 0.1rem 0.25rem rgba(34, 42, 66, 0.1);
@@ -4882,15 +4764,10 @@ input[type="button"].btn-block {
 
 .nav-tabs .nav-link.active,
 .nav-tabs .nav-item.show .nav-link {
-<<<<<<< HEAD
-  color: #525f7f;
-  background-color: #1e1e2f;
-  border-color: #e3e3e3 #e3e3e3 #1e1e2f;
-=======
+
   color: #2a2a2a;
   background-color: #2a2a2a;
   border-color: #e3e3e3 #e3e3e3 #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .nav-tabs .dropdown-menu {
@@ -4906,11 +4783,8 @@ input[type="button"].btn-block {
 .nav-pills .nav-link.active,
 .nav-pills .show>.nav-link {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .nav-fill .nav-item {
@@ -5652,13 +5526,9 @@ input[type="button"].btn-block {
 .page-item.active .page-link {
   z-index: 1;
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .page-item.disabled .page-link {
@@ -5742,11 +5612,8 @@ a.badge:focus {
 
 .badge-primary {
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 a.badge-primary:hover,
@@ -5996,11 +5863,8 @@ a.badge-darker.focus {
 }
 
 .alert-primary {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: #e66ad2;
   border-color: #e66ad2;
 }
@@ -6194,11 +6058,8 @@ a.badge-darker.focus {
   color: #ffffff;
   text-align: center;
   white-space: nowrap;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   transition: width 0.6s ease;
 }
 
@@ -6241,32 +6102,23 @@ a.badge-darker.focus {
 
 .list-group-item-action {
   width: 100%;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-align: inherit;
 }
 
 .list-group-item-action:hover,
 .list-group-item-action:focus {
   z-index: 1;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   text-decoration: none;
   background-color: #f6f9fc;
 }
 
 .list-group-item-action:active {
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: #e9ecef;
 }
 
@@ -6300,13 +6152,9 @@ a.badge-darker.focus {
 .list-group-item.active {
   z-index: 2;
   color: #ffffff;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .list-group-horizontal {
@@ -7199,11 +7047,8 @@ a.close.disabled {
 
 .popover-body {
   padding: 0.75rem 0.75rem;
-<<<<<<< HEAD
-  color: #525f7f;
-=======
+
   color: #2a2a2a;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .carousel {
@@ -7422,11 +7267,8 @@ a.close.disabled {
 }
 
 .bg-primary {
-<<<<<<< HEAD
-  background-color: #e14eca !important;
-=======
+
   background-color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 a.bg-primary:hover,
@@ -7606,11 +7448,8 @@ button.bg-darker:focus {
 }
 
 .border-primary {
-<<<<<<< HEAD
-  border-color: #e14eca !important;
-=======
+
   border-color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .border-secondary {
@@ -12640,11 +12479,8 @@ button.bg-darker:focus {
 }
 
 .text-primary {
-<<<<<<< HEAD
-  color: #e14eca !important;
-=======
+
   color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 a.text-primary:hover,
@@ -12752,11 +12588,8 @@ a.text-darker:focus {
 }
 
 .text-body {
-<<<<<<< HEAD
-  color: #525f7f !important;
-=======
+
   color: #2a2a2a !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .text-muted {
@@ -13306,16 +13139,7 @@ fieldset[disabled] .navbar .navbar-nav>a.btn.active {
 }
 
 .btn-primary {
-<<<<<<< HEAD
-  background: #e14eca;
-  background-image: -webkit-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca);
-  background-image: -o-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca);
-  background-image: -moz-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca);
-  background-image: linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca);
-  background-size: 210% 210%;
-  background-position: top right;
-  background-color: #e14eca;
-=======
+
   background: #4890FE;
   background-image: -webkit-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE);
   background-image: -o-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE);
@@ -13324,7 +13148,6 @@ fieldset[disabled] .navbar .navbar-nav>a.btn.active {
   background-size: 210% 210%;
   background-position: top right;
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   transition: all 0.15s ease;
   box-shadow: none;
   color: #ffffff;
@@ -13343,19 +13166,12 @@ fieldset[disabled] .navbar .navbar-nav>a.btn.active {
 .btn-primary:active:hover,
 .btn-primary.active:focus,
 .btn-primary.active:hover {
-<<<<<<< HEAD
-  background-color: #ba54f5 !important;
-  background-image: linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -webkit-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -o-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -moz-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-=======
+
   background-color: #4890FE !important;
   background-image: linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -webkit-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -o-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -moz-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   color: #ffffff;
   box-shadow: none;
 }
@@ -13396,15 +13212,7 @@ fieldset[disabled] .btn-primary:focus,
 fieldset[disabled] .btn-primary.focus,
 fieldset[disabled] .btn-primary:active,
 fieldset[disabled] .btn-primary.active {
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-}
 
-.btn-primary.btn-simple {
-  color: #e14eca;
-  border-color: #e14eca;
-=======
   background-color: #4890FE;
   border-color: #4890FE;
 }
@@ -13412,7 +13220,6 @@ fieldset[disabled] .btn-primary.active {
 .btn-primary.btn-simple {
   color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background: transparent;
 }
 
@@ -13420,24 +13227,17 @@ fieldset[disabled] .btn-primary.active {
 .btn-primary.btn-simple:focus,
 .btn-primary.btn-simple:active,
 .btn-primary.btn-simple:not(:disabled):not(.disabled):active {
-<<<<<<< HEAD
-  color: #e14eca;
-  border-color: #e14eca;
-=======
+
   color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none;
 }
 
 .btn-primary.btn-simple.active {
-<<<<<<< HEAD
-  border-color: #e14eca !important;
-=======
+
   border-color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-primary.btn-simple.active:hover,
@@ -13445,30 +13245,19 @@ fieldset[disabled] .btn-primary.active {
 .btn-primary.btn-simple.active:active,
 .btn-primary.btn-simple.active:not(:disabled):not(.disabled):active {
   color: #ffffff;
-<<<<<<< HEAD
-  border-color: #e14eca;
-  background-image: linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -webkit-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -o-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-image: -moz-linear-gradient(to bottom left, #e14eca, #ba54f5, #e14eca) !important;
-  background-color: #ba54f5 !important;
-=======
+
   border-color: #4890FE;
   background-image: linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -webkit-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -o-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-image: -moz-linear-gradient(to bottom left, #4890FE, #4890FE, #4890FE) !important;
   background-color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: none;
 }
 
 .btn-primary.btn-link {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-primary.btn-link:hover,
@@ -13996,11 +13785,8 @@ fieldset[disabled] .btn-danger.active {
   background-color: #ffffff;
   transition: all 0.15s ease;
   box-shadow: none;
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-neutral.animation-on-hover:hover {
@@ -14130,21 +13916,15 @@ fieldset[disabled] .btn-neutral.active {
 .show>.btn-neutral.dropdown-toggle:focus,
 .show>.btn-neutral.dropdown-toggle:hover {
   background-color: #ffffff;
-<<<<<<< HEAD
-  color: #ba54f5;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   box-shadow: none;
 }
 
 .btn-neutral:hover,
 .btn-neutral:focus {
-<<<<<<< HEAD
-  color: #ba54f5;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .btn-neutral:hover:not(.nav-link),
@@ -14989,11 +14769,8 @@ background-color: #32325d;
 }
 
 .form-control:focus {
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   background-color: transparent;
   box-shadow: none;
 }
@@ -15002,11 +14779,8 @@ background-color: #32325d;
 .form-control:focus~.input-group-append .input-group-text,
 .form-control:focus+.input-group-prepend .input-group-text,
 .form-control:focus~.input-group-prepend .input-group-text {
-<<<<<<< HEAD
-  border: 1px solid #e14eca;
-=======
+
   border: 1px solid #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border-left: none;
   background-color: transparent;
 }
@@ -15329,11 +15103,8 @@ img {
 }
 
 .modal.modal-primary .modal-content {
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   color: #ffffff;
 }
 
@@ -16148,11 +15919,8 @@ img {
 }
 
 .navbar.bg-primary {
-<<<<<<< HEAD
-  background-color: #e14eca !important;
-=======
+
   background-color: #4890FE !important;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .navbar.bg-warning {
@@ -16799,22 +16567,16 @@ h6 {
 }
 
 a {
-<<<<<<< HEAD
-  color: #ba54f5;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   font-weight: 300;
   padding: 0.25rem;
 }
 
 a:hover,
 a:focus {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 h1,
@@ -16928,21 +16690,13 @@ p.description {
 }
 
 .blockquote.blockquote-primary {
-<<<<<<< HEAD
-  border-color: #e14eca;
-  color: #e14eca;
-}
 
-.blockquote.blockquote-primary small {
-  color: #e14eca;
-=======
   border-color: #4890FE;
   color: #4890FE;
 }
 
 .blockquote.blockquote-primary small {
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .blockquote.blockquote-danger {
@@ -16965,11 +16719,8 @@ p.description {
 
 ul li,
 ol li {
-<<<<<<< HEAD
-  color: #5603ad;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 
@@ -17008,11 +16759,8 @@ hr {
 }
 
 .table>tbody>tr.table-primary>td {
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .table>tbody>tr.table-warning>td {
@@ -17230,11 +16978,8 @@ table.tablesorter thead tr .headerSortDown {
 .form-check input[type="checkbox"]:checked+.form-check-sign::before,
 .form-check input[type="checkbox"]:checked+.form-check-sign::before {
   border: none;
-<<<<<<< HEAD
-  background-color: #e14eca;
-=======
+
   background-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .form-check .form-check-sign::after {
@@ -17317,24 +17062,17 @@ table.tablesorter thead tr .headerSortDown {
 .form-check-radio input[type="radio"]:checked+.form-check-sign::after {
   width: 6px;
   height: 6px;
-<<<<<<< HEAD
-  background-color: #e14eca;
-  border-color: #e14eca;
-=======
+
   background-color: #4890FE;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   top: 9px;
   left: 6px;
   opacity: 1;
 }
 
 .form-check-radio input[type="radio"]:checked+.form-check-sign::before {
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .form-check-radio input[type="radio"]:checked+.form-check-sign::after {
@@ -17680,19 +17418,12 @@ table.tablesorter thead tr .headerSortDown {
 
 .sidebar,
 .off-canvas-sidebar {
-<<<<<<< HEAD
-  background: #ba54f5;
-  background: -webkit-linear-gradient(0deg, #ba54f5 0%, #e14eca 100%);
-  background: -o-linear-gradient(0deg, #ba54f5 0%, #e14eca 100%);
-  background: -moz-linear-gradient(0deg, #ba54f5 0%, #e14eca 100%);
-  background: linear-gradient(0deg, #ba54f5 0%, #e14eca 100%);
-=======
+
   background: #4890FE;
   background: -webkit-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: -o-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: -moz-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   height: calc(100vh - 90px);
   width: 230px;
   position: fixed;
@@ -17898,11 +17629,8 @@ table.tablesorter thead tr .headerSortDown {
   width: 6px;
   top: 22px;
   left: -4px;
-<<<<<<< HEAD
-  background: #5603ad;;
-=======
+
   background: #4890FE;;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   border-radius: 50%;
 }
 
@@ -18059,17 +17787,11 @@ table.tablesorter thead tr .headerSortDown {
 .sidebar[data="blue"],
 .off-canvas-sidebar[data="blue"] {
   background: #3358f4;
-<<<<<<< HEAD
-  background: -webkit-linear-gradient(0deg, #3358f4 0%, #1d8cf8 100%);
-  background: -o-linear-gradient(0deg, #3358f4 0%, #1d8cf8 100%);
-  background: -moz-linear-gradient(0deg, #3358f4 0%, #1d8cf8 100%);
-  background: linear-gradient(0deg, #3358f4 0%, #1d8cf8 100%);
-=======
+
   background: -webkit-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: -o-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: -moz-linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
   background: linear-gradient(0deg, #2a2a2a 0%, #2a2a2a 100%);
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .sidebar[data="green"],
@@ -18167,13 +17889,9 @@ table.tablesorter thead tr .headerSortDown {
   float: right;
   width: 100%;
   min-height: 100vh;
-<<<<<<< HEAD
-  border-top: 2px solid #e14eca;
-  background: linear-gradient(#1e1e2f, #1e1e24);
-=======
+
   border-top: 2px solid #4890FE;
   background: linear-gradient(#2a2a2a, #2a2a2a);
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
   -webkit-transition: all 0.5s cubic-bezier(0.685, 0.0473, 0.346, 1);
   -moz-transition: all 0.5s cubic-bezier(0.685, 0.0473, 0.346, 1);
   -o-transition: all 0.5s cubic-bezier(0.685, 0.0473, 0.346, 1);
@@ -18190,11 +17908,8 @@ table.tablesorter thead tr .headerSortDown {
 }
 
 .main-panel[data="primary"] {
-<<<<<<< HEAD
-  border-top: 2px solid #e14eca;
-=======
+
   border-top: 2px solid #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .main-panel>.content {
@@ -18783,11 +18498,8 @@ a[data-toggle="collapse"][aria-expanded="true"] .caret,
 }
 
 .bd-docs .bd-example {
-<<<<<<< HEAD
-  background: linear-gradient(#1e1e2f, #1e1e24);
-=======
+
   background: linear-gradient(#2a2a2a, #2a2a2a);
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .bd-docs .navbar {
@@ -18874,20 +18586,14 @@ a[data-toggle="collapse"][aria-expanded="true"] .caret,
 .bd-docs table .datepicker thead th,
 .bd-docs table .datepicker table thead th,
 .bd-docs table .datepicker .tim-icons {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .bd-docs .bd-example .picker-switch .tim-icons,
 .bd-docs table .picker-switch .tim-icons {
-<<<<<<< HEAD
-  color: #e14eca;
-=======
+
   color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .bd-docs .footer .container-fluid>nav {
@@ -19390,15 +19096,10 @@ code {
 .input-group-focus .input-group-prepend .input-group-text,
 .input-group-focus .input-group-append .input-group-text {
   background-color: #ffffff;
-<<<<<<< HEAD
-  border-color: #e14eca;
-  background-color: transparent;
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
   background-color: transparent;
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .input-group-focus.no-border .input-group-prepend .input-group-text,
@@ -20068,11 +19769,8 @@ Copyright (c) 2015 Daniel Eden
 }
 
 .white-content .form-control:focus {
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .white-content .form-group.no-border .form-control,
@@ -20143,11 +19841,8 @@ Copyright (c) 2015 Daniel Eden
 .white-content .input-group-focus .input-group-prepend .input-group-text,
 .white-content .input-group-focus .input-group-append .input-group-text,
 .white-content .input-group-focus .form-control {
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .white-content .input-group-focus.no-border .input-group-prepend .input-group-text,
@@ -20448,11 +20143,8 @@ Copyright (c) 2015 Daniel Eden
 }
 
 .card.card-white .form-control:focus {
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .card.card-white label:not(.btn) {
@@ -20528,11 +20220,8 @@ Copyright (c) 2015 Daniel Eden
 .card.card-white .input-group-focus .input-group-append .input-group-text,
 .card.card-white .input-group-focus .form-control {
   background-color: #ffffff;
-<<<<<<< HEAD
-  border-color: #e14eca;
-=======
+
   border-color: #4890FE;
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 }
 
 .card.card-white .input-group-focus.no-border .input-group-prepend .input-group-text,
@@ -20872,8 +20561,5 @@ Copyright (c) 2015 Daniel Eden
 }
 .my-custom-file-input:active::before {
   background: -webkit-linear-gradient(top, #e3e3e3, #f9f9f9);
-<<<<<<< HEAD
+
 }
-=======
-}
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin

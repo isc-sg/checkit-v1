@@ -103,13 +103,6 @@ class Camera(models.Model):
 
 
 class ReferenceImage(models.Model):
-<<<<<<< HEAD
-    def get_image_filename(self, filename):
-        h = now().strftime('%H')
-        return f'base_images/{self.url.id}/{h}-{filename}'
-
-    def get_hour():
-=======
     def get_image_filename(instance, filename):
         h = now().strftime('%H')
         print("url is", instance.url)
@@ -117,7 +110,6 @@ class ReferenceImage(models.Model):
 
     def get_hour(self):
         print("referemce hour is", now().strftime('%H'))
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
         return now().strftime('%H')
 
     url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
@@ -164,11 +156,7 @@ class Licensing(models.Model):
                                                    MaxValueValidator(168),
                                                    MinValueValidator(1)]
                                                )
-<<<<<<< HEAD
-
-=======
     # TODO run_schedule seems like its not being used - check and remove
->>>>>>> added heap of changes that were not pushed up since september 2022.  Some known - fixed bug with pdf creation where log or reference image were deleted.  Added code to push message to synergy. Current version has Synergy skin
 
 class EngineState(models.Model):
     state = models.CharField(choices=STATE_CHOICES, max_length=32)

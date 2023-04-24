@@ -14,7 +14,7 @@ import numpy as np
 import uuid
 import mysql.connector
 
-from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404
+from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
@@ -25,7 +25,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.views.decorators.cache import cache_control
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User, Group
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage
@@ -44,6 +44,12 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from rest_framework import viewsets
+from rest_framework import permissions
+from rest_framework.parsers import JSONParser
+
+from main_menu.serializers import CameraSerializer
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
                     handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
@@ -58,6 +64,57 @@ error_image = cv2.putText(error_image, "Error retrieving image",
 checkit_secret = "Checkit65911760424"[::-1].encode()
 
 key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+#
+# class UserViewSet(viewsets.ModelViewSet):
+#     """
+#     API endpoint that allows users to be viewed or edited.
+#     """
+#     queryset = User.objects.all().order_by('-date_joined')
+#     serializer_class = UserSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
+
+class CameraViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows users to be viewed or edited.
+    """
+    queryset = Camera.objects.all().order_by('camera_number')
+    serializer_class = CameraSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'camera_number'
+
+
+def CameraDetail(request, camera_number):
+    try:
+        camera = Camera.objects.get(camera_number=camera_number)
+    except Camera.DoesNotExist:
+        return HttpResponse(status=404)
+
+    if request.method == 'GET':
+        serializer = CameraSerializer(camera)
+        return JsonResponse(serializer.data)
+
+    elif request.method == 'PUT':
+        data = JSONParser().parse(request)
+        serializer = CameraSerializer(camera, data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data)
+        return JsonResponse(serializer.errors, status=400)
+
+    elif request.method == 'DELETE':
+        camera.delete()
+        return HttpResponse(status=204)
+#
+# class GroupViewSet(viewsets.ModelViewSet):
+#     """
+#     API endpoint that allows groups to be viewed or edited.
+#     """
+#     queryset = Group.objects.all()
+#     serializer_class = GroupSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
 
 
 def get_hash(key_string):

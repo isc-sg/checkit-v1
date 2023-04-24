@@ -25,7 +25,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.views.decorators.cache import cache_control
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User, Group
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage
@@ -41,6 +41,10 @@ from reportlab.lib.colors import HexColor
 import hashlib
 import json
 from cryptography.fernet import Fernet, InvalidToken
+
+from rest_framework import viewsets
+from rest_framework import permissions
+from main_menu.serializers import UserSerializer, GroupSerializer
 
 from zipfile import ZipFile, ZIP_DEFLATED
 
@@ -58,6 +62,24 @@ error_image = cv2.putText(error_image, "Error retrieving image",
 checkit_secret = "Checkit65911760424"[::-1].encode()
 
 key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows users to be viewed or edited.
+    """
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows groups to be viewed or edited.
+    """
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 def get_hash(key_string):
