@@ -5,6 +5,8 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework import routers
 from django.views.generic import TemplateView
 from rest_framework.schemas import get_schema_view
+from django.views.decorators.csrf import csrf_exempt
+
 
 from main_menu import views
 
@@ -28,7 +30,7 @@ urlpatterns = [
     #     extra_context={'schema_url': 'openapi-schema'}
     # ), name='swagger-ui'),
     path('import/', views.simple_upload, name="import"),
-    path('camera_api/<int:camera_number>/', views.CameraDetail),
+    path('reference_image/', csrf_exempt(views.reference_image_api)),
     path("status/", views.index, name='status'),
     path("scheduler/", views.scheduler, name='scheduler'),
     path('cameras/', views.CameraView.as_view(), name='cameras'),

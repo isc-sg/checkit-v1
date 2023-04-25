@@ -164,6 +164,7 @@ LOGIN_REDIRECT_URL = '/'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 102400
+APPEND_SLASH = False
 
 # USE_THOUSAND_SEPARATOR = True
 # need to change the code for displaying base and capture image for the above to work when id = (1,234) it fails

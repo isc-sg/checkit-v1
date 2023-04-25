@@ -77,7 +77,7 @@ key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
 
 class CameraViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows users to be viewed or edited.
+    API endpoint that allows cameras to be viewed or edited.
     """
     queryset = Camera.objects.all().order_by('camera_number')
     serializer_class = CameraSerializer
@@ -85,36 +85,54 @@ class CameraViewSet(viewsets.ModelViewSet):
     lookup_field = 'camera_number'
 
 
-def CameraDetail(request, camera_number):
-    try:
-        camera = Camera.objects.get(camera_number=camera_number)
-    except Camera.DoesNotExist:
-        return HttpResponse(status=404)
-
-    if request.method == 'GET':
-        serializer = CameraSerializer(camera)
-        return JsonResponse(serializer.data)
-
-    elif request.method == 'PUT':
-        data = JSONParser().parse(request)
-        serializer = CameraSerializer(camera, data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data)
-        return JsonResponse(serializer.errors, status=400)
-
-    elif request.method == 'DELETE':
-        camera.delete()
-        return HttpResponse(status=204)
-#
-# class GroupViewSet(viewsets.ModelViewSet):
-#     """
-#     API endpoint that allows groups to be viewed or edited.
-#     """
-#     queryset = Group.objects.all()
-#     serializer_class = GroupSerializer
-#     permission_classes = [permissions.IsAuthenticated]
-
+def reference_image_api(request):
+    if request.method == "POST":
+        if 'action' not in request.POST:
+            return HttpResponse("Error: requires action field")
+        action: str = request.POST['action']
+        if action.lower() not in ("delete", "refresh"):
+            return HttpResponse("Error: action needs to be either delete or refresh")
+        camera_number = request.POST['camera_number']
+        try:
+            camera_object = Camera.objects.get(camera_number=camera_number)
+        except ObjectDoesNotExist:
+            return HttpResponse("Error: camera does not exist")
+        if action.lower() == "refresh":
+            child_process = Popen(["/home/checkit/env/bin/python",
+                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number],
+                                  stdout=PIPE, stderr=PIPE)
+            stdout, stderr = child_process.communicate()
+            return_code = child_process.returncode
+            # print('return_code', return_code)
+            if return_code == 33:
+                return HttpResponse("Error: Licensing Error")
+            elif return_code == 0:
+                logging.info(f"API request completed camera check for camera {camera_number}")
+                process_output = "Run Completed - No errors reported"
+                logging.info("Process Output {p}".format(p=process_output))
+                return HttpResponse(process_output)
+            else:
+                logging.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+                return HttpResponse("Error in camera check for camera {} - {}".format(camera_number, stderr))
+        elif action.lower() == "delete":
+            if "hour" not in request.POST:
+                return HttpResponse("Error: please provide hour for delete action")
+            else:
+                hour = request.POST['hour']
+                # look up reference image and make sure it exists.
+                try:
+                    reference_image_object = ReferenceImage.objects.get(url_id=camera_object.id, hour=hour)
+                    try:
+                        reference_image_object.delete()
+                    except Exception:
+                        return HttpResponse("Error: unable to delete reference image")
+                    return HttpResponse("Success")
+                except ObjectDoesNotExist:
+                    return HttpResponse(f"Error: reference image for camera number "
+                                        f"{camera_number} and hour {hour} does not exist")
+                return HttpResponse(camera_object.id)
+    else:
+        return HttpResponse("Error: Only POST method allowed")
 
 
 def get_hash(key_string):
