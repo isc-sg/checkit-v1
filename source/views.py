@@ -85,6 +85,10 @@ class CameraViewSet(viewsets.ModelViewSet):
     lookup_field = 'camera_number'
 
 
+def custom_500_error_view(request):
+    return render(request, '500.html')
+
+
 def reference_image_api(request):
     if request.method == "POST":
         if 'action' not in request.POST:
@@ -133,7 +137,6 @@ def reference_image_api(request):
                 except ObjectDoesNotExist:
                     return HttpResponse(f"Error: reference image for camera number "
                                         f"{camera_number} and hour {hour} does not exist")
-                return HttpResponse(camera_object.id)
     else:
         return HttpResponse("Error: Only POST method allowed")
 
