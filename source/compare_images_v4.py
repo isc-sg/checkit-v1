@@ -1,6 +1,5 @@
 import datetime
 import os
-
 # import multiprocessing
 import pathos
 import math
@@ -42,7 +41,6 @@ def get_mysql_password():
     l1 = shell_output.decode('utf-8').split("\n")
     command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
-
 
     command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
@@ -158,7 +156,6 @@ def get_camera_ids(camera_numbers, checkit_cursor):
         ids = [x[0] for x in z]
         print(ids)
     except mysql.connector.Error as e:
-
         logging.error(f"Database connection error {e} {sql_statement}")
         exit(1)
     return ids
@@ -410,7 +407,6 @@ def main(ids):
 
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
     list_pointer = 0
-
 
     number_of_cores = pathos.multiprocessing.cpu_count()*2
     incrementer = math.ceil(len(list_of_cameras)/number_of_cores)

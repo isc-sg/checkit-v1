@@ -92,7 +92,10 @@ def reference_image_api(request):
         action: str = request.POST['action']
         if action.lower() not in ("delete", "refresh"):
             return HttpResponse("Error: action needs to be either delete or refresh")
-        camera_number = request.POST['camera_number']
+        if 'camera_number' in request.POST:
+            camera_number = request.POST['camera_number']
+        else:
+            camera_number = None
         try:
             camera_object = Camera.objects.get(camera_number=camera_number)
         except ObjectDoesNotExist:

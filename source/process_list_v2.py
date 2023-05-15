@@ -50,8 +50,20 @@ config = configparser.ConfigParser()
 config.read('/home/checkit/camera_checker/main_menu/config/config.cfg')
 try:
     network_interface = config['DEFAULT']['network_interface']
-    HOST = config['DEFAULT']['synergy_host']
-    PORT = int(config['DEFAULT']['synergy_port'])
+    HOST = None
+    if config.has_option('DEFAULT', 'synergy_host', ):
+        try:
+            HOST = config.get('DEFAULT', 'synergy_host', fallback=None)
+        except ValueError:
+            logging.error("Please check config file for synergy host address")
+
+    PORT = 0
+    if config.has_option('DEFAULT', 'synergy_port',):
+        try:
+            PORT = config.getint('DEFAULT', 'synergy_port', fallback=0)
+        except ValueError:
+            logging.error("Please check config file for synergy port number")
+
     CHECKIT_HOST = config['DEFAULT']['checkit_host']
 except configparser.NoOptionError:
     logging.error("Unable to read config file")
@@ -123,7 +135,18 @@ def get_transparent_edge(input_image, color):
 
 
 def send_alarms(list_of_cameras):
-    # print("sending alarm to synergy")
+    if HOST is None or PORT == 0:
+        logging.error(f"Error in config - HOST = {HOST}, PORT = {PORT}")
+
+        return
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((HOST, PORT))
+    except socket.error as e:
+        logging.error(f"Error sending to alarm server - {e}")
+        return
+    finally:
+        s.close()
     checkit_db = mysql.connector.connect(
                     host="localhost",
                     user="checkit",
@@ -190,9 +213,12 @@ def send_alarms(list_of_cameras):
                      + "<jpeg>" + image + "</jpeg>" \
                      + "<autoClose>true</autoClose></Request>""" + "\x00"
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((HOST, PORT))
-        s.send(send_alarm.encode())
-        reply = s.recv(8192).decode().rstrip("\x00")
+        try:
+            s.connect((HOST, PORT))
+            s.send(send_alarm.encode())
+            reply = s.recv(8192).decode().rstrip("\x00")
+        except socket.error as e:
+            logging.error(f"Error sending to alarm server - {e}")
         # print(reply)
 
 

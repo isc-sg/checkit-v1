@@ -38,7 +38,6 @@ def create_key(em):
     for i in l1:
         line = i.split(" ")
         if line[-1] == "/":
-
             command = "/usr/bin/sudo /sbin/blkid | grep " + line[0]
             try:
                 shell_output = subprocess.check_output(command, shell=True)
@@ -78,7 +77,6 @@ keyring_file_data=/var/lib/mysql/keyring-data/keyring
 innodb_file_per_table=ON
 
 """
-
 create_key("sam.corbo@isc.sg")
 transaction_limit = 0
 end_date_string = ""
@@ -106,7 +104,6 @@ try:
     license_key, password = create_key(email)
     print("key", license_key, "passwd", password)
     admin_cursor = admin_db.cursor()
-
 
     sql_statement = "ALTER USER 'root'@'localhost' IDENTIFIED BY " + "\'" + password + "\'"
     admin_cursor.execute(sql_statement)

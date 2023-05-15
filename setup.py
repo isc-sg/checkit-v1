@@ -14,6 +14,7 @@ fileSet.add("main_menu/select_region.py")
 fileSet.add("main_menu/tables.py")
 fileSet.add("main_menu/urls.py")
 fileSet.add("main_menu/views.py")
+fileSet.add("main_menu/serializers.py")
 setup(description='Checkit Application',
       author='Sam Corbo',
       author_email='sam.corbo@isc.sg',

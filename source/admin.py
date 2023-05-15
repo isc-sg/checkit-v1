@@ -89,6 +89,9 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level']
     list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter))
 
+    def has_add_permission(self, request, obj=None):
+        return False
+
     def get_regions(self, obj):
         return obj.url.image_regions
     get_regions.short_description = "Regions"

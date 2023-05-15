@@ -14,7 +14,7 @@ import numpy as np
 import uuid
 import mysql.connector
 
-from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404
+from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
@@ -42,11 +42,13 @@ import hashlib
 import json
 from cryptography.fernet import Fernet, InvalidToken
 
+from zipfile import ZipFile, ZIP_DEFLATED
+
 from rest_framework import viewsets
 from rest_framework import permissions
-from main_menu.serializers import UserSerializer, GroupSerializer
+from rest_framework.parsers import JSONParser
 
-from zipfile import ZipFile, ZIP_DEFLATED
+from main_menu.serializers import CameraSerializer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -63,23 +65,77 @@ checkit_secret = "Checkit65911760424"[::-1].encode()
 
 key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
 
+#
+# class UserViewSet(viewsets.ModelViewSet):
+#     """
+#     API endpoint that allows users to be viewed or edited.
+#     """
+#     queryset = User.objects.all().order_by('-date_joined')
+#     serializer_class = UserSerializer
+#     permission_classes = [permissions.IsAuthenticated]
 
-class UserViewSet(viewsets.ModelViewSet):
+
+class CameraViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows users to be viewed or edited.
+    API endpoint that allows cameras to be viewed or edited.
     """
-    queryset = User.objects.all().order_by('-date_joined')
-    serializer_class = UserSerializer
+    queryset = Camera.objects.all().order_by('camera_number')
+    serializer_class = CameraSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'camera_number'
 
 
-class GroupViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
-    queryset = Group.objects.all()
-    serializer_class = GroupSerializer
-    permission_classes = [permissions.IsAuthenticated]
+def reference_image_api(request):
+    if request.method == "POST":
+        if 'action' not in request.POST:
+            return HttpResponse("Error: requires action field")
+        action: str = request.POST['action']
+        if action.lower() not in ("delete", "refresh"):
+            return HttpResponse("Error: action needs to be either delete or refresh")
+        if 'camera_number' in request.POST:
+            camera_number = request.POST['camera_number']
+        else:
+            camera_number = None
+        try:
+            camera_object = Camera.objects.get(camera_number=camera_number)
+        except ObjectDoesNotExist:
+            return HttpResponse("Error: camera does not exist")
+        if action.lower() == "refresh":
+            child_process = Popen(["/home/checkit/env/bin/python",
+                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number],
+                                  stdout=PIPE, stderr=PIPE)
+            stdout, stderr = child_process.communicate()
+            return_code = child_process.returncode
+            # print('return_code', return_code)
+            if return_code == 33:
+                return HttpResponse("Error: Licensing Error")
+            elif return_code == 0:
+                logging.info(f"API request completed camera check for camera {camera_number}")
+                process_output = "Run Completed - No errors reported"
+                logging.info("Process Output {p}".format(p=process_output))
+                return HttpResponse(process_output)
+            else:
+                logging.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+                return HttpResponse("Error in camera check for camera {} - {}".format(camera_number, stderr))
+        elif action.lower() == "delete":
+            if "hour" not in request.POST:
+                return HttpResponse("Error: please provide hour for delete action")
+            else:
+                hour = request.POST['hour']
+                # look up reference image and make sure it exists.
+                try:
+                    reference_image_object = ReferenceImage.objects.get(url_id=camera_object.id, hour=hour)
+                    try:
+                        reference_image_object.delete()
+                    except Exception:
+                        return HttpResponse("Error: unable to delete reference image")
+                    return HttpResponse("Success")
+                except ObjectDoesNotExist:
+                    return HttpResponse(f"Error: reference image for camera number "
+                                        f"{camera_number} and hour {hour} does not exist")
+                return HttpResponse(camera_object.id)
+    else:
+        return HttpResponse("Error: Only POST method allowed")
 
 
 def get_hash(key_string):
@@ -96,7 +152,6 @@ def check_adm_database(password):
         "database": "adm"
     }
 
-
     try:
         adm_db = mysql.connector.connect(**adm_db_config)
     except mysql.connector.Error:
@@ -111,7 +166,6 @@ def check_adm_database(password):
 
         except mysql.connector.Error as e:
             print("Failed all attempts at accessing database", e)
-
     try:
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
@@ -167,7 +221,6 @@ def get_license_details():
     l1 = shell_output.decode('utf-8').split("\n")
     command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
-
 
     command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
@@ -281,7 +334,6 @@ def index(request):
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
     if request.user.is_superuser:
-
         # print("is super")
         admin_user = "True"
     else:
@@ -298,7 +350,6 @@ def index(request):
         log_file_zipped = "/tmp/logs.zip"
         with ZipFile(log_file_zipped, "w", ZIP_DEFLATED) as archive:
             for log_file in log_files:
-
                 try:
                     archive.write(log_file)
                 except FileNotFoundError:
