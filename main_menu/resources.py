@@ -13,9 +13,9 @@ class CameraResource(resources.ModelResource):
         model = Camera
         skip_unchanged = True
         exclude = ('id',)
-        fields = ('url', 'camera_number', 'camera_name',
+        fields = ('url', 'multicast_address', 'camera_number', 'camera_name',
                   'camera_location', 'image_regions', 'matching_threshold',)
-        import_id_fields = ('url', 'camera_number', 'camera_name',
+        import_id_fields = ('url', 'multicast_address', 'camera_number', 'camera_name',
                             'camera_location', 'image_regions', 'matching_threshold')
 
     def save_instance(self, instance, is_created=True, using_transactions=True, dry_run=False):

@@ -31,14 +31,8 @@ import itertools
 import socket
 
 
-checkit_secret = "Checkit65911760424"[::-1].encode()
-
-key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
-
-
 open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
-
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
@@ -79,36 +73,6 @@ except configparser.NoOptionError:
 
 
 cpus = cpu_count()
-
-
-def get_encrypted(password):
-    h = hashlib.blake2b(digest_size=64, key=checkit_secret)
-    h.update(password.encode())
-    h_in_hex = h.hexdigest().upper()
-    return h_in_hex
-
-
-def get_mysql_password():
-    fd = open("/etc/machine-id", "r")
-    machine_id = fd.read()
-    machine_id = machine_id.strip("\n")
-
-    shell_output = subprocess.check_output("/bin/df", shell=True)
-    l1 = shell_output.decode('utf-8').split("\n")
-    command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
-    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
-
-    command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
-    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
-
-    command = "sudo dmidecode | grep -i uuid"
-    product_uuid = subprocess.check_output(command, shell=True).decode(). \
-        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
-
-    finger_print = (root_fs_uuid + machine_id + product_uuid)
-    fingerprint_encrypted = get_encrypted(finger_print)
-    mysql_password = fingerprint_encrypted[10:42][::-1]
-    return mysql_password
 
 
 def take_closest(my_list, my_number):
@@ -291,7 +255,7 @@ def init_pools():
             exit(0)
 
     try:
-        password = get_mysql_password()
+        password = "0A21738C65FF283B4248D455633A9E98"
         adm_db_config = {
             "host": "localhost",
             "user": "root",
@@ -625,9 +589,9 @@ class ProcessCameras(object):
 
     def process_list(self, list_of_c):
         # logging.info(f"processing {list_of_c}, {pathos.helpers.mp.current_process()}")
-        logging.info(f"enter process_list")
+        # logging.info(f"enter process_list")
         init_pools()
-        logging.info(f"list_of_c, {list_of_c}, {type(list_of_c)}")
+        # logging.info(f"list_of_c, {list_of_c}, {type(list_of_c)}")
         for camera in list_of_c:
             fields = "*"
             table = "main_menu_camera"
@@ -649,7 +613,7 @@ class ProcessCameras(object):
             long_sql = None
             hours = sql_select(fields, table, where, long_sql, fetch_all=True)
             int_hours = []
-            logging.info(f"hours, {hours}")
+            # logging.info(f"hours, {hours}")
             if hours:
                 for i in range(0, len(hours)):
                     int_hours.append(hours[i][0])
@@ -745,22 +709,25 @@ class ProcessCameras(object):
 
                                 if matching_score < current_record[matching_threshold_index]:
                                     action = "Failed"
+                                    logging.info("movement fail")
                                 else:
                                     action = "Pass"
 
-                                if focus_value < current_record[focus_value_threshold_index]:
-                                    action = "Failed"
-                                    # print("focus fail")
-                                else:
-                                    action = "Pass"
+                                if action != "Failed":
+                                    if focus_value < current_record[focus_value_threshold_index]:
+                                        action = "Failed"
+                                        logging.info("focus fail")
+                                    else:
+                                        action = "Pass"
 
-                                if frame_brightness < current_record[light_level_threshold_index]:
-                                    action = "Failed"
-                                    # print("light fail")
-                                else:
-                                    action = "Pass"
+                                if action != "Failed":
+                                    if frame_brightness < current_record[light_level_threshold_index]:
+                                        action = "Failed"
+                                        logging.info("light fail")
+                                    else:
+                                        action = "Pass"
 
-                                print(focus_value, current_record[focus_value_threshold_index])
+                                # print(focus_value, current_record[focus_value_threshold_index])
 
 
                                 table = "main_menu_logimage"
@@ -802,7 +769,7 @@ class ProcessCameras(object):
 def start_processes(list_of_cameras):
     pool = ProcessingPool(cpus*2)
     p = ProcessCameras()
-    logging.info(f"start_processes list {list_of_cameras} {type(list_of_cameras)} cpu's {cpus}")
+    # logging.info(f"start_processes list {list_of_cameras} {type(list_of_cameras)} cpu's {cpus}")
     pool.imap(p.process_list, list_of_cameras)
     pool.close()
     pool.join()

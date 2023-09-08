@@ -168,7 +168,7 @@ def check_adm_database(password):
             adm_db = mysql.connector.connect(**adm_db_config)
 
         except mysql.connector.Error as e:
-            print("Failed all attempts at accessing database", e)
+            logging.error(f"Failed all attempts at accessing database  {e}")
     try:
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
@@ -325,6 +325,8 @@ def get_transparent_edge(input_image, color):
     rgba_image = [b, g, r, alpha]
     final_image = cv2.merge(rgba_image, 4)
     return final_image
+
+
 
 
 def index(request):
@@ -545,7 +547,7 @@ def scheduler(request):
                          "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         return_code = process.returncode
-        print('return_code', return_code)
+        # print('return_code', return_code)
         if return_code == 33:
             context = {"error": "Licensing Error"}
             return HttpResponse(template.render(context, request))
@@ -615,7 +617,8 @@ def scheduler(request):
                               stdout=PIPE, stderr=PIPE)
         stdout, stderr = child_process.communicate()
         return_code = child_process.returncode
-        print('return_code', return_code)
+        # print('return_code', return_code)
+        # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
         if return_code == 33:
             pass
             context = {"error": "Licensing Error"}
@@ -709,7 +712,7 @@ def licensing(request):
                     adm_db = mysql.connector.connect(**adm_db_config)
 
                 except mysql.connector.Error as e:
-                    print("Failed all attempts at accessing database", e)
+                    logging.info(f"Failed all attempts at accessing database {e}")
 
             try:
                 admin_cursor = adm_db.cursor()
@@ -725,7 +728,7 @@ def licensing(request):
                     new_license_key = get_hash("{}{}{}{}".format(uploaded_purchased_transactions, uploaded_end_date,
                                                result[4], uploaded_purchased_cameras))
                     if new_license_key != uploaded_license_key:
-                        print("keys dont match", new_license_key, uploaded_license_key)
+                        logging.info(f"keys dont match  {new_license_key}, {uploaded_license_key}")
                         context['status'] = "ERROR: License keys mismatch"
                         return HttpResponse(template.render(context, request))
                 else:
@@ -749,7 +752,7 @@ def licensing(request):
                 try:
                     license_record.save()
                 except Exception as e:
-                    print(e)
+                    logging.info(f"licensing error {e}")
                 context['status'] = "SUCCESS: License details saved"
                 return HttpResponse(template.render(context, request))
             except:
@@ -931,6 +934,9 @@ def export_logs_to_csv(request):
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
                         scaling_factor = (image_width / page_width) * 1.3
+                        if image_height > 1920:
+                            sf_multiplier = 2.311/(image_width/image_height)
+                            scaling_factor = (image_width / page_width) * sf_multiplier
                         c.setLineWidth(2)
                         c.setStrokeColor(HexColor("#b9b6a9"))
                         c.roundRect(left_margin_pos + 11,
@@ -1127,3 +1133,5 @@ def display_regions(request):
     else:
         message = ""
         return render(request, 'main_menu/regions.html', {'message': message})
+
+
