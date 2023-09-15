@@ -1,6 +1,7 @@
 import ast
 import datetime
 import subprocess
+import time
 from subprocess import PIPE, Popen
 import csv
 import os
@@ -473,18 +474,18 @@ def scheduler(request):
         state = "Run Completed"
     license_obj = Licensing.objects.last()
     # run_schedule = license_obj.run_schedule
-    tmp_file_name = "/tmp/" + str(uuid.uuid4())
+    # tmp_file_name = "/tmp/" + str(uuid.uuid4())
     command = "/usr/bin/crontab -l"
-    tmp_file = open(tmp_file_name, "w")
-    tmp_file.write(command)
-    tmp_file.close()
+    # tmp_file = open(tmp_file_name, "w")
+    # tmp_file.write(command)
+    # tmp_file.close()
     try:
         # logging.info("process")
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out, err = process.communicate()
         # logging.info(out, err)
-
-        if err == b"no crontab for www-data\n":
+        err = err.decode()[:14]
+        if err == "no crontab for":
             scheduler_status = "Scheduler Off"
         elif out == b"":
             scheduler_status = "Scheduler Off"
@@ -499,11 +500,11 @@ def scheduler(request):
     if request.method == 'POST' and 'toggle_scheduler' in request.POST:
         # logging.info("toggle scheduler")
         try:
-            tmp_file_name = "/tmp/" + str(uuid.uuid4())
+            # tmp_file_name = "/tmp/" + str(uuid.uuid4())
             command = "/usr/bin/crontab -l"
-            tmp_file = open(tmp_file_name, "w")
-            tmp_file.write(command)
-            tmp_file.close()
+            # tmp_file = open(tmp_file_name, "w")
+            # tmp_file.write(command)
+            # tmp_file.close()
             # logging.info("about to proc")
 
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -513,25 +514,32 @@ def scheduler(request):
 
             # logging.info("out,err", out, err)
             # logging.info("error on communicate")
-            if err == b"no crontab for www-data\n":
+            err = err.decode()[:14]
+            if err == "no crontab for":
                 # logging.info("Turning on")
                 tmp_file_name = "/tmp/" + str(uuid.uuid4())
                 command = "0 */1 * * * /home/checkit/env/bin/python " \
                           "/home/checkit/camera_checker/main_menu/start.py \n"
-                tmp_file = open(tmp_file_name, "w")
-                tmp_file.write(command)
+                fd = open(tmp_file_name, "w")
+                fd.write(command)
+                fd.close()
+
                 command = "/usr/bin/crontab " + tmp_file_name
                 # logging.info(command)
-                tmp_file.close()
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                time.sleep(1)
+                try:
+                    os.remove(tmp_file_name)
+                except OSError:
+                    pass
                 return HttpResponseRedirect(reverse(scheduler))
             else:
                 # logging.info("Turning off")
-                tmp_file_name = "/tmp/" + str(uuid.uuid4())
+                # tmp_file_name = "/tmp/" + str(uuid.uuid4())
                 command = "/usr/bin/crontab -r"
-                tmp_file = open(tmp_file_name, "w")
-                tmp_file.write(command)
-                tmp_file.close()
+                # tmp_file = open(tmp_file_name, "w")
+                # tmp_file.write(command)
+                # tmp_file.close()
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 # out, err = process.communicate()
                 # logging.info("did cron")

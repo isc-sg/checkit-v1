@@ -455,6 +455,8 @@ def open_capture_device(record):
 
 
 def close_capture_device(record, cap):
+    cap.release()
+
     if record[camera_multicast_address_index]:
         with pipes() as (out, err):
             subprocess.call(['sudo', 'ip', 'addr', 'del',
@@ -462,7 +464,6 @@ def close_capture_device(record, cap):
         error_output = err.read()
         if error_output:
             logging.error(f"Unable to leave multicast group - {error_output}")
-    cap.release()
 
 
 def look_for_objects(image):
@@ -674,7 +675,6 @@ class ProcessCameras(object):
                         return
 
                     capture_device = open_capture_device(current_record)
-                    print("capture_device", type(capture_device))
                     able_to_read = False
 
                     if capture_device.isOpened():
