@@ -49,7 +49,9 @@ tr:nth-child(even) {
 <body>
 
 {% if result == "Capture Error" %}
-<h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}
+<h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}</h3>
+{% elif result == "Image Size Error" %}
+<h3 class="h3 m-4" style="color: #FFFFFF">Image Size Error on <u>{{ camera_name }}</u> - Unable to compare images {{ message }}
 </h3>
 {% else %}
 <div class="container-fluid">

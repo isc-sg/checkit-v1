@@ -441,6 +441,11 @@ def compare_images(request):
 
             captured_image_transparent = captured_image_transparent[:, :, :3]
 
+            if captured_image_transparent.shape != base_image.shape:
+                context = {'result': "Image Size Error", 'camera_name': camera_name,
+                           'message': " - Base image and capture image size changed"}
+                return HttpResponse(template.render(context, request))
+
             merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
             merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
             base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
