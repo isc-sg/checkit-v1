@@ -168,9 +168,9 @@ def check_adm_database(password):
         "password": password,
         "database": "adm"
     }
-    adm_db = mysql.connector.connect(**adm_db_config)
 
     try:
+        adm_db = mysql.connector.connect(**adm_db_config)
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
         admin_cursor.execute(sql_statement)

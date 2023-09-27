@@ -723,7 +723,18 @@ def licensing(request):
                         "database": "adm"
                     }
                     adm_db = mysql.connector.connect(**adm_db_config)
-
+                    admin_cursor = adm_db.cursor()
+                    if mysql_password:
+                        sql_statement = f"ALTER USER 'root'@'localhost' IDENTIFIED BY '{mysql_password}';"
+                        admin_cursor.execute(sql_statement)
+                        sql_statement = "FLUSH PRIVILEGES;"
+                        admin_cursor.execute(sql_statement)
+                        adm_db_config = {
+                            "host": "localhost",
+                            "user": "root",
+                            "password": mysql_password,
+                            "database": "adm"
+                        }
                 except mysql.connector.Error as e:
                     logging.info(f"Failed all attempts at accessing database {e}")
 

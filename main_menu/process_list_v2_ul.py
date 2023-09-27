@@ -356,20 +356,22 @@ def join_multicast(list_of_cameras):
     open_file = open(open_file_name, 'w')
     close_file = open(close_file_name, 'w')
 
-    # print(list_of_cameras)
+    print("list_of_cameras 359", list_of_cameras)
 
     sql = "SELECT * FROM main_menu_camera WHERE id IN " + str(list_of_cameras).replace('[', '(').replace(']', ')')
-    # print(sql)
+    print("sql 362",sql)
     checkit_cursor = db_connection.cursor()
     checkit_cursor.execute(sql)
     checkit_result = checkit_cursor.fetchall()
+    print("checkit_result 366", checkit_result)
     db_connection.close()
 
     if checkit_result:
-        # print(checkit_result)
+        print("checkit result - 369", checkit_result)
         for record in checkit_result:
             # print(record, camera_multicast_address_index)
             multicast_address = record[camera_multicast_address_index]
+            print("multicast_address", multicast_address)
             if multicast_address:
                 # print(record[camera_id_index], record[camera_multicast_address_index])
                 open_command = "ip addr add " + multicast_address + "/32 dev " + network_interface + " autojoin"
@@ -390,12 +392,14 @@ def un_join_multicast():
 
 
 def open_capture_device(record):
-    if record[camera_multicast_address_index]:
 
+    if record[camera_multicast_address_index]:
         with pipes() as (out, err):
             subprocess.call(['sudo', 'ip', 'addr', 'add',
                              record[camera_multicast_address_index] + '/32', 'dev', network_interface, 'autojoin'])
         error_output = err.read()
+        with pipes() as (out, err):
+            subprocess.call(['sudo', 'ip', 'a'])
         if error_output:
             logging.error(f"Unable to join multicast group - {error_output}")
 
@@ -410,15 +414,15 @@ def open_capture_device(record):
         if not cap.isOpened():
             os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
             cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
-
     else:
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
         cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
-
     return cap
 
 
 def close_capture_device(record, cap):
+    cap.release()
+
     if record[camera_multicast_address_index]:
         with pipes() as (out, err):
             subprocess.call(['sudo', 'ip', 'addr', 'del',
@@ -426,7 +430,6 @@ def close_capture_device(record, cap):
         error_output = err.read()
         if error_output:
             logging.error(f"Unable to leave multicast group - {error_output}")
-    cap.release()
 
 
 def look_for_objects(image):
@@ -638,7 +641,7 @@ class ProcessCameras(object):
                         return
 
                     capture_device = open_capture_device(current_record)
-                    print("capture_device", type(capture_device))
+                    # print("capture_device", type(capture_device))
                     able_to_read = False
 
                     if capture_device.isOpened():
@@ -709,21 +712,21 @@ class ProcessCameras(object):
 
                                 if matching_score < current_record[matching_threshold_index]:
                                     action = "Failed"
-                                    logging.info("movement fail")
+                                    # logging.info("movement fail")
                                 else:
                                     action = "Pass"
 
                                 if action != "Failed":
                                     if focus_value < current_record[focus_value_threshold_index]:
                                         action = "Failed"
-                                        logging.info("focus fail")
+                                        # logging.info("focus fail")
                                     else:
                                         action = "Pass"
 
                                 if action != "Failed":
                                     if frame_brightness < current_record[light_level_threshold_index]:
                                         action = "Failed"
-                                        logging.info("light fail")
+                                        # logging.info("light fail")
                                     else:
                                         action = "Pass"
 
