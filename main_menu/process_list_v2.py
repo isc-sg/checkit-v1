@@ -745,22 +745,23 @@ class ProcessCameras(object):
 
                                 if matching_score < current_record[matching_threshold_index]:
                                     action = "Failed"
+                                    # logging.info("movement fail")
                                 else:
                                     action = "Pass"
 
-                                if focus_value < current_record[focus_value_threshold_index]:
-                                    action = "Failed"
-                                    # print("focus fail")
-                                else:
-                                    action = "Pass"
+                                if action != "Failed":
+                                    if focus_value < current_record[focus_value_threshold_index]:
+                                        action = "Failed"
+                                        # logging.info("focus fail")
+                                    else:
+                                        action = "Pass"
 
-                                if frame_brightness < current_record[light_level_threshold_index]:
-                                    action = "Failed"
-                                    # print("light fail")
-                                else:
-                                    action = "Pass"
-
-                                print(focus_value, current_record[focus_value_threshold_index])
+                                if action != "Failed":
+                                    if frame_brightness < current_record[light_level_threshold_index]:
+                                        action = "Failed"
+                                        # logging.info("light fail")
+                                    else:
+                                        action = "Pass"
 
 
                                 table = "main_menu_logimage"

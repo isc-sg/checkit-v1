@@ -1,6 +1,6 @@
 # from pathos.multiprocessing import ProcessingPool as Pool
 from pathos.multiprocessing import ProcessingPool, cpu_count
-
+import cython
 import pathos
 import math
 import numpy as np
@@ -29,10 +29,10 @@ from bisect import bisect_left
 import hashlib
 import itertools
 import socket
+import get_sdp
 
-
-open_file_name = '/tmp/' + str(uuid.uuid4().hex)
-close_file_name = '/tmp/' + str(uuid.uuid4().hex)
+# open_file_name = '/tmp/' + str(uuid.uuid4().hex)
+# close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
@@ -347,77 +347,146 @@ def close_pool():
     connection_pool.close()
 
 
-def join_multicast(list_of_cameras):
-    db_connection = mysql.connector.connect(host="localhost",
-                                    user="checkit",
-                                    password="checkit",
-                                    database="checkit")
-
-    open_file = open(open_file_name, 'w')
-    close_file = open(close_file_name, 'w')
-
-    print("list_of_cameras 359", list_of_cameras)
-
-    sql = "SELECT * FROM main_menu_camera WHERE id IN " + str(list_of_cameras).replace('[', '(').replace(']', ')')
-    print("sql 362",sql)
-    checkit_cursor = db_connection.cursor()
-    checkit_cursor.execute(sql)
-    checkit_result = checkit_cursor.fetchall()
-    print("checkit_result 366", checkit_result)
-    db_connection.close()
-
-    if checkit_result:
-        print("checkit result - 369", checkit_result)
-        for record in checkit_result:
-            # print(record, camera_multicast_address_index)
-            multicast_address = record[camera_multicast_address_index]
-            print("multicast_address", multicast_address)
-            if multicast_address:
-                # print(record[camera_id_index], record[camera_multicast_address_index])
-                open_command = "ip addr add " + multicast_address + "/32 dev " + network_interface + " autojoin"
-                close_command = "ip addr del " + multicast_address + "/32 dev " + network_interface
-                open_file.write(open_command + '\n')
-                close_file.write(close_command + '\n')
-                # print(open_command)
-    open_file.close()
-    close_file.close()
-    subprocess.call(['chmod', '+x', open_file_name])
-    subprocess.call(['chmod', '+x', close_file_name])
-    subprocess.call(['sudo', open_file_name])
-
-
-def un_join_multicast():
-    subprocess.call(['sudo', close_file_name])
-    subprocess.call(['rm', close_file_name, open_file_name])
+# def join_multicast(list_of_cameras):
+#     db_connection = mysql.connector.connect(host="localhost",
+#                                     user="checkit",
+#                                     password="checkit",
+#                                     database="checkit")
+#
+#     open_file = open(open_file_name, 'w')
+#     close_file = open(close_file_name, 'w')
+#
+#
+#
+#     sql = "SELECT * FROM main_menu_camera WHERE id IN " + str(list_of_cameras).replace('[', '(').replace(']', ')')
+#
+#     checkit_cursor = db_connection.cursor()
+#     checkit_cursor.execute(sql)
+#     checkit_result = checkit_cursor.fetchall()
+#
+#     db_connection.close()
+#
+#     if checkit_result:
+#
+#         for record in checkit_result:
+#             # print(record, camera_multicast_address_index)
+#             multicast_address = record[camera_multicast_address_index]
+#
+#             if multicast_address:
+#                 # print(record[camera_id_index], record[camera_multicast_address_index])
+#                 open_command = "ip addr add " + multicast_address + "/32 dev " + network_interface + " autojoin"
+#                 close_command = "ip addr del " + multicast_address + "/32 dev " + network_interface
+#                 open_file.write(open_command + '\n')
+#                 close_file.write(close_command + '\n')
+#                 # print(open_command)
+#     open_file.close()
+#     close_file.close()
+#     subprocess.call(['chmod', '+x', open_file_name])
+#     subprocess.call(['chmod', '+x', close_file_name])
+#     subprocess.call(['sudo', open_file_name])
+#
+#
+# def un_join_multicast():
+#     subprocess.call(['sudo', close_file_name])
+#     logging.info(f"executing {close_file_name}")
+#     subprocess.call(['rm', close_file_name, open_file_name])
 
 
 def open_capture_device(record):
 
     if record[camera_multicast_address_index]:
+        describe_uri = "DESCRIBE " + record[camera_url_index] + " RTSP/1.0\r\nCSeq: 2\r\n\r\n\r\n"
+        camera_ip_address = describe_uri.split(" ")[1][7:].split("/")[0]
+        rtsp_data = get_sdp.get_sdp(describe_uri)
+        sdp_file_name = "/tmp/" + str(uuid.uuid4()) + ".sdp"
+
+        if rtsp_data == "Error":
+            logging.error(f"Error reading rtsp from camera {record[camera_url_index]}")
+            try:
+                os.remove(sdp_file_name)
+            except OSError:
+                pass
+
+        else:
+            with open(sdp_file_name, "w") as fd:
+                for line in rtsp_data:
+                    fd.write(line)
+                    fd.write("\n")
+                    # logging.info(f"wrote line {line} to {sdp_file_name}")
+            fd.close()
+            # if os.path.isfile(sdp_file_name):
+            #     with open(sdp_file_name, "r") as fd:
+            #         contents = fd.read()
+            #         # logging.info(f"contents {contents}")
+            # # logging.info(f"sdp file data {sdp_file_name}")
         with pipes() as (out, err):
             subprocess.call(['sudo', 'ip', 'addr', 'add',
                              record[camera_multicast_address_index] + '/32', 'dev', network_interface, 'autojoin'])
         error_output = err.read()
-        with pipes() as (out, err):
-            subprocess.call(['sudo', 'ip', 'a'])
+        # not sure I need these next 2 lines.
+        # with pipes() as (out, err):
+        #     subprocess.call(['sudo', 'ip', 'a'])
         if error_output:
             logging.error(f"Unable to join multicast group - {error_output}")
 
+
         # try all 3 methods for rtsp_transport - this means users don't need to define the transport method
-        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
-        cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+        # try:
+        #     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
+        #     cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+        # except cv2.error as err:
+        #     logging.error(f"Error opening camera {record[camera_url_index]} ")
+        try:
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'protocol_whitelist;file,rtp,udp'
+            # cap = cv2.VideoCapture("rtsp://192.168.100.29/axis-media/media.amp", cv2.CAP_FFMPEG)
+            cap = cv2.VideoCapture(sdp_file_name, cv2.CAP_FFMPEG)
+
+        except cv2.error:
+            logging.error(f"Unable to open stream for {record[camera_url_index]}")
+
+        # try:
+        #     os.remove(sdp_file_name)
+        # except OSError:
+        #     pass
 
         if not cap.isOpened():
-            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
-            cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+            try:
+                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
+                cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+            except cv2.error as err:
+                logging.error(f"Error opening camera {record[camera_url_index]} ")
 
         if not cap.isOpened():
-            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-            cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+            try:
+                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+                cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+            except cv2.error as err:
+                logging.error(f"Error opening camera {record[camera_url_index]} ")
     else:
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
         cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
     return cap
+    # describe_uri = "DESCRIBE " + record[camera_url_index] + " RTSP/1.0\r\nCSeq: 2\r\n\r\n\r\n"
+    # camera_ip_address = describe_uri.split(" ")[1][7:].split("/")[0]
+    # rtsp_data = get_sdp.get_sdp(describe_uri)
+    # sdp_file_name = "/tmp/" + str(uuid.uuid4()) + ".sdp"
+    # if record[camera_multicast_address_index]:
+    #     if rtsp_data == "Error":
+    #         logging.error(f"Error reading rtsp from camera {record[camera_url_index]}")
+    #         if os.path.isfile(file_name):
+    #             os.remove(file_name)
+    #             return
+    #         # may need to check return logic if error
+    #     else:
+    #         with open(file_name, "w") as fd:
+    #             for line in rtsp_data:
+    #                 fd.write(line)
+    #                 fd.write("\n")
+    #         fd.close()
+    # else:
+    #     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+    #     cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+    # return cap
 
 
 def close_capture_device(record, cap):
@@ -430,7 +499,9 @@ def close_capture_device(record, cap):
         error_output = err.read()
         if error_output:
             logging.error(f"Unable to leave multicast group - {error_output}")
-
+    # print("start of release")
+    # cap.release()
+    # print("end of release")
 
 def look_for_objects(image):
     url = "http://localhost:8000/api/v1/detection"
