@@ -55,7 +55,10 @@ class LogTable(tables.Table):
         "td": {
             "width": 200, "align": "left"
         }})
-    camera_name = tables.Column(accessor='url.camera_name')
+    camera_name = tables.Column(accessor='url.camera_name', attrs={
+        "td": {
+            "width": 180, "align": "left"
+        }})
 
     camera_number = tables.Column(accessor='url.camera_number', attrs={
         "td": {
@@ -65,16 +68,16 @@ class LogTable(tables.Table):
 
     matching_score = tables.Column(attrs={
         "td": {
-            "width": 140, "align": "center"
+            "width": 100, "align": "center"
         }})
 
     focus_value = tables.Column(attrs={
         "td": {
-            "width": 140, "align": "center"
+            "width": 100, "align": "center"
         }})
     light_level = tables.Column(attrs={
         "td": {
-            "width": 140, "align": "center"
+            "width": 100, "align": "center"
         }})
     # region_scores = tables.Column(verbose_name="Region Analysis", attrs={
     #     "td": {
