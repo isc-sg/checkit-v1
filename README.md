@@ -4,4 +4,4 @@ Main repository for Checkit App which is used to compare images and determine mo
 
 Need to install requirements.txt in python. 
 
-Built using Python 3.8 and Django 4.1.7
+Built using Python 3.10 and Django 4.2.4
