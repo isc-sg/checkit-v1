@@ -45,6 +45,7 @@ class CameraSelectFilter(FilterSet):
 class LogFilter(FilterSet):
     matching_score = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Match")
     focus_value = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Focus")
+    light_level = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Light")
     action = ChoiceFilter(choices=LOG_RESULT_CHOICES)
     creation_date = DateRangeFilter()
     camera_name = CharFilter(field_name='url__camera_name', lookup_expr='icontains', label="Name contains",
@@ -57,7 +58,7 @@ class LogFilter(FilterSet):
 
     class Meta:
         model = LogImage
-        fields = ["camera_number", "camera_name", "camera_location", "matching_score", "focus_value",
+        fields = ["camera_number", "camera_name", "camera_location", "matching_score", "focus_value", "light_level",
                   "action", "creation_date"]
 
 
