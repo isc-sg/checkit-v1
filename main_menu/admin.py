@@ -13,10 +13,10 @@ from django.contrib.admin.models import LogEntry, DELETION
 from django.utils.html import escape
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from rangefilter.filters import DateRangeFilter
+from rangefilter.filters import DateRangeFilter, DateTimeRangeFilter
 from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDropdownFilter, ChoiceDropdownFilter
-
-
+from django.views.decorators.cache import cache_control, add_never_cache_headers
+from django.utils.decorators import method_decorator
 import os
 
 # Register your models here.
@@ -28,6 +28,11 @@ admin.site.site_title = "CheckIT"
 admin.site.site_header = "CheckIT"
 admin.site.index_title = "CheckIT Admin"
 
+class DisableClientSideCachingMiddleware(object):
+    def process_response(self, request, response):
+        add_never_cache_headers(response)
+        return response
+
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
@@ -37,7 +42,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
     exclude = ('id',)
     list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
-                    'camera_location', 'matching_threshold',)
+                    'camera_location', 'matching_threshold', 'check_reference_image')
     readonly_fields = ["creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
@@ -61,6 +66,15 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
         #     shutil.move(f'{settings.MEDIA_ROOT}/base_images/{obj.slug}',
         #                 f'{settings.MEDIA_ROOT}/base_images/{new_name}')
         # print("New id is", obj.id)
+
+    def check_reference_image(self, obj):
+        r = ReferenceImage.objects.filter(url=obj.id)
+        return r.exists()
+
+    check_reference_image.short_description = 'Has Ref'
+    check_reference_image.boolean = True  # Display as a boolean field
+
+    # Custom method for filtering
 
     def delete_model(self, request, obj):
         # print(f'{settings.MEDIA_ROOT}/base_images/{obj.id}')
@@ -97,16 +111,20 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     get_regions.short_description = "Regions"
 
     def reference_image(self, obj):
+        scaling_factor = 4
+        if obj.image.width > 1920:
+            scaling_factor = (obj.image.width / 1920) * 4
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
             url=obj.image.url,
-            width=(obj.image.width/4),
-            height=(obj.image.height/4),
+            width=(obj.image.width/scaling_factor),
+            height=(obj.image.height/scaling_factor),
                                                                                      )
                         )
 
     def get_location(self, obj):
         return obj.url.camera_location
     get_location.short_description = "Location"
+
 
 
 class LogImageAdmin(SimpleHistoryAdmin):
@@ -116,7 +134,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image')
-    list_filter = (('creation_date', DateRangeFilter), ('url__camera_location', DropdownFilter))
+    list_filter = (('creation_date', DateTimeRangeFilter), ('action', DropdownFilter), ('url__camera_location', DropdownFilter))
 
     def log_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
@@ -143,6 +161,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     def get_location(self, obj):
         return obj.url.camera_location
     get_location.short_description = "Location"
+
 
 
 @admin.register(LogEntry)
