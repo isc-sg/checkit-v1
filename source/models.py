@@ -69,6 +69,10 @@ class HoursInDay(models.Model):
 class Camera(models.Model):
     url = models.CharField(max_length=255, unique=True, verbose_name="Camera URL")
     multicast_address = models.GenericIPAddressField(protocol='IPv4', blank=True, null=True, unique=True, default=None)
+    multicast_port = models.IntegerField(blank=True, default=0, null=True,
+                                         validators=[MaxValueValidator(65535), MinValueValidator(0)])
+    camera_username = models.CharField(max_length=32, blank=True, verbose_name="Username")
+    camera_password = models.CharField(max_length=64, blank=True, verbose_name="Password")
     # image = models.ImageField(upload_to='base_images/')
     camera_number = models.IntegerField(null=False, blank=False, unique=True,
                                         validators=[MaxValueValidator(100000), MinValueValidator(1)])
