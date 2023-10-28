@@ -240,7 +240,7 @@
                     <h3>Load cameras from file</h3>
                                                 <form method="post" enctype="multipart/form-data">
                                 {% csrf_token %}
-                                <input type="file" class="btn btn-round" name="camera_list">
+                                <input type="file" class="btn btn-round" name="camera_list" accept=".csv">
                                 <button class="btn btn-round" type="submit">Upload Cameras</button>
                             </form>
                     </div>
