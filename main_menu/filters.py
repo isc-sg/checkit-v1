@@ -14,6 +14,9 @@ STATE_CHOICES = (('RUN COMPLETED', 'Finished'), ('STARTED', 'Started'), ('ERROR'
 class CameraFilter(FilterSet):
     camera_name = CharFilter(lookup_expr='icontains',
                              widget=TextInput(attrs={'size': '15'}), label="Name contains")
+    camera_number = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    multicast_address = CharFilter(lookup_expr='icontains',
+                             widget=TextInput(attrs={'size': '15'}), label="Multicast Address contains")
     url = CharFilter(lookup_expr='icontains',
                      widget=TextInput(attrs={'size': '14'}), label="URL contains")
     camera_location = CharFilter(lookup_expr='icontains',
@@ -23,7 +26,7 @@ class CameraFilter(FilterSet):
 
     class Meta:
         model = Camera
-        fields = ['camera_name', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
+        fields = ['camera_name', 'camera_number', 'multicast_address', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
 
 
 class CameraSelectFilter(FilterSet):
@@ -40,7 +43,7 @@ class CameraSelectFilter(FilterSet):
 
     class Meta:
         model = Camera
-        fields = ['camera_name', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
+        fields = ['camera_name', 'camera_number', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
 
 class LogFilter(FilterSet):
     matching_score = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Match")
