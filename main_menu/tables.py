@@ -1,14 +1,15 @@
-import re
-
 import django_tables2 as tables
 from django_tables2 import TemplateColumn
-from django.utils.html import format_html
 from .models import Camera, LogImage, EngineState
 from django.utils.safestring import mark_safe
-
+from urllib.parse import urlparse
 
 
 class CameraTable(tables.Table):
+    camera_name = tables.Column(verbose_name="Camera Name", attrs={
+        "td": {
+            "width": 180, "align": "left"
+        }})
     url = tables.Column(verbose_name="IP Address", attrs={
         "td": {
             "width": 150, "align": "center"
@@ -19,11 +20,11 @@ class CameraTable(tables.Table):
         }})
     camera_number = tables.Column(attrs={
         "td": {
-            "width": 150, "align": "center"
+            "width": 120, "align": "center"
         }})
     matching_threshold = tables.Column(attrs={
         "td": {
-            "width": 200, "align": "center"
+            "width": 100, "align": "center"
         }})
     last_check_date = tables.DateTimeColumn(format='d M Y, h:i A', attrs={
         "td": {
@@ -31,7 +32,9 @@ class CameraTable(tables.Table):
         }})
 
     def render_url(self, value):
-        return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
+        details = urlparse(value)
+        return details.hostname
+        # return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
 
     def render_multicast_port(self, value):
         if value == 0:
@@ -125,7 +128,7 @@ class LogTable(tables.Table):
     def render_region_scores(self, value):
         try:
             sorted_keys = sorted(value, key=value.get)
-        except:
+        except TypeError:
             sorted_keys = []
         display = "Low " + ','.join(str(y) for y in sorted_keys[:8]) + " - " + "High " +\
                   ','.join(str(y) for y in sorted_keys[-8:])
@@ -187,7 +190,7 @@ class CameraSelectTable(tables.Table):
         model = Camera
         template_name = 'django_tables2/bootstrap4.html'
         fields = ('camera_name', 'camera_number', 'camera_number', 'url', 'multicast_address',
-                    'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
+                  'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         sequence = ('selection', 'camera_name', 'camera_number', 'url', 'multicast_address',
                     'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
