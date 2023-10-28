@@ -26,6 +26,22 @@ class CameraFilter(FilterSet):
         fields = ['camera_name', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
 
 
+class CameraSelectFilter(FilterSet):
+    camera_name = CharFilter(lookup_expr='icontains',
+                             widget=TextInput(attrs={'size': '15'}), label="Name contains")
+    url = CharFilter(lookup_expr='icontains',
+                     widget=TextInput(attrs={'size': '14'}), label="URL contains")
+    camera_location = CharFilter(lookup_expr='icontains',
+                                 widget=TextInput(attrs={'size': '18'}), label="Location contains")
+    camera_number = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    matching_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    focus_value_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    light_level_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+
+    class Meta:
+        model = Camera
+        fields = ['camera_name', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
+
 class LogFilter(FilterSet):
     matching_score = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Match")
     focus_value = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Focus")
