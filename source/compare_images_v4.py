@@ -154,7 +154,7 @@ def get_camera_ids(camera_numbers, checkit_cursor):
         checkit_cursor.execute(sql_statement)
         z = checkit_cursor.fetchall()
         ids = [x[0] for x in z]
-        print(ids)
+        # print(ids)
     except mysql.connector.Error as e:
         logging.error(f"Database connection error {e} {sql_statement}")
         exit(1)
@@ -168,9 +168,9 @@ def check_adm_database(password):
         "password": password,
         "database": "adm"
     }
-    adm_db = mysql.connector.connect(**adm_db_config)
 
     try:
+        adm_db = mysql.connector.connect(**adm_db_config)
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
         admin_cursor.execute(sql_statement)
@@ -218,12 +218,12 @@ def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit
                   "transaction_limit = " + str(transaction_limit) + " , " + \
                   "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
                   "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
-            print(sql)
+            # print(sql)
             checkit_cursor.execute(sql)
         else:
             sql = """INSERT INTO main_menu_licensing (transaction_count, transaction_limit, end_date, license_key, license_owner, site_name, start_date, run_schedule) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
             values = (transaction_count, transaction_limit, str(end_date), license_key, customer_name, site_name, datetime.datetime.now().strftime("%Y-%m-%d"), 0)
-            print(sql, values)
+            # print(sql, values)
             checkit_cursor.execute(sql, values)
         checkit_db.commit()
     except mysql.connector.Error as e:
@@ -416,8 +416,9 @@ def main(ids):
         list_of_lists.append(list_to_process)
         list_pointer += incrementer
     #
+    logging.info(f"about to process list from compare_image_v4, {list_of_lists}")
     process_list_v2.start_processes(list_of_lists)
-
+    logging.info("compare_images_v4 done process")
     shutdown_engine_state(start_state_timestamp)
 
 

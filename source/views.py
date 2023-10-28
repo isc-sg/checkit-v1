@@ -1,6 +1,7 @@
 import ast
 import datetime
 import subprocess
+import time
 from subprocess import PIPE, Popen
 import csv
 import os
@@ -168,7 +169,7 @@ def check_adm_database(password):
             adm_db = mysql.connector.connect(**adm_db_config)
 
         except mysql.connector.Error as e:
-            print("Failed all attempts at accessing database", e)
+            logging.error(f"Failed all attempts at accessing database  {e}")
     try:
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
@@ -327,6 +328,8 @@ def get_transparent_edge(input_image, color):
     return final_image
 
 
+
+
 def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
@@ -438,6 +441,11 @@ def compare_images(request):
 
             captured_image_transparent = captured_image_transparent[:, :, :3]
 
+            if captured_image_transparent.shape != base_image.shape:
+                context = {'result': "Image Size Error", 'camera_name': camera_name,
+                           'message': " - Base image and capture image size changed"}
+                return HttpResponse(template.render(context, request))
+
             merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
             merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
             base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
@@ -471,18 +479,18 @@ def scheduler(request):
         state = "Run Completed"
     license_obj = Licensing.objects.last()
     # run_schedule = license_obj.run_schedule
-    tmp_file_name = "/tmp/" + str(uuid.uuid4())
+    # tmp_file_name = "/tmp/" + str(uuid.uuid4())
     command = "/usr/bin/crontab -l"
-    tmp_file = open(tmp_file_name, "w")
-    tmp_file.write(command)
-    tmp_file.close()
+    # tmp_file = open(tmp_file_name, "w")
+    # tmp_file.write(command)
+    # tmp_file.close()
     try:
         # logging.info("process")
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out, err = process.communicate()
         # logging.info(out, err)
-
-        if err == b"no crontab for www-data\n":
+        err = err.decode()[:14]
+        if err == "no crontab for":
             scheduler_status = "Scheduler Off"
         elif out == b"":
             scheduler_status = "Scheduler Off"
@@ -497,11 +505,11 @@ def scheduler(request):
     if request.method == 'POST' and 'toggle_scheduler' in request.POST:
         # logging.info("toggle scheduler")
         try:
-            tmp_file_name = "/tmp/" + str(uuid.uuid4())
+            # tmp_file_name = "/tmp/" + str(uuid.uuid4())
             command = "/usr/bin/crontab -l"
-            tmp_file = open(tmp_file_name, "w")
-            tmp_file.write(command)
-            tmp_file.close()
+            # tmp_file = open(tmp_file_name, "w")
+            # tmp_file.write(command)
+            # tmp_file.close()
             # logging.info("about to proc")
 
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -511,25 +519,32 @@ def scheduler(request):
 
             # logging.info("out,err", out, err)
             # logging.info("error on communicate")
-            if err == b"no crontab for www-data\n":
+            err = err.decode()[:14]
+            if err == "no crontab for":
                 # logging.info("Turning on")
                 tmp_file_name = "/tmp/" + str(uuid.uuid4())
                 command = "0 */1 * * * /home/checkit/env/bin/python " \
                           "/home/checkit/camera_checker/main_menu/start.py \n"
-                tmp_file = open(tmp_file_name, "w")
-                tmp_file.write(command)
+                fd = open(tmp_file_name, "w")
+                fd.write(command)
+                fd.close()
+
                 command = "/usr/bin/crontab " + tmp_file_name
                 # logging.info(command)
-                tmp_file.close()
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                time.sleep(1)
+                try:
+                    os.remove(tmp_file_name)
+                except OSError:
+                    pass
                 return HttpResponseRedirect(reverse(scheduler))
             else:
                 # logging.info("Turning off")
-                tmp_file_name = "/tmp/" + str(uuid.uuid4())
+                # tmp_file_name = "/tmp/" + str(uuid.uuid4())
                 command = "/usr/bin/crontab -r"
-                tmp_file = open(tmp_file_name, "w")
-                tmp_file.write(command)
-                tmp_file.close()
+                # tmp_file = open(tmp_file_name, "w")
+                # tmp_file.write(command)
+                # tmp_file.close()
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 # out, err = process.communicate()
                 # logging.info("did cron")
@@ -545,7 +560,7 @@ def scheduler(request):
                          "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         return_code = process.returncode
-        print('return_code', return_code)
+        # print('return_code', return_code)
         if return_code == 33:
             context = {"error": "Licensing Error"}
             return HttpResponse(template.render(context, request))
@@ -615,7 +630,8 @@ def scheduler(request):
                               stdout=PIPE, stderr=PIPE)
         stdout, stderr = child_process.communicate()
         return_code = child_process.returncode
-        print('return_code', return_code)
+        # print('return_code', return_code)
+        # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
         if return_code == 33:
             pass
             context = {"error": "Licensing Error"}
@@ -707,9 +723,20 @@ def licensing(request):
                         "database": "adm"
                     }
                     adm_db = mysql.connector.connect(**adm_db_config)
-
+                    admin_cursor = adm_db.cursor()
+                    if mysql_password:
+                        sql_statement = f"ALTER USER 'root'@'localhost' IDENTIFIED BY '{mysql_password}';"
+                        admin_cursor.execute(sql_statement)
+                        sql_statement = "FLUSH PRIVILEGES;"
+                        admin_cursor.execute(sql_statement)
+                        adm_db_config = {
+                            "host": "localhost",
+                            "user": "root",
+                            "password": mysql_password,
+                            "database": "adm"
+                        }
                 except mysql.connector.Error as e:
-                    print("Failed all attempts at accessing database", e)
+                    logging.info(f"Failed all attempts at accessing database {e}")
 
             try:
                 admin_cursor = adm_db.cursor()
@@ -725,7 +752,7 @@ def licensing(request):
                     new_license_key = get_hash("{}{}{}{}".format(uploaded_purchased_transactions, uploaded_end_date,
                                                result[4], uploaded_purchased_cameras))
                     if new_license_key != uploaded_license_key:
-                        print("keys dont match", new_license_key, uploaded_license_key)
+                        logging.info(f"keys dont match  {new_license_key}, {uploaded_license_key}")
                         context['status'] = "ERROR: License keys mismatch"
                         return HttpResponse(template.render(context, request))
                 else:
@@ -749,7 +776,7 @@ def licensing(request):
                 try:
                     license_record.save()
                 except Exception as e:
-                    print(e)
+                    logging.info(f"licensing error {e}")
                 context['status'] = "SUCCESS: License details saved"
                 return HttpResponse(template.render(context, request))
             except:
@@ -931,6 +958,9 @@ def export_logs_to_csv(request):
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
                         scaling_factor = (image_width / page_width) * 1.3
+                        if image_height > 1920:
+                            sf_multiplier = 2.311/(image_width/image_height)
+                            scaling_factor = (image_width / page_width) * sf_multiplier
                         c.setLineWidth(2)
                         c.setStrokeColor(HexColor("#b9b6a9"))
                         c.roundRect(left_margin_pos + 11,
@@ -1127,3 +1157,5 @@ def display_regions(request):
     else:
         message = ""
         return render(request, 'main_menu/regions.html', {'message': message})
+
+
