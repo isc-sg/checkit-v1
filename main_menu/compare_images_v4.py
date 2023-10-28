@@ -408,7 +408,7 @@ def main(ids):
     list_of_cameras = get_camera_ids(ids, checkit_cursor)
     list_pointer = 0
 
-    number_of_cores = pathos.multiprocessing.cpu_count()*2
+    number_of_cores = pathos.multiprocessing.cpu_count()*4
     incrementer = math.ceil(len(list_of_cameras)/number_of_cores)
     list_of_lists = []
     while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:
