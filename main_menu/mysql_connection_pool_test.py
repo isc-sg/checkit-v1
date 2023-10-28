@@ -53,9 +53,40 @@ except configparser.NoOptionError:
 open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 close_file_name = '/tmp/' + str(uuid.uuid4().hex)
 
-list_to_process = [[4210, 4211, 4212, 4213, 4214, 4215, 4216, 4217], [4218, 4219, 4220, 4221, 4222, 4223, 4224, 4225], [4226, 4227, 4228, 4229, 4230, 4231, 4232, 4233], [4234, 4235, 4236, 4237, 4238, 4239, 4240, 4241], [4242, 4243, 4244, 4245, 4246, 4247, 4248, 4249], [4250, 4251, 4252, 4253, 4254, 4255, 4256, 4257], [4258, 4259, 4260, 4261, 4262, 4263, 4264, 4265], [4266, 4267, 4268, 4269, 4270, 4271, 4272, 4273], [4274, 4275, 4276, 4277, 4278, 4279, 4280, 4281], [4282, 4283, 4284, 4285, 4286, 4287, 4288, 4289], [4290, 4291, 4292, 4293, 4294, 4295, 4296, 4297], [4298, 4299, 4300, 4301, 4302, 4303, 4304, 4305], [4306, 4307, 4308, 4309, 4310, 4311, 4312, 4313], [4314, 4315, 4316, 4317, 4318, 4319, 4320, 4321], [4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329], [4330, 4331, 4332, 4333, 4334, 4335, 4336, 4337], [4338, 4339, 4340, 4341, 4342, 4343, 4344, 4345], [4346, 4347, 4348, 4349, 4350, 4351, 4352, 4353], [4354, 4355, 4356, 4357, 4358, 4359]]
+list_to_process = [[5210, 5211, 5212, 5213, 5214, 5215, 5216, 5217], [5218, 5219, 5220, 5221, 5222, 5223, 5224, 5225], [5226, 5227, 5228, 5229, 5230, 5231, 5232, 5233], [5234, 5235, 5236, 5237, 5238, 5239, 5240, 5241], [5242, 5243, 5244, 5245, 5246, 5247, 5248, 5249], [5250, 5251, 5252, 5253, 5254, 5255, 5256, 5257], [5258, 5259, 5260, 5261, 5262, 5263, 5264, 5265], [5266, 5267, 5268, 5269, 5270, 5271, 5272, 5273], [5274, 5275, 5276, 5277, 5278, 5279, 5280, 5281], [5282, 5283, 5284, 5285, 5286, 5287, 5288, 5289], [5290, 5291, 5292, 5293, 5294, 5295, 5296, 5297], [5298, 5299, 5300, 5301, 5302, 5303, 5304, 5305], [5306, 5307, 5308, 5309, 5310, 5311, 5312, 5313], [5314, 5315, 5316, 5317, 5318, 5319, 5320, 5321], [5322, 5323, 5324, 5325, 5326, 5327, 5328, 5329], [5330, 5331, 5332, 5333, 5334, 5335, 5336, 5337], [5338, 5339, 5340, 5341, 5342, 5343, 5344, 5345], [5346, 5347, 5348, 5349, 5350, 5351, 5352, 5353], [5354, 5355, 5356, 5357, 5358, 5359]]
 
+db_config_checkit = {
+    "host": "localhost",
+    "user": "checkit",
+    "password": "checkit",
+    "database": "checkit"
+}
+checkit_db = mysql.connector.connect(**db_config_checkit)
+checkit_cursor = checkit_db.cursor()
+checkit_cursor.execute("SELECT * FROM main_menu_camera LIMIT 1")
+checkit_result = checkit_cursor.fetchone()
 
+field_names = [i[0] for i in checkit_cursor.description]
+
+camera_id_index = field_names.index('id')
+camera_url_index = field_names.index('url')
+camera_multicast_address_index = field_names.index('multicast_address')
+camera_number_index = field_names.index('camera_number')
+camera_name_index = field_names.index('camera_name')
+image_regions_index = field_names.index('image_regions')
+matching_threshold_index = field_names.index('matching_threshold')
+slug_index = field_names.index('slug')
+
+checkit_cursor.execute("SELECT * FROM main_menu_referenceimage LIMIT 1")
+checkit_result = checkit_cursor.fetchone()
+
+field_names = [i[0] for i in checkit_cursor.description]
+reference_image_id_index = field_names.index('id')
+reference_image_url_index = field_names.index('url_id')
+reference_image_index = field_names.index('image')
+checkit_cursor.close()
+checkit_db.close()
+print(checkit_result)
 def take_closest(my_list, my_number):
     """
     Assumes my_list is sorted. Returns closest value to my_number.
@@ -115,108 +146,30 @@ def create_key(em):
     return key[1], pw[1]
 
 
-license_file = open("/etc/checkit/checkit.lic", "r")
-registered_key = license_file.readline().strip('\n')
-email = license_file.readline().strip('\n')
-license_key, password = create_key(email)
-if license_key != registered_key:
-    logging.error("Licensing error")
-    exit(0)
+#license_file = open("/etc/checkit/checkit.lic", "r")
+#registered_key = license_file.readline().strip('\n')
+#email = license_file.readline().strip('\n')
+#license_key, password = create_key(email)
+#if license_key != registered_key:
+#    logging.error("Licensing error")
+#    exit(0)
+password = "C203EA1FF06AD85ECED4CC0568ACEF5F"
 
-
-my_db = mysql.connector.connect(host="localhost",
+adm_db = mysql.connector.connect(host="localhost",
                                 user="checkit",
                                 password="checkit",
                                 database="checkit")
 
 
-def init_pools():
-    global pool_for_checkit
-    global pool_for_adm
-    global camera_id_index
-    global camera_url_index
-    global camera_multicast_address_index
-    global camera_number_index
-    global camera_name_index
-    global image_regions_index
-    global matching_threshold_index
-    global slug_index
-    global reference_image_id_index
-    global reference_image_url_index
-    global reference_image_index
-    # print("PID %d: initializing pool..." % os.getpid())
-    try:
-        db_config_checkit = {
-            "host": "localhost",
-            "user": "checkit",
-            "password": "checkit",
-            "database": "checkit"
-        }
-        pool_for_checkit = MySQLConnectionPool(pool_name="pool_for_checkit",
-                                               pool_size=1,
-                                               **db_config_checkit)
-        connection = pool_for_checkit.get_connection()
-        checkit_cursor = connection.cursor()
-        checkit_cursor.execute("SELECT * FROM main_menu_camera LIMIT 1")
-        checkit_result = checkit_cursor.fetchone()
-
-        field_names = [i[0] for i in checkit_cursor.description]
-
-        camera_id_index = field_names.index('id')
-        camera_url_index = field_names.index('url')
-        camera_multicast_address_index = field_names.index('multicast_address')
-        camera_number_index = field_names.index('camera_number')
-        camera_name_index = field_names.index('camera_name')
-        image_regions_index = field_names.index('image_regions')
-        matching_threshold_index = field_names.index('matching_threshold')
-        slug_index = field_names.index('slug')
-
-        checkit_cursor.execute("SELECT * FROM main_menu_referenceimage LIMIT 1")
-        checkit_result = checkit_cursor.fetchone()
-
-        field_names = [i[0] for i in checkit_cursor.description]
-        reference_image_id_index = field_names.index('id')
-        reference_image_url_index = field_names.index('url_id')
-        reference_image_index = field_names.index('image')
-        connection.close()
-
-    except mysql.connector.Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            logging.error("Invalid password on main database")
-            exit(0)
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            logging.error("Database not initialised")
-            exit(0)
-
-    try:
-
-        adm_db_config = {
-            "host": "localhost",
-            "user": "root",
-            "password": password,
-            "database": "adm"
-        }
-        pool_for_adm = MySQLConnectionPool(pool_name="pool_for_adm",
-                                           pool_size=1,
-                                           **adm_db_config)
-    except mysql.connector.Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            logging.error(f"Invalid password")
-            exit(0)
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            logging.error(f"Database not initialised")
-            exit(0)
 
 
-def sql_insert(table, fields, values):
+def sql_insert(checkit_db, table, fields, values):
     try:
         sql_statement = "INSERT INTO " + table + " " + fields
-        connection = pool_for_checkit.get_connection()
-        checkit_cursor = connection.cursor()
+        checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement, values)
-        connection.commit()
+        checkit_cursor.commit()
         checkit_cursor.close()
-        connection.close()
     except mysql.connector.Error as e:
         print("Error code:", e.errno)  # error number
         print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
@@ -226,21 +179,19 @@ def sql_insert(table, fields, values):
         print("Error:", s)
 
 
-def sql_select(fields, table, where,  long_sql, fetch_all):
+def sql_select(checkit_db, fields, table, where,  long_sql, fetch_all):
     try:
         if not long_sql:
             sql_statement = "SELECT " + fields + " FROM " + table + " " + where
         else:
             sql_statement = long_sql
-        connection = pool_for_checkit.get_connection()
-        checkit_cursor = connection.cursor()
+        checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement)
         if fetch_all:
             result = checkit_cursor.fetchall()
         else:
             result = checkit_cursor.fetchone()
         checkit_cursor.close()
-        connection.close()
         return result
     except mysql.connector.Error as e:
         print("Error code:", e.errno)  # error number
@@ -251,11 +202,14 @@ def sql_select(fields, table, where,  long_sql, fetch_all):
         print("Error:", s)
 
 
-def sql_update(table, fields, where):
+def sql_update(checkit_db, table, fields, where):
     sql_statement = "UPDATE " + table + " SET " + fields + where
 
     try:
-        connection = pool_for_checkit.get_connection()
+        checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(sql_statement)
+        checkit_cursor.commit()
+        checkit_cursor.close()
     except mysql.connector.PoolError as e:
         print("Error code:", e.errno)  # error number
         print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
@@ -263,94 +217,23 @@ def sql_update(table, fields, where):
         print("Error:", e)  # errno, sqlstate, msg values
         s = str(e)
         print("Error:", s)
-    finally:
-        checkit_cursor = connection.cursor()
-        checkit_cursor.execute(sql_statement)
-        connection.commit()
-        checkit_cursor.close()
-        connection.close()
+
 
 
 def clear_table():
-    checkit_cursor = my_db.cursor()
+    checkit_cursor = adm_db.cursor()
     sql_statement = "SELECT COUNT(*) FROM connection_test"
     checkit_cursor.execute(sql_statement)
     count = checkit_cursor.fetchone()
     print('Count is', count[0])
 
-    checkit_cursor = my_db.cursor()
+    checkit_cursor = adm_db.cursor()
     sql_statement = "DELETE FROM connection_test"
     checkit_cursor.execute(sql_statement)
-    my_db.commit()
+    adm_db.commit()
     print(checkit_cursor.rowcount, "record(s) deleted")
-    my_db.close()
+    adm_db.close()
 
-
-def table_insert(item):
-    try:
-        connection = pool_for_checkit.get_connection()
-        checkit_cursor = connection.cursor()
-        current_process = str(mp.current_process()).strip("<ForkProcess(ForkPoolWorker-").strip(", started daemon)>")
-        sql_statement = "INSERT INTO connection_test (row1, row2, row3) VALUES (%s,%s,%s)"
-        values = (str(current_process), item, datetime.datetime.now())
-        checkit_cursor.execute(sql_statement, values)
-        connection.commit()
-        connection.close()
-    except mysql.connector.Error as e:
-        print("Error code:", e.errno)  # error number
-        print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
-        print("Error message:", e.msg)  # error message
-        print("Error:", e)  # errno, sqlstate, msg values
-        s = str(e)
-        print("Error:", s)
-
-
-def close_pool():
-    connection = pool_for_checkit.get_connection()
-    connection_pool = mysql.connector.pooling.PooledMySQLConnection(pool_for_checkit.pool_name, connection)
-    connection_pool.close()
-
-
-def join_multicast(list_of_cameras):
-    db_connection = mysql.connector.connect(host="localhost",
-                                    user="checkit",
-                                    password="checkit",
-                                    database="checkit")
-
-    open_file = open(open_file_name, 'w')
-    close_file = open(close_file_name, 'w')
-
-    # print(list_of_cameras)
-
-    sql = "SELECT * FROM main_menu_camera WHERE id IN " + str(list_of_cameras).replace('[', '(').replace(']', ')')
-    # print(sql)
-    checkit_cursor = db_connection.cursor()
-    checkit_cursor.execute(sql)
-    checkit_result = checkit_cursor.fetchall()
-    db_connection.close()
-
-    if checkit_result:
-        # print(checkit_result)
-        for record in checkit_result:
-            # print(record, camera_multicast_address_index)
-            multicast_address = record[camera_multicast_address_index]
-            if multicast_address:
-                # print(record[camera_id_index], record[camera_multicast_address_index])
-                open_command = "ip addr add " + multicast_address + "/32 dev " + network_interface + " autojoin"
-                close_command = "ip addr del " + multicast_address + "/32 dev " + network_interface
-                open_file.write(open_command + '\n')
-                close_file.write(close_command + '\n')
-                # print(open_command)
-    open_file.close()
-    close_file.close()
-    subprocess.call(['chmod', '+x', open_file_name])
-    subprocess.call(['chmod', '+x', close_file_name])
-    subprocess.call(['sudo', open_file_name])
-
-
-def un_join_multicast():
-    subprocess.call(['sudo', close_file_name])
-    subprocess.call(['rm', close_file_name, open_file_name])
 
 
 def open_capture_device(record):
@@ -477,7 +360,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     return full_ss, fv, region_scores
 
 
-def no_base_image(record):
+def no_base_image(checkit_db, record):
     # connection = connection_pool.get_connection()
     # checkit_cursor = connection.cursor()
     logging.debug(f"No base image for {record}")
@@ -490,7 +373,7 @@ def no_base_image(record):
         fields = "(url_id, image, matching_score, region_scores, current_matching_threshold, " \
                  "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
         values = (str(record[camera_id_index]), "", "0", "0", "0", "0", "Capture Error", now)
-        sql_insert(table, fields, values)
+        sql_insert(checkit_db, table, fields, values)
         close_capture_device(record, capture_device)
         return
     else:
@@ -516,21 +399,20 @@ def no_base_image(record):
                     table = "main_menu_referenceimage"
                     fields = "(url_id, image, hour) VALUES (%s,%s,%s)"
                     values = (str(record[camera_id_index]), sql_file_name, time_stamp.strftime('%H'))
-                    sql_insert(table, fields, values)
+                    sql_insert(checkit_db, table, fields, values)
             except OSError as error:
                 logging.error(f"Unable to create base image directory/file {error}")
 
 
-def increment_transaction_count():
+def increment_transaction_count(checkit_db):
     connected = False
     while not connected:
         try:
-            connection = pool_for_checkit.get_connection()
-            checkit_cursor = connection.cursor()
+            checkit_cursor = checkit_db.cursor()
             sql = "UPDATE main_menu_licensing SET transaction_count =  transaction_count + 1 WHERE id = 1"
             checkit_cursor.execute(sql)
-            connection.commit()
-            connection.close()
+            checkit_cursor.commit()
+            checkit_cursor.close()
             connected = True
         except mysql.connector.Error as e:
             logging.error(f"Database connection error at 488 {e}")
@@ -539,12 +421,11 @@ def increment_transaction_count():
     connected = False
     while not connected:
         try:
-            adm_connection = pool_for_adm.get_connection()
-            admin_cursor = adm_connection.cursor()
+            admin_cursor = adm_db.cursor()
             sql = "UPDATE adm SET tx_count =  tx_count + 1 WHERE id = 1"
             admin_cursor.execute(sql)
-            adm_connection.commit()
-            adm_connection.close()
+            admin_cursor.commit()
+            admin_cursor.close()
 
             connected = True
         except mysql.connector.Error as e:
@@ -553,12 +434,43 @@ def increment_transaction_count():
 
 
 def process_list(x):
+    db_config_checkit = {
+        "host": "localhost",
+        "user": "checkit",
+        "password": "checkit",
+        "database": "checkit"
+    }
+    checkit_db = mysql.connector.connect(**db_config_checkit)
+    checkit_cursor = checkit_db.cursor()
+    checkit_cursor.execute("SELECT * FROM main_menu_camera LIMIT 1")
+    checkit_result = checkit_cursor.fetchone()
+
+    field_names = [i[0] for i in checkit_cursor.description]
+
+    camera_id_index = field_names.index('id')
+    camera_url_index = field_names.index('url')
+    camera_multicast_address_index = field_names.index('multicast_address')
+    camera_number_index = field_names.index('camera_number')
+    camera_name_index = field_names.index('camera_name')
+    image_regions_index = field_names.index('image_regions')
+    matching_threshold_index = field_names.index('matching_threshold')
+    slug_index = field_names.index('slug')
+
+    checkit_cursor.execute("SELECT * FROM main_menu_referenceimage LIMIT 1")
+    checkit_result = checkit_cursor.fetchone()
+
+    field_names = [i[0] for i in checkit_cursor.description]
+    reference_image_id_index = field_names.index('id')
+    reference_image_url_index = field_names.index('url_id')
+    reference_image_index = field_names.index('image')
+    checkit_cursor.close()
+
     for camera in x:
         fields = "*"
         table = "main_menu_camera"
         where = "WHERE id = " + "\"" + str(camera) + "\""
         long_sql = None
-        current_record = sql_select(fields, table, where, long_sql, fetch_all=False)
+        current_record = sql_select(checkit_db, fields, table, where, long_sql, fetch_all=False)
         regions = current_record[image_regions_index]
 
         if regions == '0' or regions == "[]":
@@ -573,7 +485,7 @@ def process_list(x):
         table = "main_menu_referenceimage"
         where = "WHERE url_id = " + "\"" + str(current_record[camera_id_index]) + "\""
         long_sql = None
-        hours = sql_select(fields, table, where, long_sql, fetch_all=True)
+        hours = sql_select(checkit_db, fields, table, where, long_sql, fetch_all=True)
         int_hours = []
 
         if hours:
@@ -591,7 +503,7 @@ def process_list(x):
                 where = "WHERE url_id = " + "\"" + str(current_record[camera_id_index]) +\
                         "\"" + " AND hour = " + "\"" + closest_hour + "\""
                 long_sql = None
-                image = sql_select(fields, table, where, long_sql, fetch_all=False)
+                image = sql_select(checkit_db, fields, table, where, long_sql, fetch_all=False)
                 image = image[0]
 
                 base_image = "/home/checkit/camera_checker/media/" + image
@@ -657,9 +569,9 @@ def process_list(x):
                                      "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
                             values = (str(current_record[camera_id_index]), sql_file_name,
                                       "0", "{}", "0", "0", "Image Size Error", now)
-                            sql_insert(table, fields, values)
+                            sql_insert(checkit_db, table, fields, values)
 
-                            increment_transaction_count()
+                            increment_transaction_count(checkit_db)
                         else:
                             matching_score, focus_value, region_scores = compare_images(image_base_grey,
                                                                                         image_frame_grey,
@@ -679,14 +591,14 @@ def process_list(x):
                                       json.dumps(region_scores),
                                       float(current_record[matching_threshold_index]), float(focus_value),
                                       action, time_stamp_string)
-                            sql_insert(table, fields, values)
+                            sql_insert(checkit_db, table, fields, values)
 
                             table = "main_menu_camera"
                             fields = "last_check_date = " + "\"" + time_stamp_string + "\""
                             where = " WHERE id = " + "\"" + str(current_record[camera_id_index]) + "\""
-                            sql_update(table, fields, where)
+                            sql_update(checkit_db, table, fields, where)
 
-                            increment_transaction_count()
+                            increment_transaction_count(checkit_db)
                 else:
                     # print("unable to read")
                     now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
@@ -696,15 +608,15 @@ def process_list(x):
                              "current_matching_threshold, focus_value, action, creation_date) " \
                              "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
                     values = (str(current_record[camera_id_index]), "", "0", "{}", "0", "0", "Capture Error", now)
-                    sql_insert(table, fields, values)
-                    increment_transaction_count()
+                    sql_insert(checkit_db, table, fields, values)
+                    increment_transaction_count(checkit_db)
         else:
             # only gets here with new camera
             logging.info(f"No base image for camera number {current_record[camera_number_index]} - "
                          f"{current_record[camera_name_index]}")
             no_base_image(current_record)
-            increment_transaction_count()
-
+            increment_transaction_count(checkit_db)
+    adm_db.close()
 
 # list_of_numbers = [*range(0, 100000)]
 mp.set_start_method("fork")
@@ -713,11 +625,10 @@ mp.set_start_method("fork")
 
 start = timer()
 print('Starting 16 thread run')
-with mp.Pool(8, initializer=init_pools) as p:
+with mp.Pool(8) as p:
     p.map(process_list, list_to_process)
     p.close()
     p.join()
-    # p.apply(close_pool)
 
 end = timer()
 print("Time for 16 run", end-start)
