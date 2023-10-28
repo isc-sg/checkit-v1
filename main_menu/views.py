@@ -29,10 +29,10 @@ from django.views.decorators.cache import cache_control
 from django.contrib.auth.models import Permission, User, Group
 
 from .resources import CameraResource
-from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage
-from .tables import CameraTable, LogTable, EngineStateTable
+from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay
+from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable
 from .forms import DateForm, RegionsForm
-from .filters import CameraFilter, LogFilter, EngineStateFilter
+from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
 
 from reportlab.pdfgen import canvas
@@ -334,6 +334,7 @@ def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
     statvfs = os.statvfs('/home/checkit')
+
     total_disk_giga_bytes = statvfs.f_frsize * statvfs.f_blocks / (1024 * 1024 * 1024)
     total_disk_giga_bytes_free = round(statvfs.f_frsize * statvfs.f_bavail / (1024 * 1024 * 1024), 2)
     total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
@@ -795,6 +796,14 @@ class CameraView(LoginRequiredMixin, SingleTableMixin, FilterView):
     ordering = 'camera_number'
 
 
+class CameraSelectView(LoginRequiredMixin, SingleTableMixin, FilterView):
+    model = Camera
+    table_class = CameraSelectTable
+    template_name = 'main_menu/camera_select_table.html'
+    paginate_by = 100
+    filterset_class = CameraSelectFilter
+    ordering = 'camera_number'
+
 class LogView(LoginRequiredMixin, SingleTableMixin, FilterView):
     model = LogImage
     table_class = LogTable
@@ -839,6 +848,40 @@ def download_system_logs(request):
         headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
     )
 
+def mass_update(request):
+    selection = request.POST.getlist("selection")
+    selection.sort()
+    action = request.POST.get('action')
+    matching_threshold = request.POST.get('matching_threshold')
+    focus_threshold = request.POST.get('focus_threshold')
+    light_threshold = request.POST.get('light_threshold')
+    values = [selection, action,
+              ",", matching_threshold,
+              ",", focus_threshold,
+              ",", light_threshold]
+    if selection:
+        for camera_number in selection:
+            try:
+                camera_object = Camera.objects.get(pk=camera_number)
+                values.append(camera_object.camera_name)
+
+                if matching_threshold:
+                    camera_object.matching_threshold = matching_threshold
+                if focus_threshold:
+                    camera_object.focus_value_threshold = focus_threshold
+                if light_threshold:
+                    camera_object.light_level_threshold = light_threshold
+                if action == "Reset Schedule":
+                    all_days = DaysOfWeek.objects.all()
+                    all_hours = HoursInDay.objects.all()
+                    camera_object.scheduled_days.add(*all_days)
+                    camera_object.scheduled_hours.add(*all_hours)
+                camera_object.save()
+
+            except ObjectDoesNotExist:
+                values.append(f"Camera {camera_number} not found")
+
+    return HttpResponse(values)
 
 def export_logs_to_csv(request):
     selection = request.POST.getlist("selection")
@@ -1026,7 +1069,7 @@ def export_logs_to_csv(request):
                 return FileResponse(buffer, as_attachment=True, filename='results.pdf')
 
     else:
-        return HttpResponseRedirect("/state")
+        return HttpResponseRedirect("/state/")
 
 
 @permission_required('camera_checker.main_menu')
