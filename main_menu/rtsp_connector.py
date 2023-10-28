@@ -255,7 +255,7 @@ for camera in cameras:
 
     # start_time = time.time()
 
-    track = None
+
     port = None
     inside_video_section = False
     video_a_parameters = {}
