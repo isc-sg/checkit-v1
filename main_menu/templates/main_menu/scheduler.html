@@ -14,7 +14,7 @@
     </title>
     <!--     Fonts and icons     -->
 
-    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
+<!---    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/> -->
     <!-- Nucleo Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
@@ -153,7 +153,7 @@
 
                                 <form method="post">
                                     {% csrf_token %}
-                                    <button class="btn" type="submit" name="start_engine">Run Now</button>
+                                    <button class="btn btn-round" type="submit" name="start_engine">Run Now</button>
                                     <br>
 
                                     <i style="font-size:2em"> {{ system_state }} &nbsp;&nbsp;</i>
@@ -176,7 +176,7 @@
                                 <form method="post">
                                     {% csrf_token %}
                                                         {% if admin_user == "True" %}
-                                    <button class="btn" type="submit" name="toggle_scheduler">Toggle Scheduler</button>
+                                    <button class="btn btn-round" type="submit" name="toggle_scheduler">Toggle Scheduler</button>
                                                         {% endif %}
 
                                     <br>
@@ -224,7 +224,6 @@
                         <div class="form-group">
                             <form method="post">
                                 {% csrf_token %}
-                                <label>Enter camera to check</label>
                                 {% if camera_does_not_exist %}
                                 <input type="number" style="::placeholder {color: red;};"
                                        placeholder="Camera does not exist" class="form-control"
@@ -234,7 +233,16 @@
                                 {% endif %}
 
                             </form>
+
                         </div>
+                    <br>
+                    <br>
+                    <h3>Load cameras from file</h3>
+                                                <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="file" class="btn btn-round" name="camera_list">
+                                <button class="btn btn-round" type="submit">Upload Cameras</button>
+                            </form>
                     </div>
                 </div>
                 <div id="row2" class="row">
