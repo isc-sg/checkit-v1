@@ -841,6 +841,22 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
+    def get_queryset(self):
+        # You can manipulate the QuerySet here to exclude records based on a condition
+        queryset = super().get_queryset()  # Get the original QuerySet
+        return queryset.exclude(state='STARTED')
+
+# def engine_state_view(request):
+#
+#     records_to_display = EngineState.objects.exclude(state='STARTED')
+#     table = EngineStateTable(records_to_display)
+#     paginate_by = 24
+#     filterset_class = EngineStateFilter
+#     ordering = 'state_timestamp'
+#
+#     return render(request, "main_menu/engine_state_table.html", {
+#         "table": table
+#     })
 
 def download_system_logs(request):
     response = HttpResponse(
