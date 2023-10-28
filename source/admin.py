@@ -15,8 +15,8 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from rangefilter.filters import DateRangeFilter
 from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDropdownFilter, ChoiceDropdownFilter
-
-
+from django.views.decorators.cache import cache_control, add_never_cache_headers
+from django.utils.decorators import method_decorator
 import os
 
 # Register your models here.
@@ -28,6 +28,11 @@ admin.site.site_title = "CheckIT"
 admin.site.site_header = "CheckIT"
 admin.site.index_title = "CheckIT Admin"
 
+class DisableClientSideCachingMiddleware(object):
+    def process_response(self, request, response):
+        add_never_cache_headers(response)
+        return response
+
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
@@ -36,7 +41,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     resource_class = CameraResource
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
     exclude = ('id',)
-    list_display = ('camera_name', 'camera_number', 'url', 'multicast_address',
+    list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
                     'camera_location', 'matching_threshold',)
     readonly_fields = ["creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
@@ -96,6 +101,7 @@ class ReferenceAdmin(SimpleHistoryAdmin):
         return obj.url.image_regions
     get_regions.short_description = "Regions"
 
+
     def reference_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
             url=obj.image.url,
@@ -107,6 +113,7 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     def get_location(self, obj):
         return obj.url.camera_location
     get_location.short_description = "Location"
+
 
 
 class LogImageAdmin(SimpleHistoryAdmin):
@@ -143,6 +150,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     def get_location(self, obj):
         return obj.url.camera_location
     get_location.short_description = "Location"
+
 
 
 @admin.register(LogEntry)
