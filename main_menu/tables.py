@@ -33,11 +33,17 @@ class CameraTable(tables.Table):
     def render_url(self, value):
         return str(re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', value)).strip("[").strip("]").strip("\'")
 
+    def render_multicast_port(self, value):
+        if value == 0:
+            return "—"
+        else:
+            return value
+
     class Meta:
         model = Camera
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("camera_number", "camera_name", "camera_location", "url", "multicast_address", "matching_threshold",
-                  "last_check_date")
+        fields = ("camera_number", "camera_name", "camera_location", "url", "multicast_address", "multicast_port",
+                  "matching_threshold", "last_check_date")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
 
 
@@ -105,7 +111,7 @@ class LogTable(tables.Table):
     def render_matching_score(self, value, record):
         camera_object = Camera.objects.get(pk=record.url_id)
         default_matching_threshold = camera_object.matching_threshold
-        if value > default_matching_threshold:
+        if value >= default_matching_threshold:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
@@ -161,3 +167,28 @@ class EngineStateTable(tables.Table):
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         sequence = ('selection', 'state', 'state_timestamp', 'number_failed_images')
         order_by = '-state_timestamp'
+
+
+class CameraSelectTable(tables.Table):
+    selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
+                                      attrs={"td": {
+                                             "width": 50, "align": "center"
+                                             }, "th__input": {"onclick": "toggle(this)"}})
+    camera_name = tables.Column(attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+    camera_number = tables.Column(attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+
+    class Meta:
+        model = Camera
+        template_name = 'django_tables2/bootstrap4.html'
+        fields = ('camera_name', 'camera_number', 'camera_number', 'url', 'multicast_address',
+                    'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
+        attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
+        sequence = ('selection', 'camera_name', 'camera_number', 'url', 'multicast_address',
+                    'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
+        order_by = 'camera_number'
