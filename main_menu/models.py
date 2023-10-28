@@ -71,11 +71,11 @@ class Camera(models.Model):
     multicast_address = models.GenericIPAddressField(protocol='IPv4', blank=True, null=True, unique=True, default=None)
     multicast_port = models.IntegerField(blank=True, default=0, null=True,
                                          validators=[MaxValueValidator(65535), MinValueValidator(0)])
-    camera_username = models.CharField(max_length=32, blank=True)
-    camera_password = models.CharField(max_length=64, blank=True)
+    camera_username = models.CharField(max_length=32, blank=True, verbose_name="Username")
+    camera_password = models.CharField(max_length=64, blank=True, verbose_name="Password")
     # image = models.ImageField(upload_to='base_images/')
     camera_number = models.IntegerField(null=False, blank=False, unique=True,
-                                        validators=[MaxValueValidator(100000), MinValueValidator(1)])
+                                        validators=[MaxValueValidator(9999999999), MinValueValidator(1)])
     camera_name = models.CharField(max_length=100, null=False, blank=False, unique=True)
     slug = models.SlugField(max_length=100, null=True, blank=False, unique=True, verbose_name="URL friendly name")
     camera_location = models.CharField(max_length=100)
