@@ -14,6 +14,7 @@ import process_list_v2
 import logging
 from logging.handlers import RotatingFileHandler
 import hashlib
+import psutil
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -24,6 +25,12 @@ checkit_secret = "Checkit65911760424"[::-1].encode()
 
 key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
 
+def is_process_running(pid):
+    try:
+        process = psutil.Process(pid)
+        return process.is_running()
+    except psutil.NoSuchProcess:
+        return False
 
 def get_encrypted(password):
     h = hashlib.blake2b(digest_size=64, key=checkit_secret)
@@ -158,6 +165,7 @@ def get_camera_ids(camera_numbers, checkit_cursor):
     except mysql.connector.Error as e:
         logging.error(f"Database connection error {e} {sql_statement}")
         exit(1)
+        # TODO - check exit state - may need to just do return
     return ids
 
 
@@ -288,17 +296,16 @@ def check_engine_state(checkit_db):
         state_timestamp = checkit_result[state_timestamp_index]
         engine_process_id = checkit_result[engine_process_id_index]
 
-    try:
-        os.kill(engine_process_id, 0)
-    except OSError:
-        process_state = "NOT RUNNING"
-    else:
+    if is_process_running(engine_process_id):
         process_state = "RUNNING"
+    else:
+        process_state = "NOT RUNNING"
 
     if state == "STARTED":
         if process_state == "RUNNING":
             logging.info("Engine already running - exiting")
             exit(0)
+
 
         # exit gracefully because engine is running
 
@@ -314,8 +321,8 @@ def check_engine_state(checkit_db):
         sql_statement = "INSERT INTO main_menu_enginestate " \
                         "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
                         " VALUES (%s,%s,%s,%s,%s)"
-        values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
-        logging.info("transaction rate %s", transaction_rate)
+        values = (state, 0, 0, state_timestamp, 0)
+        # logging.info("transaction rate %s", transaction_rate)
         logging.error("Last run failed to exit properly")
         # checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement, values)
@@ -417,6 +424,7 @@ def main(ids):
         list_pointer += incrementer
     #
     # logging.info(f"about to process list, {list_of_lists}")
+    print("starting", list_of_lists)
     process_list_v2.start_processes(list_of_lists)
     # logging.info("c4 done process")
     shutdown_engine_state(start_state_timestamp)
