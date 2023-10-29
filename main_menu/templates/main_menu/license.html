@@ -153,12 +153,12 @@ input::file-selector-button {
 
                 <div id="container1">
                     <div class="row">
-                        <div class="col-md-7">
+                        <div class="col-md-5">
                             <div class="card">
                                 <div class="card-header">
                                     <h5 class="title">Details</h5>
                                 </div>
-
+                                <div class="bordered-form">
                                 <div class="card-body">
                                     <form>
 
@@ -203,7 +203,7 @@ input::file-selector-button {
                                                 </div>
                                             </div>
 
-                                            <div class="col-md-4 pr-md-1">
+                                            <div class="col-md-3 pr-md-1">
                                                 <div class="form-group">
                                                     <div class="alert alert-info">
                                                         <label>End Date</label>
@@ -212,7 +212,7 @@ input::file-selector-button {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="col-md-4 pr-md-1">
+                                            <div class="col-md-3 pr-md-1">
                                                 <div class="form-group">
                                                     <div class="alert alert-info">
                                                         <label>Transactions Purchased</label>
@@ -233,6 +233,7 @@ input::file-selector-button {
                                                             <p></p>
                                                             <span> {{ transaction_count }}</span>
                                                         </div>
+                                                    </div>
                                                     </div>
                                                     <form method="post">
                                     {% csrf_token %}
