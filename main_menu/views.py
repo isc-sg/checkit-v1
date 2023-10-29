@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import uuid
 import mysql.connector
+import psutil
 
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
 from django.template import loader
@@ -85,6 +86,12 @@ class CameraViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'camera_number'
 
+def is_process_running(pid):
+    try:
+        process = psutil.Process(pid)
+        return process.is_running()
+    except psutil.NoSuchProcess:
+        return False
 
 def custom_500_error_view(request):
     return render(request, '500.html')
@@ -475,9 +482,23 @@ def scheduler(request):
     # get the actual state from the engine here and pass it to context
     obj = EngineState.objects.last()
     if obj is not None:
+        # use .title() to give it correct case as the record is in upper case.
         state = obj.state.title()
+        pid = obj.engine_process_id
     else:
         state = "Run Completed"
+
+    if state == "Started" and not is_process_running(pid):
+        print("State is started but pid not running")
+        state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+        record = EngineState()
+        record.state = "ERROR"
+        record.engine_process_id = 0
+        record.transaction_rate = 0
+        record.state_timestamp = state_timestamp
+        record.number_failed_images = 0
+        record.save()
+        state = "ERROR"
     license_obj = Licensing.objects.last()
     # run_schedule = license_obj.run_schedule
     # tmp_file_name = "/tmp/" + str(uuid.uuid4())
@@ -496,7 +517,7 @@ def scheduler(request):
         elif out == b"":
             scheduler_status = "Scheduler Off"
         else:
-            scheduler_status = "Scheduler Running"
+            scheduler_status = "Scheduler On"
     except:
         logging.error("crontab look up failed")
     context = {'system_state': state,
@@ -552,6 +573,32 @@ def scheduler(request):
                 return HttpResponseRedirect(reverse(scheduler))
         except:
             logging.error("crontab look up failed")
+
+    if request.FILES:
+        uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.decode().split("\n")
+        uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # Extract the items that exist in the model
+        matching_items = matching_records.values_list('camera_number', flat=True)
+
+        # Iterate over your list and check if each item exists in the model
+        good_numbers = []
+        bad_numbers = []
+        for item in uploaded_file:
+            if item in matching_items:
+                bad_numbers.append(item)
+            else:
+                good_numbers.append(item)
+
+        if bad_numbers:
+            context = {'system_state': state,
+               "scheduler_status": scheduler_status, "admin_user": admin_user, "error": "Invalid camera numbers in file"}
+            return HttpResponse(template.render(context, request))
+
+        return HttpResponse("Good" + str(good_numbers) + "Bad" + str(bad_numbers))
+
     if request.method == 'POST' and 'start_engine' in request.POST:
         logging.info("User {u} started engine".format(u=user_name))
         # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
@@ -561,7 +608,7 @@ def scheduler(request):
                          "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         return_code = process.returncode
-        # print('return_code', return_code)
+        # print("Return code", return_code)
         if return_code == 33:
             context = {"error": "Licensing Error"}
             return HttpResponse(template.render(context, request))
@@ -1217,4 +1264,17 @@ def display_regions(request):
         message = ""
         return render(request, 'main_menu/regions.html', {'message': message})
 
+def count_current_records_processed(request):
+    engine_object = EngineState.objects.filter(state="STARTED").last()
+    start_time = engine_object.state_timestamp
+    camera_count = Camera.objects.count()
+    logs = LogImage.objects.filter(creation_date__gte=start_time).count()
+    print(camera_count, type(camera_count))
+    print(logs, type(logs))
+    progress = int(( logs / camera_count ) * 100)
+    data = {'progress': progress, 'start_time': start_time, 'camera_count': camera_count}
+    response = JsonResponse(data)
+    return response
 
+def progress_meter(request):
+    return render(request, "main_menu/progress_meter.html")

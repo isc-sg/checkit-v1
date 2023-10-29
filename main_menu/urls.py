@@ -44,7 +44,9 @@ urlpatterns = [
     path("export/", views.export_logs_to_csv, name='export csv logs'),
     path("images/", views.compare_images, name="images"),
     path('regions/', views.input_camera_for_regions, name='regions'),
-    path('api-auth/', include('rest_framework.urls', namespace='rest_framework'))
+    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('get_progress/', views.count_current_records_processed, name='get_progress'),
+    path('progress_meter/', views.progress_meter, name='progress_meter'),
 
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()

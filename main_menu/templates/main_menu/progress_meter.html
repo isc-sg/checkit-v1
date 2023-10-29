@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progress Meter</title>
+</head>
+<body>
+    <h1>Task Progress</h1>
+    <div id="progress-meter">0%</div>
+
+    <script>
+        function updateProgress() {
+            fetch('/get_progress/')  // Replace with your Django view URL
+                .then(response => response.json())
+                .then(data => {
+                    // Update the progress meter with the received data
+                    document.getElementById('progress-meter').innerText = data.progress + '%';
+
+                    // If the task is not complete, schedule the next update
+                    if (data.progress < 100) {
+                        setTimeout(updateProgress, 1000);  // Update every 1 second
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        // Start the progress updates
+        updateProgress();
+    </script>
+</body>
+</html>

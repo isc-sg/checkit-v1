@@ -154,12 +154,38 @@
                             <div id="container1">
                                 <div id="row1" class="row">
                                     <div class="col-md-4">
-                                        <i style="font-size:2em"> {{ system_state }}&nbsp;&nbsp;</i>
+                                        <i style="color: white;font-size:2em"> {{ system_state }}&nbsp;&nbsp;</i>
                                         {% if system_state == "Started" %}
                                         <i class="fa-solid fa-person-running" style="color:green;font-size:4em;"></i>
                                         {% else %}
                                         <i class="fa-solid fa-person-running" style="color:red;font-size:4em;"></i>
                                         {% endif %}
+                                        <div style="color: white;font-size:2em" id="progress-meter">0%</div>
+
+    <script>
+                function updateProgress() {
+            fetch('/get_progress/')  // Replace with your Django view URL
+                .then(response => response.json())
+                .then(data => {
+                    // Update the progress meter with the received data
+                    document.getElementById('progress-meter').innerText = data.progress + '%';
+
+                    if (data.progress < 100) {
+                        setTimeout(updateProgress, 1000);  // Update every 1 second
+                    } else if (!pageRefreshed) {
+                        // Refresh the page when progress reaches 100%
+                        location.reload();
+                        pageRefreshed = true; // Set the flag to prevent further refresh
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        // Start the progress updates
+        updateProgress();
+    </script>
                                     </div>
                                 </div>
                             </div>
