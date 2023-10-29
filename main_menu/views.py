@@ -1278,3 +1278,10 @@ def count_current_records_processed(request):
 
 def progress_meter(request):
     return render(request, "main_menu/progress_meter.html")
+
+def cameras_with_missing_reference_images(request):
+    table = CameraTable(Camera.objects.exclude(referenceimage__isnull=False))
+
+    return render(request, "main_menu/camera_table.html", {
+        "table": table
+    })
