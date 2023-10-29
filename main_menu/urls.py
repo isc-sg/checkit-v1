@@ -47,6 +47,8 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     path('get_progress/', views.count_current_records_processed, name='get_progress'),
     path('progress_meter/', views.progress_meter, name='progress_meter'),
+    path('missing_reference_images/', views.cameras_with_missing_reference_images, name='missing_ref'),
+
 
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()
