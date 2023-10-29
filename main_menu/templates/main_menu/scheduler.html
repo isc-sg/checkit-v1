@@ -38,7 +38,35 @@
       :placeholder-shown {
         border: 1px solid red;
       }
+input {
+    margin-top: 1rem;
+}
 
+input::file-selector-button {
+    font-weight: normal;
+    background: none;
+    color: white;
+    padding: 0em;
+    border: none;
+    border-radius: 0px;
+}
+
+        .running-man {
+            font-size: 24px;
+            animation: run 1s infinite linear;
+        }
+
+        @keyframes run {
+            0% {
+                transform: translateX(0);
+            }
+            50% {
+                transform: translateX(100px);
+            }
+            100% {
+                transform: translateX(0);
+            }
+        }
 
 
 
@@ -143,9 +171,14 @@
                 <div class="col-sm-10">
 
                 </div>
+
                 <div class="container-fluid">
 
                     <h3 id="heading1">System Status</h3>
+                    {% if error %}
+                        <i style="color: red;font-size:2em"> {{ error }} </i>
+                        <br>
+                    {%  endif %}
 
                     <div id="container1">
                         <div id="row1" class="row">
@@ -156,14 +189,15 @@
                                     <button class="btn btn-round" type="submit" name="start_engine">Run Now</button>
                                     <br>
 
-                                    <i style="font-size:2em"> {{ system_state }} &nbsp;&nbsp;</i>
+                                    <i style="color: white; font-size:2em"> {{ system_state }} &nbsp;&nbsp;</i>
                                     {% if system_state == "Started" %}
-                                    <i class="fa-solid fa-person-running" style="color:green;font-size:4em;"></i>
+                                    <i class="fa fa-cog fa-spin fa-3x fa-fw" style="color:green;font-size:4em;"></i>
                                     {% else %}
                                     <i class="fa-solid fa-person-running" style="color:red;font-size:4em;"></i>
                                     {% endif %}
 
                                 </form>
+
                             </div>
                         </div>
                     </div>
@@ -181,8 +215,8 @@
 
                                     <br>
 
-                                    <i style="font-size:2em"> {{ scheduler_status }} {{error}} &nbsp;&nbsp;</i>
-                                    {% if scheduler_status == "Scheduler Running" %}
+                                    <i style="color: white;font-size:2em"> {{ scheduler_status }}  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</i>
+                                    {% if scheduler_status == "Scheduler On" %}
                                     <i class="fa-sharp fa-solid fa-calendar-check" style="color:green;font-size:4em;"></i>
                                     {% else %}
                                     <i class="fa-sharp fa-solid fa-calendar-xmark" style="color:red;font-size:4em;"></i>
@@ -219,9 +253,10 @@
 <!--                            </form>-->
 <!--                        </div>-->
 <!--                    </div>-->
-                    <h3>Run on a single camera</h3>
                     <div class="col-md-3 pr-md-1">
-                        <div class="form-group">
+                        <div class="bordered-form">
+                                            <h3>Run on a single camera</h3>
+
                             <form method="post">
                                 {% csrf_token %}
                                 {% if camera_does_not_exist %}
@@ -237,10 +272,11 @@
                         </div>
                     <br>
                     <br>
+                    <div class="bordered-form">
                     <h3>Load cameras from file</h3>
                                                 <form method="post" enctype="multipart/form-data">
                                 {% csrf_token %}
-                                <input type="file" class="btn btn-round" name="camera_list" accept=".csv">
+                                <input type="file" class="btn btn-round" name="camera_list" accept="text/pain,.csv,.txt">
                                 <button class="btn btn-round" type="submit">Upload Cameras</button>
                             </form>
                     </div>
