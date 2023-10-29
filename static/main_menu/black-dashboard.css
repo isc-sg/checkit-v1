@@ -4464,7 +4464,7 @@ input[type="button"].btn-block {
 .custom-file::before {
   content: 'Select some files';
   display: inline-block;
-  width: 50%
+  width: 50%;
   margin-bottom: 0;
   white-space: nowrap;
   -webkit-user-select: none;
@@ -14730,6 +14730,19 @@ background-color: #32325d;
     float: none;
     padding-left: 0;
   }
+}
+
+.bordered-form {
+
+    width: 200%; /* Adjust the width as needed */
+    border: 2px solid #9d9d9d; /* Add a border around the form with a solid blue line */
+    border-radius: 10px;
+    padding: 10px; /* Add some padding inside the border */
+}
+
+label, input {
+    display: block; /* Place labels and inputs on separate lines */
+    margin-bottom: 10px; /* Add spacing between form elements */
 }
 
 /* Form controls */
