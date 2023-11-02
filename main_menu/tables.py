@@ -198,3 +198,14 @@ class CameraSelectTable(tables.Table):
         sequence = ('selection', 'camera_name', 'camera_number', 'url', 'multicast_address',
                     'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
         order_by = 'camera_number'
+
+class LogSummaryTable(tables.Table):
+    action = tables.Column()
+    hour = tables.Column()
+    count = tables.Column()
+    class Meta:
+        model = LogImage
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('hour', 'action', 'count')
+        attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
+        order_by = '-hour'

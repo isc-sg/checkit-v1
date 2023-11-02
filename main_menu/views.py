@@ -15,6 +15,12 @@ import numpy as np
 import uuid
 import mysql.connector
 import psutil
+from django.utils import timezone
+from django.db.models.functions import TruncHour
+from django.db.models import Count
+
+
+
 
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
 from django.template import loader
@@ -31,7 +37,7 @@ from django.contrib.auth.models import Permission, User, Group
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay
-from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable
+from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable
 from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
@@ -588,16 +594,41 @@ def scheduler(request):
         bad_numbers = []
         for item in uploaded_file:
             if item in matching_items:
-                bad_numbers.append(item)
-            else:
                 good_numbers.append(item)
+            else:
+                bad_numbers.append(item)
 
         if bad_numbers:
             context = {'system_state': state,
                "scheduler_status": scheduler_status, "admin_user": admin_user, "error": "Invalid camera numbers in file"}
             return HttpResponse(template.render(context, request))
+        if good_numbers:
+            joined_string = ' '.join(map(str, good_numbers))
+            process_string = f"/home/checkit/camera_checker/main_menu/start.py {joined_string}"
+            # subprocess.call(["/home/checkit/camera_checker/main_menu/start.py", joined_string])
+            os.system(process_string)
+            # child_process = Popen(["/home/checkit/env/bin/python",
+            #                        process_string],
+            #                       stdout=PIPE, stderr=PIPE)
+            # stdout, stderr = child_process.communicate()
+            # return_code = child_process.returncode
+            # print('return_code', return_code)
+            # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
+            # if return_code == 33:
+            #     pass
+            #     context = {"error": "Licensing Error"}
+            #     return HttpResponse(template.render(context, request))
+            # elif return_code == 0:
+            #     logging.info(f"User {user_name} completed camera check for cameras {good_numbers}")
+            #     process_output = "Run Completed - No errors reported"
+            #     logging.info("Process Output {p}".format(p=process_output))
+            #     return HttpResponseRedirect(reverse(index))
+            # else:
+            #     logging.error("Error in camera check for cameras {} - {}".format(good_numbers, stderr))
+            #     context = {"error": "Error Checking Cameras"}
+            #     return HttpResponse(template.render(context, request))
+            return HttpResponseRedirect(reverse(scheduler))
 
-        return HttpResponse("Good" + str(good_numbers) + "Bad" + str(bad_numbers))
 
     if request.method == 'POST' and 'start_engine' in request.POST:
         logging.info("User {u} started engine".format(u=user_name))
@@ -616,7 +647,7 @@ def scheduler(request):
             logging.info(f"User {user_name} completed camera check for all cameras")
             process_output = "Run Completed - No errors reported"
             logging.info("Process Output {p}".format(p=process_output))
-            return HttpResponseRedirect(reverse(index))
+            return HttpResponseRedirect(reverse(scheduler))
             # if process_output.decode() == '':
             #     process_output = "Run Completed - No errors reported"
         else:
@@ -984,11 +1015,11 @@ def export_logs_to_csv(request):
 
             writer = csv.writer(response)
             writer.writerow(["camera_name", "camera_number", "camera_location",
-                             "pass_fail", "matching_score", "focus_value", "creation_date"])
+                             "pass_fail", "matching_score", "focus_value", "light_level", "creation_date"])
             # print(logs)
             for log in logs:
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
-                                 log.action, log.matching_score, log.focus_value,
+                                 log.action, log.matching_score, log.focus_value,log.light_level,
                                  datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
 
             return response
@@ -1285,3 +1316,22 @@ def cameras_with_missing_reference_images(request):
     return render(request, "main_menu/camera_table.html", {
         "table": table
     })
+
+def action_per_hour_report(request):
+    # Get the current time
+    current_time = timezone.now()
+
+    # Calculate the start time (e.g., last 24 hours)
+    start_time = current_time - timezone.timedelta(days=3)
+
+    # Query the database to count the number of cameras for each action per hour
+    results = (
+        LogImage.objects
+        .filter(creation_date__range=(start_time, current_time))
+        .annotate(hour=TruncHour('creation_date'))
+        .values('hour', 'action')
+        .annotate(count=Count('url'))
+        .order_by('hour', 'action')
+    )
+    table = LogSummaryTable(results)
+    return render(request, 'main_menu/log_summary.html', {'table': table})
