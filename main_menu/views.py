@@ -1015,12 +1015,13 @@ def export_logs_to_csv(request):
 
             writer = csv.writer(response)
             writer.writerow(["camera_name", "camera_number", "camera_location",
-                             "pass_fail", "matching_score", "focus_value", "light_level", "creation_date"])
+                             "pass_fail", "matching_score", "focus_value", "light_level", "creation_date",
+                             "current_focus_value", "current_light_level"])
             # print(logs)
             for log in logs:
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
                                  log.action, log.matching_score, log.focus_value,log.light_level,
-                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S")])
+                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S"),log.current_focus_value,log.current_light_level])
 
             return response
 
@@ -1045,11 +1046,14 @@ def export_logs_to_csv(request):
                         logging.error(f"missing baseimage for logs {base_image}")
                         continue
                     matching_score = log.matching_score
+                    current_matching_threshold = log.current_matching_threshold
                     focus_value = log.focus_value
                     light_level = log.light_level
+                    current_focus_value = log.current_focus_value
+                    current_light_level = log.current_light_level
 
                     image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
-                                       focus_value, log_image, light_level))
+                                       focus_value, log_image, light_level, current_focus_value, current_light_level, current_matching_threshold))
             buffer = io.BytesIO()
             c = canvas.Canvas(buffer, pagesize=landscape(A4))
 
@@ -1075,7 +1079,7 @@ def export_logs_to_csv(request):
                     c.setFont("Helvetica", 10)
                     c.drawString(*coord(270, 10, page_height, mm), text="Page " + str(c.getPageNumber()))
                     for i in image_list[:3]:
-                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image, light_level = i
+                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image, light_level, current_focus_value, current_light_level, current_matching_threshold = i
 
                         c.drawString(
                             *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5,
@@ -1086,11 +1090,34 @@ def export_logs_to_csv(request):
                         c.drawString(*coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos),
                                             page_height, mm),
                                      text="Capture: " + creation_time.strftime("%d-%b-%Y %H:%M %p"))
-                        c.drawString(*coord(left_margin_pos + 88, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm), text="Matching Score: " + str(matching_score) +
-                                                                   "            Focus Value: " + str(focus_value))
+                        if matching_score < current_matching_threshold:
+                            c.setFillColor(HexColor("#CC0000"))
+                            c.setStrokeColor(HexColor("#000000"))
+                        else:
+                            c.setFillColor(HexColor("#000000"))
+                            c.setStrokeColor(HexColor("#000000"))
+                        c.drawString(*coord(left_margin_pos + 87, top_margin_text_pos + (count * top_margin_image_pos),
+                                            page_height, mm), text="Matching Score: " + str(matching_score) + "/" + str(current_matching_threshold))
+                        if focus_value < current_focus_value:
+                            c.setFillColor(HexColor("#CC0000"))
+                            c.setStrokeColor(HexColor("#000000"))
+                        else:
+                            c.setFillColor(HexColor("#000000"))
+                            c.setStrokeColor(HexColor("#000000"))
+                        c.drawString(*coord(left_margin_pos + 129, top_margin_text_pos + (count * top_margin_image_pos),
+                                            page_height, mm), text="  Focus Value: " + str(int(focus_value))
+                                                                   + "/" + str(int(current_focus_value)))
+                        if light_level < current_light_level:
+                            c.setFillColor(HexColor("#CC0000"))
+                            c.setStrokeColor(HexColor("#000000"))
+                        else:
+                            c.setFillColor(HexColor("#000000"))
+                            c.setStrokeColor(HexColor("#000000"))
                         c.drawString(*coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm), text="Light Level: " + str(light_level))
+                                            page_height, mm), text="Light Level: " + str(int(light_level)) +
+                                                                   "/" + str(int(current_light_level)))
+                        c.setFillColor(HexColor("#000000"))
+                        c.setStrokeColor(HexColor("#000000"))
 
                         image_rl = canvas.ImageReader(base_image)
                         image_width, image_height = image_rl.getSize()
