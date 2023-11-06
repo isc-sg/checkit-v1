@@ -134,28 +134,41 @@ def check_main_databases_initialised():
 
 def get_camera_ids(camera_numbers, checkit_cursor):
     if camera_numbers:
-        joined_string = ' '.join(map(str, camera_numbers))
-        sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
+        logging.info(f"camera_numbers, {camera_numbers}, {type(camera_numbers)}")
+        joined_string = ','.join(map(str, camera_numbers))
+        # sql_statement = "SELECT id FROM main_menu_camera " + "WHERE camera_number in " + "(" + joined_string + ")"
+        sql_statement = (f"SELECT id FROM main_menu_camera "
+                         f"WHERE camera_number IN ({joined_string})")
     else:
         # sql_statement = "SELECT id FROM main_menu_camera"
 
         current_hour = datetime.datetime.now().hour
         current_day = datetime.datetime.now().strftime("%A")
 
-        sql_statement = """select id from main_menu_daysofweek where day_of_the_week = """ + "\"" + current_day + "\""
+        # sql_statement = """select id from main_menu_daysofweek where day_of_the_week = """ + "\"" + current_day + "\""
+        sql_statement = (f"SELECT id FROM main_menu_daysofweek "
+                         f"WHERE day_of_the_week = '{current_day}'")
         checkit_cursor.execute(sql_statement)
         day_index = checkit_cursor.fetchone()[0]
 
-        sql_statement = """select id from main_menu_hoursinday where hour_in_the_day = """ + str(current_hour)
+        # sql_statement = """select id from main_menu_hoursinday where hour_in_the_day = """ + str(current_hour)
+        sql_statement = (f"SELECT id FROM main_menu_hoursinday "
+                         f"WHERE hour_in_the_day = {current_hour}")
         checkit_cursor.execute(sql_statement)
         hour_index = checkit_cursor.fetchone()[0]
+        #
+        # sql_statement = "SELECT main_menu_camera_scheduled_hours.camera_id FROM main_menu_camera_scheduled_hours " \
+        #                 "JOIN main_menu_camera_scheduled_days " \
+        #                 "ON main_menu_camera_scheduled_days.camera_id = main_menu_camera_scheduled_hours.camera_id " \
+        #                 "WHERE main_menu_camera_scheduled_days.daysofweek_id = " + str(day_index) + \
+        #                 " AND main_menu_camera_scheduled_hours.hoursinday_id = " + str(hour_index)
 
-        sql_statement = "SELECT main_menu_camera_scheduled_hours.camera_id FROM main_menu_camera_scheduled_hours " \
-                        "JOIN main_menu_camera_scheduled_days " \
-                        "ON main_menu_camera_scheduled_days.camera_id = main_menu_camera_scheduled_hours.camera_id " \
-                        "WHERE main_menu_camera_scheduled_days.daysofweek_id = " + str(day_index) + \
-                        " AND main_menu_camera_scheduled_hours.hoursinday_id = " + str(hour_index)
-
+        sql_statement = (f"SELECT checkit.main_menu_camera_scheduled_hours.camera_id "
+                         f"FROM main_menu_camera_scheduled_hours "
+                         f"JOIN main_menu_camera_scheduled_days "
+                         f"ON main_menu_camera_scheduled_days.camera_id = main_menu_camera_scheduled_hours.camera_id "
+                         f"WHERE main_menu_camera_scheduled_days.daysofweek_id = {day_index} "
+                         f"AND main_menu_camera_scheduled_hours.hoursinday_id = {hour_index}")
     try:
         # checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement)
@@ -363,8 +376,9 @@ def calculate_transaction_rate(checkit_cursor, start_state_timestamp):
 
 
 def count_failed(checkit_cursor, start_state_timestamp):
-    sql_statement = """SELECT COUNT(*) FROM main_menu_logimage WHERE action = "Failed" AND creation_date > """ +\
-                    "\"" + start_state_timestamp + "\""
+    sql_statement = (f"SELECT COUNT(*) FROM main_menu_logimage "
+                     f"WHERE action = 'Failed' "
+                     f"AND creation_date > '{start_state_timestamp}'")
     checkit_cursor.execute(sql_statement)
     checkit_result = checkit_cursor.fetchall()[0][0]
     return checkit_result
@@ -424,7 +438,7 @@ def main(ids):
         list_pointer += incrementer
     #
     # logging.info(f"about to process list, {list_of_lists}")
-    print("starting", list_of_lists)
+    logging.info(f"starting  {list_of_lists}")
     process_list_v2.start_processes(list_of_lists)
     # logging.info("c4 done process")
     shutdown_engine_state(start_state_timestamp)
