@@ -235,11 +235,14 @@ def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit
         checkit_cursor.execute(sql)
         result = checkit_cursor.fetchone()
         if result:
-            sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
-                  "transaction_limit = " + str(transaction_limit) + " , " + \
-                  "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
-                  "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
+            # sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
+            #       "transaction_limit = " + str(transaction_limit) + " , " + \
+            #       "end_date = " + "\"" + end_date.strftime('%Y-%m-%d') + "\" , " \
+            #       "license_key = " + "\"" + license_key + "\"" + " ORDER BY id DESC LIMIT 1"
             # print(sql)
+            sql = (f"UPDATE main_menu_licensing SET transaction_count = {transaction_count}, "
+                   f"transaction_limit = {transaction_limit}, end_date = '{end_date.strftime('%Y-%m-%d')}', "
+                   f"license_key = '{license_key}' ORDER BY id DESC LIMIT 1")
             checkit_cursor.execute(sql)
         else:
             sql = """INSERT INTO main_menu_licensing (transaction_count, transaction_limit, end_date, license_key, license_owner, site_name, start_date, run_schedule) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
@@ -294,9 +297,9 @@ def check_engine_state(checkit_db):
     if checkit_result is None:
         # this is needed if there are no records in enginestate table ( ie first time run )
         sql_statement = "INSERT INTO main_menu_enginestate " \
-                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                        " VALUES (%s,%s,%s,%s,%s)"
-        values = (state, engine_process_id, transaction_rate, state_timestamp, 0)
+                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images, number_pass_images)" \
+                        " VALUES (%s,%s,%s,%s,%s,%s)"
+        values = (state, engine_process_id, transaction_rate, state_timestamp, 0, 0)
 
         # checkit_cursor = checkit_db.cursor()
         checkit_cursor.execute(sql_statement, values)
@@ -332,9 +335,9 @@ def check_engine_state(checkit_db):
         state = "ERROR"
         state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
         sql_statement = "INSERT INTO main_menu_enginestate " \
-                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                        " VALUES (%s,%s,%s,%s,%s)"
-        values = (state, 0, 0, state_timestamp, 0)
+                        "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images, number_pass_images)" \
+                        " VALUES (%s,%s,%s,%s,%s,%s)"
+        values = (state, 0, 0, state_timestamp, 0, 0)
         # logging.info("transaction rate %s", transaction_rate)
         logging.error("Last run failed to exit properly")
         # checkit_cursor = checkit_db.cursor()
@@ -348,9 +351,9 @@ def check_engine_state(checkit_db):
     transaction_rate = 0
 
     sql_statement = "INSERT INTO main_menu_enginestate " \
-                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                    " VALUES (%s,%s,%s,%s,%s)"
-    values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0)
+                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images, number_pass_images)" \
+                    " VALUES (%s,%s,%s,%s,%s,%s)"
+    values = (state, engine_process_id, transaction_rate, start_state_timestamp, 0, 0)
 
     # checkit_cursor = checkit_db.cursor()
     checkit_cursor.execute(sql_statement, values)
@@ -359,8 +362,9 @@ def check_engine_state(checkit_db):
 
 
 def calculate_transaction_rate(checkit_cursor, start_state_timestamp):
-    sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " +\
-                    "\"" + start_state_timestamp + "\""
+    # sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " +\
+    #                 "\"" + start_state_timestamp + "\""
+    sql_statement = f"SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > '{start_state_timestamp}'"
     # below used for testing
     # sql_statement = "SELECT COUNT(*) FROM main_menu_logimage WHERE creation_date > " + "\"" + "2021-07-08" + "\""
 
@@ -382,6 +386,16 @@ def count_failed(checkit_cursor, start_state_timestamp):
     checkit_cursor.execute(sql_statement)
     checkit_result = checkit_cursor.fetchall()[0][0]
     return checkit_result
+
+
+def count_passed(checkit_cursor, start_state_timestamp):
+    sql_statement = (f"SELECT COUNT(*) FROM main_menu_logimage "
+                     f"WHERE action = 'Pass' "
+                     f"AND creation_date > '{start_state_timestamp}'")
+    checkit_cursor.execute(sql_statement)
+    checkit_result = checkit_cursor.fetchall()[0][0]
+    return checkit_result
+
 
 
 def shutdown_engine_state(start_state_timestamp):
@@ -408,10 +422,11 @@ def shutdown_engine_state(start_state_timestamp):
 
     transaction_rate = calculate_transaction_rate(checkit_cursor, start_state_timestamp)
     fails = count_failed(checkit_cursor, start_state_timestamp)
+    passes = count_passed(checkit_cursor, start_state_timestamp)
     sql_statement = "INSERT INTO main_menu_enginestate " \
-                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images)" \
-                    " VALUES (%s,%s,%s,%s,%s)"
-    values = (state, engine_process_id, transaction_rate, state_timestamp, fails)
+                    "(state, engine_process_id, transaction_rate, state_timestamp, number_failed_images, number_pass_images)" \
+                    " VALUES (%s,%s,%s,%s,%s,%s)"
+    values = (state, engine_process_id, transaction_rate, state_timestamp, fails, passes)
     logging.info("Run completed")
     checkit_cursor.execute(sql_statement, values)
     checkit_db.commit()
@@ -432,6 +447,7 @@ def main(ids):
     number_of_cores = pathos.multiprocessing.cpu_count()*4
     incrementer = math.ceil(len(list_of_cameras)/number_of_cores)
     list_of_lists = []
+    logging.info(f"List of lists {list_of_lists}")
     while len(list_of_cameras[list_pointer:list_pointer + incrementer]) > 0:
         list_to_process = list_of_cameras[list_pointer:list_pointer + incrementer]
         list_of_lists.append(list_to_process)
@@ -444,8 +460,8 @@ def main(ids):
     shutdown_engine_state(start_state_timestamp)
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
 
 
 # this will compare last_check_date which includes time as well but still returns values less than today's date

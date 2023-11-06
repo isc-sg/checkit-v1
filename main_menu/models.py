@@ -170,3 +170,4 @@ class EngineState(models.Model):
     transaction_rate = models.PositiveIntegerField(null=False, blank=False, default=0)
     state_timestamp = models.DateTimeField('run completion time', null=False, blank=False, default=timezone.now)
     number_failed_images = models.PositiveIntegerField(null=False, blank=False, default=0)
+    number_pass_images = models.PositiveIntegerField(null=False, blank=False, default=0)
