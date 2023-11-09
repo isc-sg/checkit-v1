@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 import cython
-import compare_images_v4
+import compare_images_v4_bg
 import argparse
 
 
@@ -12,4 +12,4 @@ args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    compare_images_v4.main(args.list_of_cameras)
+    compare_images_v4_bg.main(args.list_of_cameras)
