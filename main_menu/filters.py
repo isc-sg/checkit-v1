@@ -69,7 +69,9 @@ class EngineStateFilter(FilterSet):
     state = ChoiceFilter(choices=STATE_CHOICES)
     state_timestamp = DateRangeFilter()
     number_failed_images = RangeFilter(widget=RangeWidget(attrs={'size': '7'},), label="Fails")
-
+    number_pass_images = RangeFilter(widget=RangeWidget(attrs={'size': '7'},), label="Pass")
+    user = CharFilter(field_name='user', lookup_expr='icontains', label="User contains",
+                             widget=TextInput(attrs={'size': '15'}))
     class Meta:
         model = EngineState
-        fields = ['state', 'state_timestamp', "number_failed_images"]
+        fields = ['state', 'state_timestamp', "number_failed_images", "number_pass_images", "user"]

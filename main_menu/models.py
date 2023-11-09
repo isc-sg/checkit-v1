@@ -171,3 +171,5 @@ class EngineState(models.Model):
     state_timestamp = models.DateTimeField('run completion time', null=False, blank=False, default=timezone.now)
     number_failed_images = models.PositiveIntegerField(null=False, blank=False, default=0)
     number_pass_images = models.PositiveIntegerField(null=False, blank=False, default=0)
+    number_others = models.PositiveIntegerField(null=False, blank=False, default=0)
+    user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)

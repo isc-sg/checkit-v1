@@ -156,10 +156,14 @@ class EngineStateTable(tables.Table):
         "td": {
             "width": 150, "align": "center"
         }})
-    state_timestamp = tables.DateTimeColumn(attrs={'td': {"width": 230, "align": "center"}},format='d M Y, h:i A')
+    state_timestamp = tables.DateTimeColumn(attrs={'td': {"width": 320, "align": "center"}},format='d M Y, h:i A')
     number_failed_images = tables.Column(verbose_name="Number of failed images")
     number_pass_images = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
                                        verbose_name="Number of pass images")
+    number_others = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
+                                       verbose_name="Number of others")
+    user = tables.Column(attrs={'td': {"width": 250, "align": "center"}},
+                                  verbose_name="User ID")
 
     def render_number_failed_images(self, value, column):
         if value > 0:
@@ -172,9 +176,10 @@ class EngineStateTable(tables.Table):
     class Meta:
         model = EngineState
         template_name = 'django_tables2/bootstrap4.html'
-        fields = ("state", "state_timestamp", "number_failed_images", "number_pass_images")
+        fields = ("state", "state_timestamp", "number_failed_images", "number_pass_images", "number_others", "user")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
-        sequence = ('selection', 'state', 'state_timestamp', 'number_failed_images', 'number_pass_images')
+        sequence = ('selection', 'state', 'state_timestamp', 'number_failed_images',
+                    'number_pass_images', 'number_others', 'user')
         order_by = '-state_timestamp'
 
 
