@@ -57,7 +57,6 @@ from rest_framework import permissions
 from rest_framework.parsers import JSONParser
 
 from main_menu.serializers import CameraSerializer
-import main_menu.compare_images_v4
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -633,30 +632,28 @@ def scheduler(request):
 
     if request.method == 'POST' and 'start_engine' in request.POST:
         logging.info("User {u} started engine".format(u=user_name))
-        main_menu.compare_images_v4.main([])
-        engine_object = EngineState.objects.last()
-        engine_object.user = user_name
-        engine_object.save()
-        engine_object = EngineState.objects.order_by("-id")[1]
-        engine_object.user = user_name
-        engine_object.save()
-        # process = Popen(["/home/checkit/env/bin/python",
-        #                  "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
-        # stdout, stderr = process.communicate()
-        # return_code = process.returncode
-        # if return_code == 33:
-        #     context = {"error": "Licensing Error"}
-        #     return HttpResponse(template.render(context, request))
-        # elif return_code == 0:
-        #     logging.info(f"User {user_name} completed camera check for all cameras")
-        #     process_output = "Run Completed - No errors reported"
-        #     logging.info("Process Output {p}".format(p=process_output))
-        #     return HttpResponseRedirect(reverse(scheduler))
-        #
-        # else:
-        #     logging.error("Error in camera check for all cameras - {}".format(stderr))
-        #     context = {"error": "Error Checking Camera"}
-        #     return HttpResponse(template.render(context, request))
+        # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
+        # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
+        #                                           "/home/checkit/camera_checker/main_menu/start.py"])
+        process = Popen(["/home/checkit/env/bin/python",
+                         "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        return_code = process.returncode
+        # print("Return code", return_code)
+        if return_code == 33:
+            context = {"error": "Licensing Error"}
+            return HttpResponse(template.render(context, request))
+        elif return_code == 0:
+            logging.info(f"User {user_name} completed camera check for all cameras")
+            process_output = "Run Completed - No errors reported"
+            logging.info("Process Output {p}".format(p=process_output))
+            return HttpResponseRedirect(reverse(scheduler))
+            # if process_output.decode() == '':
+            #     process_output = "Run Completed - No errors reported"
+        else:
+            logging.error("Error in camera check for all cameras - {}".format(stderr))
+            context = {"error": "Error Checking Camera"}
+            return HttpResponse(template.render(context, request))
 
     # if request.method == 'POST' and 'new_run' in request.POST:
     #     new_run_schedule = request.POST.get('new_run')
@@ -922,10 +919,10 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
-    # def get_queryset(self):
-    #     # You can manipulate the QuerySet here to exclude records based on a condition
-    #     queryset = super().get_queryset()  # Get the original QuerySet
-    #     return queryset.exclude(state='STARTED')
+    def get_queryset(self):
+        # You can manipulate the QuerySet here to exclude records based on a condition
+        queryset = super().get_queryset()  # Get the original QuerySet
+        return queryset.exclude(state='STARTED')
 
 # def engine_state_view(request):
 #
@@ -1330,12 +1327,9 @@ def count_current_records_processed(request):
     start_time = engine_object.state_timestamp
     camera_count = Camera.objects.count()
     logs = LogImage.objects.filter(creation_date__gte=start_time).count()
-    # print(camera_count, type(camera_count))
-    # print(logs, type(logs))
-    try:
-        progress = int(( logs / camera_count ) * 100)
-    except ZeroDivisionError:
-        progress = 100
+    print(camera_count, type(camera_count))
+    print(logs, type(logs))
+    progress = int(( logs / camera_count ) * 100)
     data = {'progress': progress, 'start_time': start_time, 'camera_count': camera_count}
     response = JsonResponse(data)
     return response
