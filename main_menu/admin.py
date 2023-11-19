@@ -18,6 +18,8 @@ from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDrop
 from django.views.decorators.cache import cache_control, add_never_cache_headers
 from django.utils.decorators import method_decorator
 import os
+from django_celery_beat.apps import BeatConfig
+BeatConfig.verbose_name = "Checkit Clocks"
 
 # Register your models here.
 # from .models import Camera, ReferenceImage, LogImage
@@ -133,7 +135,7 @@ class LogImageAdmin(SimpleHistoryAdmin):
     list_display = ['url', 'creation_date', 'action', 'get_location', ]
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
-                       'creation_date', 'log_image')
+                       'creation_date', 'log_image', 'user', 'run_number')
     list_filter = (('creation_date', DateTimeRangeFilter), ('action', DropdownFilter), ('url__camera_location', DropdownFilter))
 
     def log_image(self, obj):
