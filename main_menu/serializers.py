@@ -29,7 +29,8 @@ class CameraSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Camera
-        fields = ['url', 'multicast_address', 'camera_number', 'camera_name', 'camera_location',
+        fields = ['url', 'multicast_address', 'multicast_port', 'camera_username', 'camera_password',
+                  'camera_number', 'camera_name', 'camera_location',
                   'matching_threshold', 'focus_value_threshold', 'light_level_threshold',
                   'scheduled_hours', 'scheduled_days']
         # extra_kwargs = {
