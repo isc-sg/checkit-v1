@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'django_admin_listfilter_dropdown',
     'rest_framework',
     'rest_framework.authtoken',
+    'celery',
+    'django_celery_beat',
 
 ]
 
@@ -130,7 +132,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 
-TIME_ZONE = 'Asia/Singapore'
+TIME_ZONE = 'Australia/Melbourne'
 
 USE_I18N = True
 
@@ -187,18 +189,24 @@ LOGGING = {
             'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
         },
         'simple': {
-            'format': '[%(asctime)s] %(levelname)s [%(funcName)s] - %(username)s: %(message)s'
+            'format': '[%(asctime)s] %(levelname)s [%(funcName)s] - %(message)s'
         }
     },
     'handlers': {
-        'console': {
+        'file': {
             'level': 'INFO',
-            'class': 'logging.StreamHandler',
+            'class': 'logging.FileHandler',
+            'filename': '/home/checkit/camera_checker/logs/checkit.log',  # Replace with the desired path
             'formatter': 'simple'
         },
-
     },
-
+    'loggers': {
+        '': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
     }
 
 REST_FRAMEWORK = {
@@ -215,3 +223,19 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
 }
+# Celery settings
+CELERY_BROKER_URL = "redis://localhost:6379"
+CELERY_RESULT_BACKEND = "redis://localhost:6379"
+# CELERY_RESULT_BACKEND = "django-db"
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+# CELERY_TASK_TRACK_STARTED = True
+CELERY_LOG_FILE = '/home/checkit/camera_checker/logs/engine.log'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERYD_LOG_FORMAT = '[%(asctime)s] [%(levelname)s] [%(task_name)s(%(task_id)s)] %(message)s'
+CELERYD_LOG_FILE = CELERY_LOG_FILE
+CELERYD_LOG_LEVEL = 'INFO'
+# USE_TZ = True
+CELERY_IMPORTS = ['camera_checker.celery',]
+CELERY_TIMEZONE = "Asia/Singapore"
