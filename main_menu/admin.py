@@ -102,7 +102,7 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
     exclude = ('id',)
     list_display = ['url', 'hour', 'reference_image', 'get_location']
-    readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level']
+    readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date']
     list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter))
 
     def has_add_permission(self, request, obj=None):
