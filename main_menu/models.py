@@ -120,6 +120,17 @@ class ReferenceImage(models.Model):
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
     light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
+    focus_value = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    # matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
+    #                                          validators=[MaxValueValidator(1), MinValueValidator(0)],
+    #                                          default=0)
+    # focus_value_threshold = models.DecimalField(max_digits=6, decimal_places=2,
+    #                                             validators=[MaxValueValidator(9999), MinValueValidator(0)],
+    #                                             default=0)
+    # light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
+    #                                             validators=[MaxValueValidator(255), MinValueValidator(0)],
+    #                                             default=0)
+    creation_date = models.DateTimeField('date created', default=timezone.now)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -138,6 +149,11 @@ class LogImage(models.Model):
     current_light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
     action = models.CharField(max_length=20, null=True)
     creation_date = models.DateTimeField('date created', default=timezone.now)
+    user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)
+    run_number = models.PositiveIntegerField(null=False, blank=False, default=0)
+    reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.DO_NOTHING,
+                                        verbose_name="Reference Image", null=True, blank=True)
+
     history = HistoricalRecords()
 
     def __str__(self):
@@ -149,7 +165,7 @@ class Licensing(models.Model):
     end_date = models.DateField('license end date', null=False, blank=False, default=timezone.now)
     transaction_limit = models.IntegerField(null=False, blank=False,
                                             validators=[
-                                                MaxValueValidator(9999999),
+                                                MaxValueValidator(99999999),
                                                 MinValueValidator(1)
                                                        ]
                                             )
@@ -166,10 +182,19 @@ class Licensing(models.Model):
 
 class EngineState(models.Model):
     state = models.CharField(choices=STATE_CHOICES, max_length=32)
-    engine_process_id = models.PositiveIntegerField(null=False, blank=False, default=0)
+    number_of_cameras_in_run = models.PositiveIntegerField(null=False, blank=False, default=0)
     transaction_rate = models.PositiveIntegerField(null=False, blank=False, default=0)
     state_timestamp = models.DateTimeField('run completion time', null=False, blank=False, default=timezone.now)
     number_failed_images = models.PositiveIntegerField(null=False, blank=False, default=0)
     number_pass_images = models.PositiveIntegerField(null=False, blank=False, default=0)
     number_others = models.PositiveIntegerField(null=False, blank=False, default=0)
     user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)
+
+    @property
+    def progress(self):
+        # Perform your calculation here
+        if self.number_of_cameras_in_run != 0:
+            return ((self.number_pass_images + self.number_failed_images + self.number_others)
+                    / self.number_of_cameras_in_run) * 100
+        else:
+            return 0  # Handle division by zero or other cases
