@@ -152,35 +152,86 @@ class EngineStateTable(tables.Table):
                                       attrs={"td": {
                                              "width": 50, "align": "center"
                                              }, "th__input": {"onclick": "toggle(this)"}})
+    id = tables.Column(attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }}, verbose_name="Run Number")
     state = tables.Column(attrs={
         "td": {
-            "width": 150, "align": "center"
+            "width": 100, "align": "center"
         }})
-    state_timestamp = tables.DateTimeColumn(attrs={'td': {"width": 320, "align": "center"}},format='d M Y, h:i A')
-    number_failed_images = tables.Column(verbose_name="Number of failed images")
+    state_timestamp = tables.DateTimeColumn(attrs={'td': {"width": 580, "align": "center"}},format='d M Y, h:i A')
+    number_failed_images = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
+                                         verbose_name="Number of failed images")
     number_pass_images = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
                                        verbose_name="Number of pass images")
     number_others = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
                                        verbose_name="Number of others")
-    user = tables.Column(attrs={'td': {"width": 250, "align": "center"}},
+    user = tables.Column(attrs={'td': {"width": 350, "align": "center"}},
                                   verbose_name="User ID")
+    number_of_cameras_in_run = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
+                         verbose_name="Cameras in Run")
+    progress = tables.Column(attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }}, verbose_name="Progress")
 
-    def render_number_failed_images(self, value, column):
-        if value > 0:
-            column.attrs = {'td': {'bgcolor': '#770000', "width": 200, "align": "center"}}
+    def render_state(self, value, record):
+        if record.progress < 100 and value != "Started":
+            return "Not Completed"
         else:
-            column.attrs = {'td': {"width": 200, "align": "center"}}
-        return value
+            return value
+
+    def render_progress(self, value):
+        if value == 0:
+            return ""
+        else:
+            return f"{int(value)}%"
+
+    def render_id(self, value, record):
+        if record.state == "STARTED":
+            return " "
+        else:
+            return value
+
+    def render_number_others(self, value, record):
+        if record.state == "STARTED":
+            return " "
+        else:
+            return value
+
+    def render_number_of_cameras_in_run(self, value, record):
+        if record.state == "STARTED":
+            return " "
+        else:
+            return value
+
+    def render_number_pass_images(self, value, record):
+        if record.state == "STARTED":
+            return " "
+        else:
+            return value
+
+
+    def render_number_failed_images(self, value, column, record):
+        if record.state == "STARTED":
+            return " "
+        else:
+            if value > 0 :
+                return mark_safe(f'<span style="color: red;">{value}</span>')
+            else:
+                return value
 
 
     class Meta:
         model = EngineState
         template_name = 'django_tables2/bootstrap4.html'
-        fields = ("state", "state_timestamp", "number_failed_images", "number_pass_images", "number_others", "user")
+        fields = ("id", "state", "state_timestamp", "number_failed_images", "number_pass_images",
+                  "number_others", "number_of_cameras_in_run", "progress", "user")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
-        sequence = ('selection', 'state', 'state_timestamp', 'number_failed_images',
-                    'number_pass_images', 'number_others', 'user')
-        order_by = '-state_timestamp'
+        sequence = ('selection', 'id', 'state', 'state_timestamp', 'number_failed_images',
+                    'number_pass_images', 'number_others', 'number_of_cameras_in_run', 'progress', 'user')
+        order_by = '-id'
 
 
 class CameraSelectTable(tables.Table):

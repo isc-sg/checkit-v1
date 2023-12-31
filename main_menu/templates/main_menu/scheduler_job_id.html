@@ -174,14 +174,11 @@ input::file-selector-button {
 
                 <div class="container-fluid">
 
-                    <h3 id="heading1">Scheduler</h3>
-                    {% if error %}
-                        <i style="color: red;font-size:2em"> {{ error }} </i>
-                        <br>
-                    {%  endif %}
+                    <h3 id="heading1">Job successfully submitted</h3>
 
-                    <i id="running-icon" class="fa-solid fa-person-running" style="color:red;font-size:4em;"></i>
-
+                                        <i id="running-icon" class="fa-solid fa-person-running" style="color:red;font-size:4em;"></i>
+{#                                        {% endif %}#}
+{#                                        <div style="color: white;font-size:2em" id="progress-meter">0%</div>#}
 
 <script>
     // Function to update progress based on AJAX response
@@ -213,109 +210,12 @@ input::file-selector-button {
     // Set up a setInterval to check and update progress every second
     const progressInterval = setInterval(updateProgress, 1000);
 </script>
-
-                    <div id="container1">
-                        <div id="row1" class="row">
-
-                            <div class="col-md-4">
-
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <button class="btn btn-round" type="submit" name="start_engine">Run Now</button>
-                                    <br>
-
-
-
-                                </form>
-
-                            </div>
-                        </div>
-                    </div>
-                    <p></p>
-                    <h3></h3>
-                    <div id="container2">
-                        <div id="row2_1" class="row">
-                            <div class="col-md-4">
-
-{#                                <form method="post">#}
-{#                                    {% csrf_token %}#}
-{#                                                        {% if admin_user == "True" %}#}
-{#                                    <button class="btn btn-round" type="submit" name="toggle_scheduler">Toggle Scheduler</button>#}
-{#                                                        {% endif %}#}
-{##}
-{#                                    <br>#}
-{##}
-{#                                    <i style="color: white;font-size:2em"> {{ scheduler_status }}  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</i>#}
-{#                                    {% if scheduler_status == "Scheduler On" %}#}
-{#                                    <i class="fa-sharp fa-solid fa-calendar-check" style="color:green;font-size:4em;"></i>#}
-{#                                    {% else %}#}
-{#                                    <i class="fa-sharp fa-solid fa-calendar-xmark" style="color:red;font-size:4em;"></i>#}
-{#                                    {% endif %}#}
-{##}
-{#                                </form>#}
-                            </div>
-                        </div>
-                    </div>
-                    <p></p>
-                    <h3></h3>
-<!--                    <h3>Current run schedule</h3>-->
-<!--                    <div class="col-md-3 pr-md-1">-->
-<!--                        <div class="form-group">-->
-<!--                            <div class="alert alert-info">-->
-
-<!--                                {% if run_schedule == 0 %}-->
-<!--                                <span>The scheduler is not running</span>-->
-<!--                                {% endif %}-->
-<!--                                {% if run_schedule == 1 %}-->
-<!--                                <span>The system will run hourly</span>-->
-<!--                                {% endif %}-->
-<!--                                {% if run_schedule > 1 %}-->
-<!--                                <span>The system will run every {{ run_schedule }} hours</span>-->
-<!--                                {% endif %}-->
-
-<!--                            </div>-->
-<!--                            <form method="post">-->
-<!--                                {% csrf_token %}-->
-
-<!--                                <label>Enter new hourly interval for run</label>-->
-<!--                                <input type="number" class="form-control" required min="0" max="24" name="new_run"/>-->
-<!--                                <h3></h3>-->
-<!--                            </form>-->
-<!--                        </div>-->
-<!--                    </div>-->
-                    <div class="col-md-3 pr-md-1">
-                        <div class="bordered-form">
-                                            <h3>Run on a single camera</h3>
-
-                            <form method="post">
-                                {% csrf_token %}
-                                {% if camera_does_not_exist %}
-                                <input type="number" style="::placeholder {color: red;};"
-                                       placeholder="Camera does not exist" class="form-control"
-                                       name="camera_check"/>
-                                {% else %}
-                                <input type="number" class="form-control" min=1 required name="camera_check"/>
-                                {% endif %}
-
-                            </form>
-
-                        </div>
-                    <br>
-                    <br>
-                    <div class="bordered-form">
-                    <h3>Load cameras from file</h3>
-                                                <form method="post" enctype="multipart/form-data">
-                                {% csrf_token %}
-                                <input type="file" class="btn btn-round" name="camera_list" accept="text/pain,.csv,.txt">
-                                <button class="btn btn-round" type="submit">Upload Cameras</button>
-                            </form>
-                    </div>
-                </div>
-                <div id="row2" class="row">
-                    <div class="col-md-4">
-
-                    </div>
-                </div>
+                <br>
+                <br>
+                    {% if jobid %}
+                        <i style="color: white;font-size:3em"> You run number is {{ jobid }} </i>
+                        <br>
+                    {%  endif %}
             </div>
 
         </div>

@@ -2,6 +2,7 @@ import ast
 import datetime
 import subprocess
 import time
+import zipfile
 from subprocess import PIPE, Popen
 import csv
 import os
@@ -18,6 +19,8 @@ import psutil
 from django.utils import timezone
 from django.db.models.functions import TruncHour
 from django.db.models import Count
+from pathos.multiprocessing import cpu_count
+
 
 
 
@@ -55,23 +58,49 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.parsers import JSONParser
+from main_menu.tasks import process_cameras
 
 from main_menu.serializers import CameraSerializer
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
-                                               '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-                    handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
-                                                  maxBytes=10000000, backupCount=10)])
+from celery import Celery, current_app
+import celery
+from celery import shared_task
 
+# import main_menu.compare_images_v4
+
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
+#                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+#                     handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',
+#                                                   maxBytes=10000000, backupCount=10)])
+logger = logging.getLogger(__name__)
 error_image = np.zeros((720, 1280, 3), np.uint8)
 
 error_image = cv2.putText(error_image, "Error retrieving image",
                           (250, 300), cv2.FONT_HERSHEY_TRIPLEX, 2,
                           (0, 0, 255), 2, cv2.LINE_AA)
 
-checkit_secret = "Checkit65911760424"[::-1].encode()
 
-key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+def array_to_string(array):
+    new_string = ""
+    for element in array:
+        new_string += chr(element)
+    return new_string
+
+
+# checkit_secret = "Checkit65911760424"[::-1].encode()
+# convert strings to ascii decimal values as an array - this helps obfuscate the string after compiling
+checkit_array = [52, 50, 52, 48, 54, 55, 49, 49, 57, 53, 54, 116, 105, 107, 99, 101, 104, 67]
+
+checkit_secret = array_to_string(checkit_array).encode()
+
+# key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+
+key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 103, 118, 101, 56, 119, 95, 70, 85, 48, 89, 45,
+             76, 72, 78, 118, 121, 103, 75, 108, 72, 105, 119, 80, 108, 74, 78, 79, 114, 54, 77, 61]
+
+key = array_to_string(key_array).encode()
+
+number_of_cpus = cpu_count()
 
 #
 # class UserViewSet(viewsets.ModelViewSet):
@@ -128,12 +157,12 @@ def reference_image_api(request):
             if return_code == 33:
                 return HttpResponse("Error: Licensing Error")
             elif return_code == 0:
-                logging.info(f"API request completed camera check for camera {camera_number}")
+                logger.info(f"API request completed camera check for camera {camera_number}")
                 process_output = "Run Completed - No errors reported"
-                logging.info("Process Output {p}".format(p=process_output))
+                logger.info("Process Output {p}".format(p=process_output))
                 return HttpResponse(process_output)
             else:
-                logging.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+                logger.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
                 return HttpResponse("Error in camera check for camera {} - {}".format(camera_number, stderr))
         elif action.lower() == "delete":
             if "hour" not in request.POST:
@@ -182,7 +211,7 @@ def check_adm_database(password):
             adm_db = mysql.connector.connect(**adm_db_config)
 
         except mysql.connector.Error as e:
-            logging.error(f"Failed all attempts at accessing database  {e}")
+            logger.error(f"Failed all attempts at accessing database  {e}")
     try:
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
@@ -229,20 +258,37 @@ def get_encrypted(password):
 
 def get_license_details():
     f = Fernet(key)
-
-    fd = open("/etc/machine-id", "r")
+    machine_command_array = [47, 101, 116, 99, 47, 109, 97, 99, 104, 105, 110, 101, 45, 105, 100]
+    machine_command = array_to_string(machine_command_array)
+    # fd = open("/etc/machine-id", "r")
+    # use ascii_to_string to obfuscate the command after compile
+    fd = open(machine_command, "r")
     machine_uuid = fd.read()
     machine_uuid = machine_uuid.strip("\n")
-
-    shell_output = subprocess.check_output("/bin/df", shell=True)
+    shell_command_array = [47, 98, 105, 110, 47, 100, 102]
+    shell_command_string = array_to_string(shell_command_array)
+    # shell_output = subprocess.check_output("/bin/df", shell=True)
+    shell_output = subprocess.check_output(shell_command_string, shell=True)
     l1 = shell_output.decode('utf-8').split("\n")
-    command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
+                     101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
+
+    command = array_to_string(command_array)
     root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
 
-    command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    # command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105,
+                     110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+
+    command = array_to_string(command_array) + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
-    command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    # command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
+                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
+
+    command = array_to_string(command_array)
     product_uuid = subprocess.check_output(command, shell=True).decode(). \
         strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
@@ -263,6 +309,18 @@ def get_license_details():
                     "product_uuid": product_uuid}
     encoded_string = f.encrypt(str(license_dict).encode())
     return machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password
+
+
+def license_limits_are_ok():
+    # return True if all good - False if fails
+    try:
+        license_obj = Licensing.objects.last()
+        if license_obj.transaction_count > license_obj.transaction_limit or datetime.date.today() > license_obj.end_date:
+            return False
+        else:
+            return True
+    except ObjectDoesNotExist:
+        return False
 
 
 def take_closest(my_list, my_number):
@@ -373,7 +431,7 @@ def index(request):
                 try:
                     archive.write(log_file)
                 except FileNotFoundError:
-                    logging.info("Logfile {f} does not exist".format(f=log_file))
+                    logger.info("Logfile {f} does not exist".format(f=log_file))
         if os.path.exists(log_file_zipped):
             with open(log_file_zipped, 'rb') as fh:
                 response = HttpResponse(fh.read(), content_type="application/octet-stream")
@@ -482,7 +540,7 @@ def scheduler(request):
     else:
         admin_user = "False"
 
-    logging.info("User {u} access to Scheduler".format(u=user_name))
+    logger.info("User {u} access to Scheduler".format(u=user_name))
 
     template = loader.get_template('main_menu/scheduler.html')
     # get the actual state from the engine here and pass it to context
@@ -490,21 +548,21 @@ def scheduler(request):
     if obj is not None:
         # use .title() to give it correct case as the record is in upper case.
         state = obj.state.title()
-        pid = obj.engine_process_id
+        # pid = obj.engine_process_id
     else:
         state = "Run Completed"
 
-    if state == "Started" and not is_process_running(pid):
-        print("State is started but pid not running")
-        state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-        record = EngineState()
-        record.state = "ERROR"
-        record.engine_process_id = 0
-        record.transaction_rate = 0
-        record.state_timestamp = state_timestamp
-        record.number_failed_images = 0
-        record.save()
-        state = "ERROR"
+    # if state == "Started" and not is_process_running(pid):
+    #     print("State is started but pid not running")
+    #     state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+    #     record = EngineState()
+    #     record.state = "ERROR"
+    #     record.engine_process_id = 0
+    #     record.transaction_rate = 0
+    #     record.state_timestamp = state_timestamp
+    #     record.number_failed_images = 0
+    #     record.save()
+    #     state = "ERROR"
     license_obj = Licensing.objects.last()
     # run_schedule = license_obj.run_schedule
     # tmp_file_name = "/tmp/" + str(uuid.uuid4())
@@ -525,7 +583,7 @@ def scheduler(request):
         else:
             scheduler_status = "Scheduler On"
     except:
-        logging.error("crontab look up failed")
+        logger.error("crontab look up failed")
     context = {'system_state': state,
                "scheduler_status": scheduler_status, "admin_user": admin_user}
 
@@ -578,9 +636,13 @@ def scheduler(request):
                 # logging.info("did cron")
                 return HttpResponseRedirect(reverse(scheduler))
         except:
-            logging.error("crontab look up failed")
+            logger.error("crontab look up failed")
 
     if request.FILES:
+        if not license_limits_are_ok():
+            template = loader.get_template('main_menu/license_error.html')
+            context = {"license_error": "True"}
+            return HttpResponse(template.render(context, request))
         uploaded_file = request.FILES['camera_list'].read()
         uploaded_file = uploaded_file.decode().split("\n")
         uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
@@ -603,10 +665,41 @@ def scheduler(request):
                "scheduler_status": scheduler_status, "admin_user": admin_user, "error": "Invalid camera numbers in file"}
             return HttpResponse(template.render(context, request))
         if good_numbers:
-            joined_string = ' '.join(map(str, good_numbers))
-            process_string = f"/home/checkit/camera_checker/main_menu/start.py {joined_string}"
-            # subprocess.call(["/home/checkit/camera_checker/main_menu/start.py", joined_string])
-            os.system(process_string)
+            # joined_string = ' '.join(map(str, good_numbers))
+            # process_string = f"/home/checkit/camera_checker/main_menu/start.py {joined_string}"
+            # # subprocess.call(["/home/checkit/camera_checker/main_menu/start.py", joined_string])
+            # os.system(process_string)
+            template = loader.get_template('main_menu/scheduler_job_id.html')
+            camera_ids = []
+            for number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=number)
+                camera_ids.append(camera_object.id)
+            number_of_cameras_in_run = len(camera_ids)
+            x = number_of_cpus
+            num_sublists = (len(camera_ids) + x - 1) // x
+            sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+            # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
+            state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+            engine_process_id = 0
+            transaction_rate = 0
+            # create STARTED record first then create FINISHED and pass that record id to celery to have the
+            # workers update the timestamp and counts as the complete check
+            engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+                                              number_of_cameras_in_run=number_of_cameras_in_run)
+            engine_state_record.save()
+            engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+                                              number_of_cameras_in_run=number_of_cameras_in_run)
+            engine_state_record.save()
+            engine_state_id = engine_state_record.id
+
+            for group_of_cameras in sublists:
+                # print("processing list", group_of_cameras )
+                # long_task.delay(group_of_cameras)
+                process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+            # return HttpResponseRedirect(reverse(index))
+            context = {"jobid": engine_state_id}
+            return HttpResponse(template.render(context, request))
+
             # child_process = Popen(["/home/checkit/env/bin/python",
             #                        process_string],
             #                       stdout=PIPE, stderr=PIPE)
@@ -627,33 +720,72 @@ def scheduler(request):
             #     logging.error("Error in camera check for cameras {} - {}".format(good_numbers, stderr))
             #     context = {"error": "Error Checking Cameras"}
             #     return HttpResponse(template.render(context, request))
-            return HttpResponseRedirect(reverse(scheduler))
+            # return HttpResponseRedirect(reverse(scheduler))
 
 
     if request.method == 'POST' and 'start_engine' in request.POST:
-        logging.info("User {u} started engine".format(u=user_name))
-        # subprocess.Popen(["nohup", "/home/checkit/camera_checker/main_menu/compare_images_v2.bin"])
-        # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
-        #                                           "/home/checkit/camera_checker/main_menu/start.py"])
-        process = Popen(["/home/checkit/env/bin/python",
-                         "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
-        stdout, stderr = process.communicate()
-        return_code = process.returncode
-        # print("Return code", return_code)
-        if return_code == 33:
-            context = {"error": "Licensing Error"}
+        template = loader.get_template('main_menu/scheduler_job_id.html')
+        if not license_limits_are_ok():
+            template = loader.get_template('main_menu/license_error.html')
+            context = {"license_error": "True"}
             return HttpResponse(template.render(context, request))
-        elif return_code == 0:
-            logging.info(f"User {user_name} completed camera check for all cameras")
-            process_output = "Run Completed - No errors reported"
-            logging.info("Process Output {p}".format(p=process_output))
-            return HttpResponseRedirect(reverse(scheduler))
-            # if process_output.decode() == '':
-            #     process_output = "Run Completed - No errors reported"
-        else:
-            logging.error("Error in camera check for all cameras - {}".format(stderr))
-            context = {"error": "Error Checking Camera"}
-            return HttpResponse(template.render(context, request))
+
+        logger.info("User {u} started engine".format(u=user_name))
+        camera_objects = Camera.objects.all()
+        camera_ids = [item.id for item in camera_objects]
+        number_of_cameras_in_run = len(camera_ids)
+        x = number_of_cpus
+        num_sublists = (len(camera_ids) + x - 1) // x
+        sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+        # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
+        # state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+        # state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
+        state_timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        # state_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        engine_process_id = 0
+        transaction_rate = 0
+        # create STARTED record first then create FINISHED/ RUN COMPLETED and pass that record id to celery to have the
+        # workers update the timestamp and counts as the complete check
+        engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_id = engine_state_record.id
+        # process_cameras(camera_ids[:20], engine_state_id, user_name)
+        for group_of_cameras in sublists:
+            # print("processing list", group_of_cameras )
+            # long_task.delay(group_of_cameras)
+            process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+        # # return HttpResponseRedirect(reverse(index))
+        context = {"jobid": engine_state_id}
+        return HttpResponse(template.render(context, request))
+
+        # main_menu.compare_images_v4.main([])
+        # engine_object = EngineState.objects.last()
+        # engine_object.user = user_name
+        # engine_object.save()
+        # engine_object = EngineState.objects.order_by("-id")[1]
+        # engine_object.user = user_name
+        # engine_object.save()
+        # process = Popen(["/home/checkit/env/bin/python",
+        #                  "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
+        # stdout, stderr = process.communicate()
+        # return_code = process.returncode
+        # if return_code == 33:
+        #     context = {"error": "Licensing Error"}
+        #     return HttpResponse(template.render(context, request))
+        # elif return_code == 0:
+        #     logging.info(f"User {user_name} completed camera check for all cameras")
+        #     process_output = "Run Completed - No errors reported"
+        #     logging.info("Process Output {p}".format(p=process_output))
+        #     return HttpResponseRedirect(reverse(scheduler))
+        #
+        # else:
+        #     logging.error("Error in camera check for all cameras - {}".format(stderr))
+        #     context = {"error": "Error Checking Camera"}
+        #     return HttpResponse(template.render(context, request))
 
     # if request.method == 'POST' and 'new_run' in request.POST:
     #     new_run_schedule = request.POST.get('new_run')
@@ -689,6 +821,11 @@ def scheduler(request):
     #                      f" hours from {old_run_schedule} hours")
     #     return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'camera_check' in request.POST:
+        if not license_limits_are_ok():
+            template = loader.get_template('main_menu/license_error.html')
+            context = {"license_error": "True"}
+            return HttpResponse(template.render(context, request))
+        template = loader.get_template('main_menu/scheduler_job_id.html')
         input_number = request.POST.get('camera_check')
         try:
             camera_object = Camera.objects.get(camera_number=input_number)
@@ -700,32 +837,45 @@ def scheduler(request):
             context = {'camera_does_not_exist': input_number, 'system_state': state, 'run_schedule': run_schedule}
             return HttpResponse(template.render(context, request))
         camera_number = str(camera_object.camera_number)
+        camera_id = [camera_object.id]
         # process_output = subprocess.check_output(["/home/checkit/camera_checker/main_menu/compare_images_v2.bin",
         #                                           camera_number])
         # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
         #                                           "/home/checkit/camera_checker/main_menu/start.py", camera_number])
-        child_process = Popen(["/home/checkit/env/bin/python",
-                              "/home/checkit/camera_checker/main_menu/start.py", camera_number],
-                              stdout=PIPE, stderr=PIPE)
-        stdout, stderr = child_process.communicate()
-        return_code = child_process.returncode
-        # print('return_code', return_code)
-        # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
-        if return_code == 33:
-            pass
-            context = {"error": "Licensing Error"}
-            return HttpResponse(template.render(context, request))
-        elif return_code == 0:
-            logging.info(f"User {user_name} completed camera check for camera {camera_number}")
-            process_output = "Run Completed - No errors reported"
-            logging.info("Process Output {p}".format(p=process_output))
-            return HttpResponseRedirect(reverse(index))
-        else:
-            logging.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
-            context = {"error": "Error Checking Camera"}
-            return HttpResponse(template.render(context, request))
-    return HttpResponse(template.render(context, request))
+        state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+        number_of_cameras_in_run = 1
+        engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_id = engine_state_record.id
+        process_cameras.delay(camera_id, engine_state_id, user_name)
 
+        # child_process = Popen(["/home/checkit/env/bin/python",
+        #                       "/home/checkit/camera_checker/main_menu/start.py", camera_number],
+        #                       stdout=PIPE, stderr=PIPE)
+        # stdout, stderr = child_process.communicate()
+        # return_code = child_process.returncode
+        # # print('return_code', return_code)
+        # # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
+        # if return_code == 33:
+        #     pass
+        #     context = {"error": "Licensing Error"}
+        #     return HttpResponse(template.render(context, request))
+        # elif return_code == 0:
+        #     logger.info(f"User {user_name} completed camera check for camera {camera_number}")
+        #     process_output = "Run Completed - No errors reported"
+        #     logger.info("Process Output {p}".format(p=process_output))
+        #     return HttpResponseRedirect(reverse(index))
+        # else:
+        #     logger.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+        #     context = {"error": "Error Checking Camera"}
+        #     return HttpResponse(template.render(context, request))
+        context = {"jobid": engine_state_id}
+        return HttpResponse(template.render(context, request))
+    return HttpResponse(template.render(context, request))
 
 @login_required
 def licensing(request):
@@ -815,7 +965,7 @@ def licensing(request):
                             "database": "adm"
                         }
                 except mysql.connector.Error as e:
-                    logging.info(f"Failed all attempts at accessing database {e}")
+                    logger.info(f"Failed all attempts at accessing database {e}")
 
             try:
                 admin_cursor = adm_db.cursor()
@@ -831,7 +981,7 @@ def licensing(request):
                     new_license_key = get_hash("{}{}{}{}".format(uploaded_purchased_transactions, uploaded_end_date,
                                                result[4], uploaded_purchased_cameras))
                     if new_license_key != uploaded_license_key:
-                        logging.info(f"keys dont match  {new_license_key}, {uploaded_license_key}")
+                        logger.info(f"keys dont match  {new_license_key}, {uploaded_license_key}")
                         context['status'] = "ERROR: License keys mismatch"
                         return HttpResponse(template.render(context, request))
                 else:
@@ -855,7 +1005,7 @@ def licensing(request):
                 try:
                     license_record.save()
                 except Exception as e:
-                    logging.info(f"licensing error {e}")
+                    logger.info(f"licensing error {e}")
                 context['status'] = "SUCCESS: License details saved"
                 return HttpResponse(template.render(context, request))
             except:
@@ -919,10 +1069,10 @@ class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = EngineStateFilter
     ordering = 'state_timestamp'
 
-    def get_queryset(self):
-        # You can manipulate the QuerySet here to exclude records based on a condition
-        queryset = super().get_queryset()  # Get the original QuerySet
-        return queryset.exclude(state='STARTED')
+    # def get_queryset(self):
+    #     # You can manipulate the QuerySet here to exclude records based on a condition
+    #     queryset = super().get_queryset()  # Get the original QuerySet
+    #     return queryset.exclude(state='STARTED')
 
 # def engine_state_view(request):
 #
@@ -977,6 +1127,126 @@ def mass_update(request):
 
     return HttpResponse(values)
 
+def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fail):
+    while len(image_list) > 0:
+        left_margin_pos = 20
+        top_margin_text_pos = 23
+        top_margin_image_pos = 67
+        second_image_pos = 85
+        count = 0
+        canvas_page.setFillColor(HexColor("#a2a391"))
+        canvas_page.setStrokeColor(HexColor("#a2a391"))
+
+        canvas_page.rect(0, 0, page_width, page_height, stroke=1, fill=1)
+        # this creates a rectangle the size of the sheet
+        canvas_page.setFillColor(HexColor("#000000"))
+        canvas_page.setStrokeColor(HexColor("#000000"))
+
+        canvas_page.setFont("Helvetica-BoldOblique", 18, )
+        if pass_or_fail == "Failed":
+            canvas_page.drawString(*coord(110, 10, page_height, mm), text="Failed Images Report")
+        else:
+            canvas_page.drawString(*coord(110, 10, page_height, mm), text="Pass Images Report")
+
+        canvas_page.setFont("Helvetica", 10)
+        canvas_page.drawString(*coord(270, 10, page_height, mm), text="Page " + str(canvas_page.getPageNumber()))
+        for i in image_list[:3]:
+            camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image, light_level, current_focus_value, current_light_level, current_matching_threshold, user_name, run_number = i
+
+            canvas_page.drawString(
+                *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                       page_height, mm), text="Camera Name: " + camera_name)
+            canvas_page.drawString(
+                *coord(left_margin_pos + 87, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                       page_height, mm), text="Camera Number: " + str(camera_number))
+            canvas_page.drawString(
+                *coord(left_margin_pos + 137, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                       page_height, mm), text="Run Number: " + str(run_number))
+            canvas_page.drawString(
+                *coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos) - 5,
+                       page_height, mm), text="User: " + str(user_name))
+            canvas_page.drawString(*coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos),
+                                page_height, mm),
+                         text="Capture: " + creation_time.strftime("%d-%b-%Y %H:%M %p"))
+            if matching_score < current_matching_threshold:
+                canvas_page.setFillColor(HexColor("#CC0000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            else:
+                canvas_page.setFillColor(HexColor("#000000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            canvas_page.drawString(*coord(left_margin_pos + 87, top_margin_text_pos + (count * top_margin_image_pos),
+                                page_height, mm),
+                         text="Matching Score: " + str(matching_score) + "/" + str(current_matching_threshold))
+            if focus_value > current_focus_value:
+                canvas_page.setFillColor(HexColor("#CC0000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            else:
+                canvas_page.setFillColor(HexColor("#000000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            canvas_page.drawString(*coord(left_margin_pos + 129, top_margin_text_pos + (count * top_margin_image_pos),
+                                page_height, mm), text="  Focus Value: " + str(int(focus_value))
+                                                       + "/" + str(int(current_focus_value)))
+            if light_level < current_light_level:
+                canvas_page.setFillColor(HexColor("#CC0000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            else:
+                canvas_page.setFillColor(HexColor("#000000"))
+                canvas_page.setStrokeColor(HexColor("#000000"))
+            canvas_page.drawString(*coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos),
+                                page_height, mm), text="Light Level: " + str(int(light_level)) +
+                                                       "/" + str(int(current_light_level)))
+            canvas_page.setFillColor(HexColor("#000000"))
+            canvas_page.setStrokeColor(HexColor("#000000"))
+
+            image_rl = canvas.ImageReader(base_image)
+            image_width, image_height = image_rl.getSize()
+            scaling_factor = (image_width / page_width) * 1.3
+            if image_height > 1920:
+                sf_multiplier = 2.311 / (image_width / image_height)
+                scaling_factor = (image_width / page_width) * sf_multiplier
+            canvas_page.setLineWidth(2)
+            canvas_page.setStrokeColor(HexColor("#b9b6a9"))
+            canvas_page.roundRect(left_margin_pos + 11,
+                        page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 139,
+                        width=773, height=168, radius=4, stroke=1, fill=0)
+            canvas_page.setStrokeColor(HexColor("#767368"))
+            canvas_page.roundRect(left_margin_pos + 10,
+                        page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 140,
+                        width=775, height=170, radius=4, stroke=1, fill=0)
+            canvas_page.drawImage(image_rl,
+                        *coord(left_margin_pos - 2,
+                               top_margin_image_pos + (count * top_margin_image_pos) + 3,
+                               page_height, mm),
+                        width=image_width / (mm * scaling_factor),
+                        height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+            image_rl2 = canvas.ImageReader(log_image)
+            image_width, image_height = image_rl.getSize()
+
+            canvas_page.drawImage(image_rl2,
+                        *coord(left_margin_pos + 2 + second_image_pos,
+                               top_margin_image_pos + (count * top_margin_image_pos) + 3,
+                               page_height, mm), width=image_width / (mm * scaling_factor),
+                        height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+            log_image_cv2 = cv2.imread(log_image)
+            log_image_edges = get_transparent_edge(log_image_cv2, (0, 0, 255))
+            log_image_edges = log_image_edges[:, :, :3]
+            reference_image_cv2 = cv2.imread(base_image)
+            merged_image = cv2.addWeighted(reference_image_cv2, 1, log_image_edges, 1, 0)
+            cv2.imwrite("/tmp/merged_image.jpg", merged_image)
+            image_rl3 = canvas.ImageReader("/tmp/merged_image.jpg")
+
+            canvas_page.drawImage(image_rl3,
+                        *coord(left_margin_pos + 2 + (2 * second_image_pos) + 5,
+                               top_margin_image_pos + (count * top_margin_image_pos) + 3,
+                               page_height, mm), width=image_width / (mm * scaling_factor),
+                        height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
+
+            count += 1
+        canvas_page.showPage()
+        del image_list[:3]
+    return canvas_page
+
+
 def export_logs_to_csv(request):
     selection = request.POST.getlist("selection")
     selection.sort()
@@ -1016,17 +1286,18 @@ def export_logs_to_csv(request):
             writer = csv.writer(response)
             writer.writerow(["camera_name", "camera_number", "camera_location",
                              "pass_fail", "matching_score", "focus_value", "light_level", "creation_date",
-                             "current_focus_value", "current_light_level"])
+                             "current_focus_value", "current_light_level", "user", "run_number"])
             # print(logs)
             for log in logs:
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
                                  log.action, log.matching_score, log.focus_value,log.light_level,
-                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S"),log.current_focus_value,log.current_light_level])
+                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S"),
+                                 log.current_focus_value,log.current_light_level, log.user, log.run_number])
 
             return response
 
-        elif request.POST.get('action') == "Export PDF":
-            image_list = []
+        elif request.POST.get('action') == "Export Failed PDF":
+            image_list_for_failed = []
             log = []
             base_image = ""
             for log in logs:
@@ -1036,14 +1307,13 @@ def export_logs_to_csv(request):
                     hour = str(log.creation_date.hour).zfill(2)
                     log_image = settings.MEDIA_ROOT + "/" + str(log.image)
                     if not os.path.exists(log_image):
-                        logging.error(f"missing logfile {log_image}")
+                        logger.error(f"missing logfile {log_image}")
                         continue
                     camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
-                    for c in camera:
-                        base_image = settings.MEDIA_ROOT + "/base_images/" + str(c.id) + "/" + hour + ".jpg"
+                    base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
                     if not os.path.exists(base_image):
-                        logging.error(f"missing baseimage for logs {base_image}")
+                        logger.error(f"missing baseimage for logs {base_image}")
                         continue
                     matching_score = log.matching_score
                     current_matching_threshold = log.current_matching_threshold
@@ -1051,143 +1321,102 @@ def export_logs_to_csv(request):
                     light_level = log.light_level
                     current_focus_value = log.current_focus_value
                     current_light_level = log.current_light_level
+                    user_name = log.user
+                    run_number = log.run_number
 
-                    image_list.append((camera_name, camera_number, log.creation_date, base_image, matching_score,
-                                       focus_value, log_image, light_level, current_focus_value, current_light_level, current_matching_threshold))
-            buffer = io.BytesIO()
-            c = canvas.Canvas(buffer, pagesize=landscape(A4))
+                    image_list_for_failed.append((camera_name, camera_number, log.creation_date, base_image,
+                                                  matching_score, focus_value, log_image, light_level,
+                                                  current_focus_value, current_light_level,
+                                                  current_matching_threshold, user_name, run_number))
+
+            buffer_for_failed = io.BytesIO()
+            canvas_for_failed = canvas.Canvas(buffer_for_failed, pagesize=landscape(A4))
 
             page_width, page_height = landscape(A4)
-            if image_list:
-                while len(image_list) > 0:
-                    left_margin_pos = 20
-                    top_margin_text_pos = 23
-                    top_margin_image_pos = 67
-                    second_image_pos = 85
-                    count = 0
-                    c.setFillColor(HexColor("#a2a391"))
-                    c.setStrokeColor(HexColor("#a2a391"))
-
-                    c.rect(0, 0, page_width, page_height, stroke=1, fill=1)
-                    # this creates a rectangle the size of the sheet
-                    c.setFillColor(HexColor("#000000"))
-                    c.setStrokeColor(HexColor("#000000"))
-
-                    c.setFont("Helvetica-BoldOblique", 18, )
-                    c.drawString(*coord(110, 10, page_height, mm), text="Failed Images Report")
-
-                    c.setFont("Helvetica", 10)
-                    c.drawString(*coord(270, 10, page_height, mm), text="Page " + str(c.getPageNumber()))
-                    for i in image_list[:3]:
-                        camera_name, camera_number, creation_time, base_image, matching_score, focus_value, log_image, light_level, current_focus_value, current_light_level, current_matching_threshold = i
-
-                        c.drawString(
-                            *coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos) - 5,
-                                   page_height, mm), text="Camera Name: " + camera_name)
-                        c.drawString(
-                            *coord(left_margin_pos + 88, top_margin_text_pos + (count * top_margin_image_pos) - 5,
-                                   page_height, mm), text="Camera Number: " + str(camera_number))
-                        c.drawString(*coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm),
-                                     text="Capture: " + creation_time.strftime("%d-%b-%Y %H:%M %p"))
-                        if matching_score < current_matching_threshold:
-                            c.setFillColor(HexColor("#CC0000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        else:
-                            c.setFillColor(HexColor("#000000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        c.drawString(*coord(left_margin_pos + 87, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm), text="Matching Score: " + str(matching_score) + "/" + str(current_matching_threshold))
-                        if focus_value < current_focus_value:
-                            c.setFillColor(HexColor("#CC0000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        else:
-                            c.setFillColor(HexColor("#000000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        c.drawString(*coord(left_margin_pos + 129, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm), text="  Focus Value: " + str(int(focus_value))
-                                                                   + "/" + str(int(current_focus_value)))
-                        if light_level < current_light_level:
-                            c.setFillColor(HexColor("#CC0000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        else:
-                            c.setFillColor(HexColor("#000000"))
-                            c.setStrokeColor(HexColor("#000000"))
-                        c.drawString(*coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos),
-                                            page_height, mm), text="Light Level: " + str(int(light_level)) +
-                                                                   "/" + str(int(current_light_level)))
-                        c.setFillColor(HexColor("#000000"))
-                        c.setStrokeColor(HexColor("#000000"))
-
-                        image_rl = canvas.ImageReader(base_image)
-                        image_width, image_height = image_rl.getSize()
-                        scaling_factor = (image_width / page_width) * 1.3
-                        if image_height > 1920:
-                            sf_multiplier = 2.311/(image_width/image_height)
-                            scaling_factor = (image_width / page_width) * sf_multiplier
-                        c.setLineWidth(2)
-                        c.setStrokeColor(HexColor("#b9b6a9"))
-                        c.roundRect(left_margin_pos + 11,
-                                    page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 139,
-                                    width=773, height=168, radius=4, stroke=1, fill=0)
-                        c.setStrokeColor(HexColor("#767368"))
-                        c.roundRect(left_margin_pos + 10,
-                                    page_height - (top_margin_image_pos + (count * top_margin_image_pos * mm)) - 140,
-                                    width=775, height=170, radius=4, stroke=1, fill=0)
-                        c.drawImage(image_rl,
-                                    *coord(left_margin_pos - 2,
-                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
-                                           page_height, mm),
-                                    width=image_width / (mm * scaling_factor),
-                                    height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
-                        image_rl2 = canvas.ImageReader(log_image)
-                        image_width, image_height = image_rl.getSize()
-
-                        c.drawImage(image_rl2,
-                                    *coord(left_margin_pos + 2 + second_image_pos,
-                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
-                                           page_height, mm), width=image_width / (mm * scaling_factor),
-                                    height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
-                        log_image_cv2 = cv2.imread(log_image)
-                        log_image_edges = get_transparent_edge(log_image_cv2, (0, 0, 255))
-                        log_image_edges = log_image_edges[:, :, :3]
-                        reference_image_cv2 = cv2.imread(base_image)
-                        merged_image = cv2.addWeighted(reference_image_cv2, 1, log_image_edges, 1, 0)
-                        cv2.imwrite("/tmp/merged_image.jpg", merged_image)
-                        image_rl3 = canvas.ImageReader("/tmp/merged_image.jpg")
-
-                        c.drawImage(image_rl3,
-                                    *coord(left_margin_pos + 2 + (2 * second_image_pos) + 5,
-                                           top_margin_image_pos + (count * top_margin_image_pos) + 3,
-                                           page_height, mm), width=image_width / (mm * scaling_factor),
-                                    height=image_height / (mm * scaling_factor), preserveAspectRatio=True, mask=None)
-
-                        count += 1
-                    c.showPage()
-                    del image_list[:3]
-                c.save()
-                buffer.seek(0)
-
-                return FileResponse(buffer, as_attachment=True, filename='results.pdf')
+            if image_list_for_failed:
+                canvas_for_failed = write_pdf_pages(image_list_for_failed, page_width,
+                                                    page_height, canvas_for_failed, "Failed")
+                canvas_for_failed.save()
+                buffer_for_failed.seek(0)
+                return FileResponse(buffer_for_failed, as_attachment=True, filename='failed_results.pdf')
             else:
-                c.setFillColor(HexColor("#a2a391"))
-                c.setStrokeColor(HexColor("#a2a391"))
-                path = c.beginPath()
+                canvas_for_failed.setFillColor(HexColor("#a2a391"))
+                canvas_for_failed.setStrokeColor(HexColor("#a2a391"))
+                path = canvas_for_failed.beginPath()
                 path.moveTo(0 * cm, 0 * cm)
                 path.lineTo(0 * cm, 30 * cm)
                 path.lineTo(25 * cm, 30 * cm)
                 path.lineTo(25 * cm, 0 * cm)
                 # this creates a rectangle the size of the sheet
-                c.drawPath(path, True, True)
-                c.setFillColor(HexColor("#000000"))
-                c.setStrokeColor(HexColor("#000000"))
-                c.setFont("Helvetica-BoldOblique", 18, )
-                c.drawString(*coord(25, 10, page_height, mm),
+                canvas_for_failed.drawPath(path, True, True)
+                canvas_for_failed.setFillColor(HexColor("#000000"))
+                canvas_for_failed.setStrokeColor(HexColor("#000000"))
+                canvas_for_failed.setFont("Helvetica-BoldOblique", 18, )
+                canvas_for_failed.drawString(*coord(25, 10, page_height, mm),
                              text="There are no failed images for the selected records")
-                c.showPage()
-                c.save()
-                buffer.seek(0)
-                return FileResponse(buffer, as_attachment=True, filename='results.pdf')
+                canvas_for_failed.showPage()
+                canvas_for_failed.save()
+                buffer_for_failed.seek(0)
+                return FileResponse(buffer_for_failed, as_attachment=True, filename='failed_results.pdf')
+        elif request.POST.get('action') == "Export Pass PDF":
+            buffer_for_pass = io.BytesIO()
+            canvas_for_pass = canvas.Canvas(buffer_for_pass, pagesize=landscape(A4))
+            page_width, page_height = landscape(A4)
+            image_list_for_pass = []
+
+            for log in logs:
+                if log.action == "Pass":
+                    camera_name = log.url.camera_name
+                    camera_number = log.url.camera_number
+                    hour = str(log.creation_date.hour).zfill(2)
+                    log_image = settings.MEDIA_ROOT + "/" + str(log.image)
+                    if not os.path.exists(log_image):
+                        logger.error(f"missing logfile {log_image}")
+                        continue
+                    camera = Camera.objects.filter(id=log.url_id)
+                    # print(camera)
+                    base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
+                    if not os.path.exists(base_image):
+                        logger.error(f"missing baseimage for logs {base_image}")
+                        continue
+                    matching_score = log.matching_score
+                    current_matching_threshold = log.current_matching_threshold
+                    focus_value = log.focus_value
+                    light_level = log.light_level
+                    current_focus_value = log.current_focus_value
+                    current_light_level = log.current_light_level
+                    user_name = log.user
+                    run_number = log.run_number
+
+                    image_list_for_pass.append((camera_name, camera_number, log.creation_date, base_image,
+                                                matching_score, focus_value, log_image, light_level,
+                                                current_focus_value, current_light_level,
+                                                current_matching_threshold, user_name, run_number))
+            if image_list_for_pass:
+                canvas_for_pass = write_pdf_pages(image_list_for_pass, page_width,
+                                                  page_height, canvas_for_pass, "Pass")
+                canvas_for_pass.save()
+                buffer_for_pass.seek(0)
+                return FileResponse(buffer_for_pass, as_attachment=True, filename='pass_results.pdf')
+            else:
+                canvas_for_pass.setFillColor(HexColor("#a2a391"))
+                canvas_for_pass.setStrokeColor(HexColor("#a2a391"))
+                path = canvas_for_pass.beginPath()
+                path.moveTo(0 * cm, 0 * cm)
+                path.lineTo(0 * cm, 30 * cm)
+                path.lineTo(25 * cm, 30 * cm)
+                path.lineTo(25 * cm, 0 * cm)
+                # this creates a rectangle the size of the sheet
+                canvas_for_pass.drawPath(path, True, True)
+                canvas_for_pass.setFillColor(HexColor("#000000"))
+                canvas_for_pass.setStrokeColor(HexColor("#000000"))
+                canvas_for_pass.setFont("Helvetica-BoldOblique", 18, )
+                canvas_for_pass.drawString(*coord(25, 10, page_height, mm),
+                             text="There are no pass images for the selected records")
+                canvas_for_pass.showPage()
+                canvas_for_pass.save()
+                buffer_for_pass.seek(0)
+                return FileResponse(buffer_for_pass, as_attachment=True, filename='pass_results.pdf')
 
     else:
         return HttpResponseRedirect("/state/")
@@ -1196,7 +1425,7 @@ def export_logs_to_csv(request):
 @permission_required('camera_checker.main_menu')
 def input_camera_for_regions(request):
     user_name = request.user.username
-    logging.info("User {u} access to Regions".format(u=user_name))
+    logger.info("User {u} access to Regions".format(u=user_name))
 
     if request.method == 'POST':
 
@@ -1322,15 +1551,15 @@ def display_regions(request):
         message = ""
         return render(request, 'main_menu/regions.html', {'message': message})
 
-def count_current_records_processed(request):
-    engine_object = EngineState.objects.filter(state="STARTED").last()
-    start_time = engine_object.state_timestamp
-    camera_count = Camera.objects.count()
-    logs = LogImage.objects.filter(creation_date__gte=start_time).count()
-    print(camera_count, type(camera_count))
-    print(logs, type(logs))
-    progress = int(( logs / camera_count ) * 100)
-    data = {'progress': progress, 'start_time': start_time, 'camera_count': camera_count}
+def get_engine_status(request):
+    app = celery.Celery('camera_checker', broker='redis://localhost:6379')
+    status = app.control.inspect().active()
+    running = False
+    if status:
+        for value in status.values():
+            if value != []:
+                running = True
+    data = {'progress': running}
     response = JsonResponse(data)
     return response
 
@@ -1362,3 +1591,40 @@ def action_per_hour_report(request):
     )
     table = LogSummaryTable(results)
     return render(request, 'main_menu/log_summary.html', {'table': table})
+
+
+@shared_task()
+def clear_logs():
+    last_log_date = datetime.datetime.now() - datetime.timedelta(days=30)
+    logs = LogImage.objects.filter(creation_date__lte=last_log_date)
+    # print(len(logs))
+    logs.delete()
+    logging.info("ran clear logs")
+
+@shared_task()
+def check_all_cameras():
+    user_name = "system_scheduler"
+    camera_objects = Camera.objects.all()
+    camera_ids = [item.id for item in camera_objects]
+    number_of_cameras_in_run = len(camera_ids)
+    x = number_of_cpus
+    num_sublists = (len(camera_ids) + x - 1) // x
+    sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+    number_of_cameras_in_run = len(camera_ids)
+    state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+    engine_process_id = 0
+    transaction_rate = 0
+    # create STARTED record first then create FINISHED and pass that record id to celery to have the
+    # workers update the timestamp and counts as the complete check
+    engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+                                      number_of_cameras_in_run=number_of_cameras_in_run)
+    engine_state_record.save()
+    engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+                                      number_of_cameras_in_run=number_of_cameras_in_run)
+    engine_state_record.save()
+    engine_state_id = engine_state_record.id
+    for group_of_cameras in sublists:
+        # print("processing list", group_of_cameras )
+        # long_task.delay(group_of_cameras)
+        status = process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+        # print("status", status)

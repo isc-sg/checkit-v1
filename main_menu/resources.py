@@ -16,10 +16,12 @@ class CameraResource(resources.ModelResource):
         exclude = ('id',)
         fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
                   'camera_password', 'camera_number', 'camera_name',
-                  'camera_location', 'image_regions', 'matching_threshold',)
+                  'camera_location', 'image_regions', 'matching_threshold',
+                  'focus_value_threshold', 'light_level_threshold')
         import_id_fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
                             'camera_password', 'camera_number', 'camera_name',
-                            'camera_location', 'image_regions', 'matching_threshold')
+                            'camera_location', 'image_regions', 'matching_threshold',
+                            'focus_value_threshold', 'light_level_threshold')
         report_skipped = True
         raise_errors = True
 
