@@ -187,17 +187,17 @@ def get_fd_drive(dris):
 	return dris[416+python64:n].decode("utf-8")
 
 def get_swkey_type(dris):
-    return get4bytes(dris, 544+python64)
+	return get4bytes(dris, 544+python64)
 
 def get_swkey_exp_day(dris):
-    return get4bytes(dris, 548+python64)
+	return get4bytes(dris, 548+python64)
 
 def get_swkey_exp_month(dris):
-    return get4bytes(dris, 552+python64)
+	return get4bytes(dris, 552+python64)
 
 def get_swkey_exp_year(dris):
-    return get4bytes(dris, 556+python64)
-	
+	return get4bytes(dris, 556+python64)
+
 # you may also want to retrieve var_a values that you already entered into the dris!
 def get_var_a(dris):
 	return get4bytes_signed(dris, 300+python64)
