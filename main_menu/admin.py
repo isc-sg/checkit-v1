@@ -127,7 +127,22 @@ class ReferenceAdmin(SimpleHistoryAdmin):
         return obj.url.camera_location
     get_location.short_description = "Location"
 
-
+    # def delete_model(self, request, obj):
+    #     logs = LogImage.objects.filter(reference_image_id=obj.id)
+    #     try:
+    #         logs.delete()
+    #     except:
+    #         pass
+    #     obj.delete()
+    #
+    # def delete_queryset(self, request, queryset):
+    #     for ref in queryset:
+    #         logs = LogImage.objects.filter(reference_image_id=ref.id)
+    #         try:
+    #             logs.delete()
+    #         except:
+    #             pass
+    #     queryset.delete()
 
 class LogImageAdmin(SimpleHistoryAdmin):
     resource_class = LogImage
