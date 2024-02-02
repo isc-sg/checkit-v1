@@ -93,6 +93,7 @@ class Camera(models.Model):
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     scheduled_hours = models.ManyToManyField(HoursInDay, blank=True)
     scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True)
+    snooze = models.BooleanField(default=False,help_text="Set to true to pause checks for this camera")
     history = HistoricalRecords()
 
     def __str__(self):
@@ -109,11 +110,11 @@ class Camera(models.Model):
 class ReferenceImage(models.Model):
     def get_image_filename(instance, filename):
         h = now().strftime('%H')
-        print("url is", instance.url)
+        # print("url is", instance.url)
         return f'base_images/{instance.url}/{h}-{filename}'
 
     def get_hour(self):
-        print("reference hour is", now().strftime('%H'))
+        # print("reference hour is", now().strftime('%H'))
         return now().strftime('%H')
 
     url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
@@ -151,7 +152,7 @@ class LogImage(models.Model):
     creation_date = models.DateTimeField('date created', default=timezone.now)
     user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)
     run_number = models.PositiveIntegerField(null=False, blank=False, default=0)
-    reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.DO_NOTHING,
+    reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.CASCADE,
                                         verbose_name="Reference Image", null=True, blank=True)
 
     history = HistoricalRecords()
