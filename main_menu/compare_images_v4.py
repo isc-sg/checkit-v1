@@ -195,7 +195,7 @@ def check_adm_database(password):
         admin_cursor = adm_db.cursor()
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
         admin_cursor.execute(sql_statement)
-        result = admin_cursor.fetchone()
+        result = admin_cursor.fetchall()[-1]
         if not result:
             logging.error("License not setup")
             exit(33)
@@ -233,7 +233,7 @@ def sync_adm_and_main_databases(checkit_db, transaction_count, transaction_limit
         checkit_cursor = checkit_db.cursor()
         sql = "SELECT * FROM main_menu_licensing"
         checkit_cursor.execute(sql)
-        result = checkit_cursor.fetchone()
+        result = checkit_cursor.fetchall()[-1]
         if result:
             # sql = "UPDATE main_menu_licensing SET transaction_count =  " + str(transaction_count) + ", " + \
             #       "transaction_limit = " + str(transaction_limit) + " , " + \
