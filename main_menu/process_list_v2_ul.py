@@ -29,7 +29,11 @@ from bisect import bisect_left
 import hashlib
 import itertools
 import socket
-import get_sdp
+import ipaddress
+import base64
+from termcolor import colored
+import re
+import multiprocessing as mp
 
 # open_file_name = '/tmp/' + str(uuid.uuid4().hex)
 # close_file_name = '/tmp/' + str(uuid.uuid4().hex)
@@ -42,6 +46,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lin
 
 config = configparser.ConfigParser()
 config.read('/home/checkit/camera_checker/main_menu/config/config.cfg')
+
+socket_timeout = 1
+message_queue = mp.Queue()
+
 
 try:
     if config.has_option('DEFAULT', 'log_alarms'):
@@ -73,6 +81,118 @@ except configparser.NoOptionError:
 
 
 cpus = cpu_count()
+
+
+def add_auth(username, password):
+    if username:
+        # Combine username and password into a single string
+        credentials = f"{username}:{password}"
+        # Encode credentials in Base64
+        encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+        # Add the Authorization header
+        return f"Authorization: Basic {encoded_credentials}\r\n"
+    else:
+        return ""
+
+
+def extract_ip_from_rtsp_url(rtsp_url):
+    # Define a regular expression pattern to match IP addresses
+    ip_pattern = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+
+    # Define a regular expression pattern to match the RTSP protocol part
+    protocol_pattern = r'rtsp://'
+
+    # Define a regular expression pattern to match the username:password part
+    auth_pattern = r'(?:\S+:\S+@)?'
+    # auth_pattern = r'(?:[^@]*@)?'
+
+    # Define a regular expression pattern to match the port number part
+    port_pattern = r'(?::\d+)?'
+
+    # Combine the patterns to create a full regular expression
+    rtsp_pattern = f'{protocol_pattern}{auth_pattern}({ip_pattern}){port_pattern}(/.*)?'
+
+    # Use re.search to find the IP address in the URL
+    match = re.search(rtsp_pattern, rtsp_url)
+
+    if match:
+        ip_address = match.group(1)
+        return ip_address
+    else:
+        return None
+
+
+def check_uri(uri):
+    camera_ip_address = extract_ip_from_rtsp_url(uri)
+
+    try:
+        ipaddress.ip_address(camera_ip_address)
+    except ValueError:
+        # print((colored("Invalid IP address" + str(uri), 'red', attrs=['reverse', 'blink'])))
+        logging.error(f"Invalid IP address {uri}")
+        # print needs to be changed to logging
+        return "Error"
+    return camera_ip_address
+
+def options(uri, username=None, password=None):
+    error_flag = False
+    camera_ip_address = check_uri(uri)
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(socket_timeout)
+        s.connect((camera_ip_address, 554))
+        request = f"OPTIONS {uri} RTSP/1.0\r\nCSeq: 0\r\n"
+        request += add_auth(username=username, password=password)
+        request += "\r\n"
+        s.sendall(request.encode())
+        data = s.recv(1024).decode()
+        response = data.split("\r\n")
+        if response[0] != "RTSP/1.0 200 OK":
+            error_flag = True
+        s.close()
+    except socket.timeout:
+        # print((colored("Error connecting to device " + str(uri), 'red', attrs=['reverse', 'blink'])))
+        logging.error(f"Timed out connecting to device {uri}")
+        response = f"Timed out connecting to device {uri}"
+        error_flag = True
+    except socket.error as error:
+        # print((colored("Error connecting to device " + str(uri), 'red', attrs=['reverse', 'blink'])))
+        logging.error(f"Error connecting to device {uri}")
+        response = f"Error connecting to device {error}"
+        error_flag = True
+
+    return response, error_flag
+
+def describe(uri, username=None, password=None):
+    error_flag = False
+    camera_ip_address = check_uri(uri)
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(socket_timeout)
+        s.connect((camera_ip_address, 554))
+        request = f"DESCRIBE {uri} RTSP/1.0\r\nCSeq: 0\r\n"
+        request += add_auth(username=username, password=password)
+        request += "\r\n"
+        s.sendall(request.encode())
+        data = s.recv(1024).decode()
+        response = data.split("\r\n")
+        s.close()
+        if response[0] != "RTSP/1.0 200 OK":
+            error_flag = True
+    except socket.timeout:
+        # print((colored("Error connecting to device " + str(uri), 'red', attrs=['reverse', 'blink'])))
+        logging.error(f"Timed out connecting to device {uri}")
+        response = f"Timed out connecting to device {uri}"
+        error_flag = True
+    except socket.error as error:
+        # print((colored("Error connecting to device " + str(uri), 'red', attrs=['reverse', 'blink'])))
+        logging.error(f"Error connecting to device {uri}")
+        response = f"Error connecting to device {uri} - {error}"
+        error_flag = True
+
+    return response, error_flag
 
 
 def take_closest(my_list, my_number):
@@ -160,18 +280,6 @@ def send_alarms(list_of_cameras):
         camera_name = camera_details[4]
         camera_location = camera_details[6]
         image = "http://" + CHECKIT_HOST + "/media/" + log_image
-        # log_image = cv2.imread("/home/checkit/camera_checker/media/" + log_image)
-        # base_image = cv2.imread("/home/checkit/camera_checker/media/" + "base_images/" \
-        #              + str(url_id) + "/" + log_image.split("-")[1].split(":")[0].zfill(2) + ".jpg")
-        # log_transparent_edges = get_transparent_edge(log_image, [0, 0, 255])
-        # log_transparent_edges = log_transparent_edges[:, :, :3]
-        # merged_image = cv2.addWeighted(log_transparent_edges, 1, base_image, 1, 0)
-        # cv2.imwrite("/tmp/.tmp_image.jpg", merged_image)
-
-        # cv2.imshow("log", image)
-        # cv2.waitKey(0)
-        # print(url_id, camera_number, camera_name, camera_url, camera_location,
-        #       creation_date, action, log_image, matching_score, focus_value, light_level)
         message = "Error detected on camera " + camera_url \
                   + "|with matching score result " + str(matching_score) \
                   + "|at location " + camera_location
@@ -202,6 +310,9 @@ def init_pools():
     global camera_id_index
     global camera_url_index
     global camera_multicast_address_index
+    global camera_multicast_port_index
+    global camera_username_index
+    global camera_password_index
     global camera_number_index
     global camera_name_index
     global image_regions_index
@@ -221,7 +332,7 @@ def init_pools():
             "database": "checkit"
         }
         pool_for_checkit = MySQLConnectionPool(pool_name="pool_for_checkit",
-                                               pool_size=10,
+                                               pool_size=1,
                                                **db_config_checkit)
         connection = pool_for_checkit.get_connection()
         checkit_cursor = connection.cursor()
@@ -231,6 +342,9 @@ def init_pools():
         camera_id_index = field_names.index('id')
         camera_url_index = field_names.index('url')
         camera_multicast_address_index = field_names.index('multicast_address')
+        camera_multicast_port_index = field_names.index("multicast_port")
+        camera_username_index = field_names.index('camera_username')
+        camera_password_index = field_names.index('camera_password')
         camera_number_index = field_names.index('camera_number')
         camera_name_index = field_names.index('camera_name')
         image_regions_index = field_names.index('image_regions')
@@ -255,7 +369,7 @@ def init_pools():
             exit(0)
 
     try:
-        password = "0A21738C65FF283B4248D455633A9E98"
+        password = "7F8129340F252052FE8B81A60466763B"
         adm_db_config = {
             "host": "localhost",
             "user": "root",
@@ -388,132 +502,152 @@ def close_pool():
 #
 # def un_join_multicast():
 #     subprocess.call(['sudo', close_file_name])
-#     logging.info(f"executing {close_file_name}")
 #     subprocess.call(['rm', close_file_name, open_file_name])
 
 
-def open_capture_device(record):
+def open_capture_device(url, multicast_address, multicast_port, describe_data):
 
-    if record[camera_multicast_address_index]:
-        describe_uri = "DESCRIBE " + record[camera_url_index] + " RTSP/1.0\r\nCSeq: 2\r\n\r\n\r\n"
-        camera_ip_address = describe_uri.split(" ")[1][7:].split("/")[0]
-        rtsp_data = get_sdp.get_sdp(describe_uri)
-        sdp_file_name = "/tmp/" + str(uuid.uuid4()) + ".sdp"
+    if multicast_address:
 
-        if rtsp_data == "Error":
-            logging.error(f"Error reading rtsp from camera {record[camera_url_index]}")
+        ip_address = extract_ip_from_rtsp_url(url)
+        if not ip_address:
+            logging.error(f"Error in URL for camera url {url}")
+            return "Error"
+
+        describe_data = [item for item in describe_data if len(item) >= 2 and item[1] == "="]
+
+        port = None
+        inside_video_section = False
+        video_a_parameters = {}
+        video_c_parameter = None
+        control = None
+
+        for index, line in enumerate(describe_data):
+
+            # Check for the start of the video section (m=video)
+            if line.startswith("a="):
+                key = line[2:].split(":")
+                # need to cater for cases where multiple ":" exist eg a=control:rtsp://1.1.1.1:554/h264
+                if key[0] == "control":
+                    # join the remainder of the values in key to be value
+                    value = ":".join(key[1:])
+                    if url in value:
+                        control = value.split(url)[1][1:]
+                    else:
+                        control = value
+            if line.startswith("m=video"):
+                inside_video_section = True
+                port = line.split()[1]
+                if multicast_address and multicast_port:
+                    if port == "0":
+                        fixed_entry = line.replace("m=video 0", f"m=video {multicast_port}")
+                        describe_data[index] = fixed_entry
+                # print("Port number", port)
+                continue
+
+            if line.startswith("m=") and inside_video_section:
+                inside_video_section = False
+                break
+            if inside_video_section and line.startswith("c="):
+                video_c_parameter = line[2:]
+                if multicast_address:
+                    if video_c_parameter.split(" ")[-1] == "0.0.0.0":
+                        fixed_entry = line.replace("0.0.0.0", multicast_address)
+                        describe_data[index] = fixed_entry
+                        video_c_parameter = fixed_entry[2:]
+
+            if inside_video_section and line.startswith("a="):
+                # video_a_parameters.append(line[2:])
+                try:
+                    key, value = line[2:].split(":")
+                    video_a_parameters[key] = value
+
+                    if key == "control":
+                        if url in value:
+                            control = value.split(url)[2]
+                        else:
+                            control = value
+
+                except ValueError:
+                    video_a_parameters[line[2:]] = True
+
+        with open(f"/tmp/{ip_address}.sdp", "w") as fd:
+
+            for line in describe_data:
+                fd.write(line + "\n")
+        fd.close()
+
+        with pipes() as (out, err):
+            subprocess.call(['sudo', 'ip', 'addr', 'add',
+                             multicast_address + '/32', 'dev', network_interface, 'autojoin'])
+        error_output = err.read()
+        if "File exists" not in error_output:
+            if error_output:
+                logging.error(f"Unable to join multicast group - {error_output}")
+                try:
+                    os.remove(f"/tmp/{ip_address}.sdp")
+                except OSError:
+                    pass
+                return "Error"
+        cap = None
+        try:
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'protocol_whitelist;file,rtp,udp'
+            cap = cv2.VideoCapture(f"/tmp/{ip_address}.sdp", cv2.CAP_FFMPEG)
+        except cv2.error:
+            logging.error(f"Unable to open session description file for {url}")
             try:
-                os.remove(sdp_file_name)
+                os.remove(f"/tmp/{ip_address}.sdp")
             except OSError:
                 pass
 
-        else:
-            with open(sdp_file_name, "w") as fd:
-                for line in rtsp_data:
-                    fd.write(line)
-                    fd.write("\n")
-                    # logging.info(f"wrote line {line} to {sdp_file_name}")
-            fd.close()
-            # if os.path.isfile(sdp_file_name):
-            #     with open(sdp_file_name, "r") as fd:
-            #         contents = fd.read()
-            #         # logging.info(f"contents {contents}")
-            # # logging.info(f"sdp file data {sdp_file_name}")
-        with pipes() as (out, err):
-            subprocess.call(['sudo', 'ip', 'addr', 'add',
-                             record[camera_multicast_address_index] + '/32', 'dev', network_interface, 'autojoin'])
-        error_output = err.read()
-        # not sure I need these next 2 lines.
-        # with pipes() as (out, err):
-        #     subprocess.call(['sudo', 'ip', 'a'])
-        if error_output:
-            logging.error(f"Unable to join multicast group - {error_output}")
-
-
-        # try all 3 methods for rtsp_transport - this means users don't need to define the transport method
-        # try:
-        #     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp_multicast'
-        #     cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
-        # except cv2.error as err:
-        #     logging.error(f"Error opening camera {record[camera_url_index]} ")
         try:
-            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'protocol_whitelist;file,rtp,udp'
-            # cap = cv2.VideoCapture("rtsp://192.168.100.29/axis-media/media.amp", cv2.CAP_FFMPEG)
-            cap = cv2.VideoCapture(sdp_file_name, cv2.CAP_FFMPEG)
-
-        except cv2.error:
-            logging.error(f"Unable to open stream for {record[camera_url_index]}")
-
-        # try:
-        #     os.remove(sdp_file_name)
-        # except OSError:
-        #     pass
+            os.remove(f"/tmp/{ip_address}.sdp")
+        except OSError:
+            pass
 
         if not cap.isOpened():
             try:
                 os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
-                cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+                cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             except cv2.error as err:
-                logging.error(f"Error opening camera {record[camera_url_index]} ")
+                logging.error(f"Error opening camera {url} - {err}")
 
         if not cap.isOpened():
             try:
                 os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-                cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+                cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             except cv2.error as err:
-                logging.error(f"Error opening camera {record[camera_url_index]} ")
+                logging.error(f"Error opening camera {url} - {err}")
+                return "Error"
     else:
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-        cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
+        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            return "Error"
+
     return cap
-    # describe_uri = "DESCRIBE " + record[camera_url_index] + " RTSP/1.0\r\nCSeq: 2\r\n\r\n\r\n"
-    # camera_ip_address = describe_uri.split(" ")[1][7:].split("/")[0]
-    # rtsp_data = get_sdp.get_sdp(describe_uri)
-    # sdp_file_name = "/tmp/" + str(uuid.uuid4()) + ".sdp"
-    # if record[camera_multicast_address_index]:
-    #     if rtsp_data == "Error":
-    #         logging.error(f"Error reading rtsp from camera {record[camera_url_index]}")
-    #         if os.path.isfile(file_name):
-    #             os.remove(file_name)
-    #             return
-    #         # may need to check return logic if error
-    #     else:
-    #         with open(file_name, "w") as fd:
-    #             for line in rtsp_data:
-    #                 fd.write(line)
-    #                 fd.write("\n")
-    #         fd.close()
-    # else:
-    #     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-    #     cap = cv2.VideoCapture(record[camera_url_index], cv2.CAP_FFMPEG)
-    # return cap
+
+def display_queue():
+    message = None
+    while message != "End":
+        message = message_queue.get()
+        if message != "End":
+            logging.info(message)
 
 
-def close_capture_device(record, cap):
+def close_capture_device(cap, multicast_address):
     cap.release()
 
-    if record[camera_multicast_address_index]:
+    if multicast_address:
         with pipes() as (out, err):
             subprocess.call(['sudo', 'ip', 'addr', 'del',
-                             record[camera_multicast_address_index] + '/32', 'dev', network_interface])
+                             multicast_address + '/32', 'dev', network_interface])
         error_output = err.read()
         if error_output:
             logging.error(f"Unable to leave multicast group - {error_output}")
-    # print("start of release")
-    # cap.release()
-    # print("end of release")
-
-def look_for_objects(image):
-    url = "http://localhost:8000/api/v1/detection"
-    payload = {"model": "yolov4", }
-    files = [
-        ('image', ('1561-7_26_4.jpg', open('/Users/sam/Downloads/1561-7_26_4.jpg', 'rb'), 'image/jpeg'))
-    ]
-    headers = {}
-    response = requests.request("POST", url, headers=headers, data=payload, files=files)
-    objects = ""
-    # rtsp://192.168.1.166:7001/e3e9a385-7fe0-3ba5-5482-a86cde7faf48?stream=0
-    return objects
 
 
 def compare_images(base, frame, r, base_color, frame_color):
@@ -572,14 +706,14 @@ def compare_images(base, frame, r, base_color, frame_color):
     blur = cv2.blur(frame, (5, 5))
     frame_brightness = cv2.mean(blur)[0]
     blur = cv2.blur(base, (5, 5))
-    base_brightness = cv2.mean(blur)[0]
+    # base_brightness = cv2.mean(blur)[0]
 
-    if is_low_contrast(frame, 0.25) or frame_brightness < 50:
-        logging.info("Log image is of poor quality")
-        full_ss = 0
-    if is_low_contrast(base, 0.25) or base_brightness < 50:
-        logging.info("Base image is of poor quality - please review reference images")
-        full_ss = 0
+    # if is_low_contrast(frame, 0.25) or frame_brightness < 50:
+    #     logging.info("Log image is of poor quality")
+    #     full_ss = 0
+    # if is_low_contrast(base, 0.25) or base_brightness < 50:
+    #     logging.info("Base image is of poor quality - please review reference images")
+    #     full_ss = 0
 
     logging.debug(f"Match Score for full image is {full_ss}")
     logging.debug(f"Match Score for regions is {scores_average}")
@@ -589,13 +723,16 @@ def compare_images(base, frame, r, base_color, frame_color):
     return full_ss, fv, region_scores, frame_brightness
 
 
-def no_base_image(record):
+def no_base_image(record, describe_data):
     # connection = connection_pool.get_connection()
     # checkit_cursor = connection.cursor()
-    logging.debug(f"No base image for {record}")
-    capture_device = open_capture_device(record)
+    logging.info(f"Capturing base image for {record[camera_url_index]}")
+    capture_device = open_capture_device(url=record[camera_url_index],
+                                         multicast_address=record[camera_multicast_address_index],
+                                         multicast_port=record[camera_multicast_port_index],
+                                         describe_data=describe_data)
 
-    if not capture_device.isOpened():
+    if not capture_device.isOpened() or capture_device == "Error":
         logging.error(f"unable to open capture device {record[camera_url_index]}")
         now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
         table = "main_menu_logimage"
@@ -641,6 +778,7 @@ def no_base_image(record):
                         logging.error(f"Unable to save reference image {file_name}")
             except OSError as error:
                 logging.error(f"Unable to create base image directory/file {error}")
+            close_capture_device(record, capture_device)
 
 
 def increment_transaction_count():
@@ -662,11 +800,12 @@ def get_factorial():
 class ProcessCameras(object):
 
     def process_list(self, list_of_c):
-        # logging.info(f"processing {list_of_c}, {pathos.helpers.mp.current_process()}")
+        logging.info(f"processing {list_of_c}, {pathos.helpers.mp.current_process()}")
         # logging.info(f"enter process_list")
         init_pools()
         # logging.info(f"list_of_c, {list_of_c}, {type(list_of_c)}")
         for camera in list_of_c:
+            logging.info(f"Doing camera {camera}")
             fields = "*"
             table = "main_menu_camera"
             where = "WHERE id = " + "\"" + str(camera) + "\""
@@ -678,7 +817,11 @@ class ProcessCameras(object):
                 regions.extend(range(1, 65))
             else:
                 regions = eval(regions)
-
+            url = current_record[camera_url_index]
+            multicast_address = current_record[camera_multicast_address_index]
+            multicast_port = current_record[camera_multicast_port_index]
+            user_name = current_record[camera_username_index]
+            user_password = current_record[camera_password_index]
             current_time = datetime.datetime.now()
             hour = current_time.strftime('%H')
             fields = "hour"
@@ -687,14 +830,22 @@ class ProcessCameras(object):
             long_sql = None
             hours = sql_select(fields, table, where, long_sql, fetch_all=True)
             int_hours = []
-            # logging.info(f"hours, {hours}")
+            logging.info(f"hours,{camera} {hours} ")
             if hours:
                 for i in range(0, len(hours)):
                     int_hours.append(hours[i][0])
                     int_hours[i] = int(int_hours[i])
                 hour = int(hour)
                 if hour not in int_hours:
-                    no_base_image(current_record)
+                    options_response, error_flag = options(url, user_name, user_password)
+                    if error_flag:
+                        logging.info(f"Error connecting to RTSP OPTIONS on camera {url}")
+                        continue
+                    describe_data, error_flag = describe(url, user_name, user_password)
+                    if error_flag:
+                        logging.info(f"Error connecting to RTSP DESCRIBE on camera {url}")
+                        continue
+                    no_base_image(current_record, describe_data)
                 else:
                     closest_hour = take_closest(int_hours, hour)
                     closest_hour = str(closest_hour).zfill(2)
@@ -709,22 +860,34 @@ class ProcessCameras(object):
                     base_image = "/home/checkit/camera_checker/media/" + image
                     if not os.path.isfile(base_image):
                         logging.error(f'Base image missing for {base_image}')
-                        return
+                        continue
 
-                    capture_device = open_capture_device(current_record)
-                    # print("capture_device", type(capture_device))
+                    options_response, error_flag = options(url, user_name, user_password)
+                    if error_flag:
+                        logging.info(f"Error connecting to RTSP OPTIONS on camera {url}")
+                        continue
+                    describe_data, error_flag = describe(url, user_name, user_password)
+                    if error_flag:
+                        logging.info(f"Error connecting to RTSP DESCRIBE on camera {url}")
+                        continue
+                    capture_device = open_capture_device(url,
+                                                         multicast_address,
+                                                         multicast_port,
+                                                         describe_data)
                     able_to_read = False
-
-                    if capture_device.isOpened():
-                        able_to_read, image_frame = capture_device.read()
-                        close_capture_device(current_record, capture_device)
+                    if capture_device != "Error":
+                        if capture_device.isOpened():
+                            able_to_read, image_frame = capture_device.read()
+                            close_capture_device(current_record, capture_device)
                     else:
-                        logging.error(f"Unable to open capture device {current_record[camera_url_index]}")
+                        logging.error(f"Unable to open capture device {url}")
+                        continue
+
                     if able_to_read:
                         image_base = cv2.imread(base_image)
                         if image_base is None:
                             logging.error(f"Base image is logged but unable to file {base_image}")
-                            exit()
+                            continue
                         time_stamp = datetime.datetime.now()
                         time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S")
                         directory = "/home/checkit/camera_checker/media/logs/" + str(time_stamp.year) + "/" + \
@@ -737,6 +900,7 @@ class ProcessCameras(object):
                             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
                         except OSError as error:
                             logging.error(f"Error saving log file {error}")
+                            continue
 
                         able_to_write = cv2.imwrite(log_image_file_name, image_frame)
                         capture_dimensions = image_frame.shape[:2]
@@ -745,6 +909,7 @@ class ProcessCameras(object):
 
                         if not able_to_write:
                             logging.error(f"Unable to write log image {log_image_file_name}")
+                            continue
 
                         # write the log file - create variable to store in DB
                         else:
@@ -758,7 +923,7 @@ class ProcessCameras(object):
                                 logging.error(f"Error in converting image {err}")
                                 status = "failed"
                                 # need to test this return with cv2 error
-                                return
+                                continue
 
                             if reference_dimensions != capture_dimensions or status == "failed":
                                 logging.error(
@@ -771,8 +936,8 @@ class ProcessCameras(object):
                                 values = (str(current_record[camera_id_index]), sql_file_name,
                                           "0", "0", "{}", "0", "0", "Image Size Error", now)
                                 sql_insert(table, fields, values)
-
                                 increment_transaction_count()
+                                continue
                             else:
                                 matching_score, focus_value, region_scores, frame_brightness = compare_images(
                                     image_base_grey,
@@ -801,8 +966,6 @@ class ProcessCameras(object):
                                     else:
                                         action = "Pass"
 
-                                # print(focus_value, current_record[focus_value_threshold_index])
-
 
                                 table = "main_menu_logimage"
                                 fields = "(url_id, image, matching_score, region_scores, " \
@@ -818,7 +981,6 @@ class ProcessCameras(object):
                                 fields = "last_check_date = " + "\"" + time_stamp_string + "\""
                                 where = " WHERE id = " + "\"" + str(current_record[camera_id_index]) + "\""
                                 sql_update(table, fields, where)
-
                                 increment_transaction_count()
                     else:
                         # print("unable to read")
@@ -834,9 +996,17 @@ class ProcessCameras(object):
                         increment_transaction_count()
             else:
                 # only gets here with new camera
-                logging.info(f"No base image for camera number {current_record[camera_number_index]} - "
+                logging.info(f"No base image for camera number {camera} - {current_record[camera_number_index]} - "
                              f"{current_record[camera_name_index]}")
-                no_base_image(current_record)
+                options_response, error_flag = options(url, user_name, user_password)
+                if error_flag:
+                    logging.info(f"Error connecting to RTSP OPTIONS on camera {url}")
+                    continue
+                describe_data, error_flag = describe(url, user_name, user_password)
+                if error_flag:
+                    logging.info(f"Error connecting to RTSP DESCRIBE on camera {url}")
+                    continue
+                no_base_image(current_record, describe_data)
                 increment_transaction_count()
 
 
