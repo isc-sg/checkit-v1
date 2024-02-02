@@ -30,6 +30,8 @@ from main_menu.dplin64py import DDProtCheck
 from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 
+from .models import ReferenceImage, LogImage, Camera, EngineState
+from django.core.exceptions import ObjectDoesNotExist
 
 logger = get_task_logger(__name__)
 
@@ -207,9 +209,16 @@ def get_license_details():
     command = array_to_string(command_array) + root_dev
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
-    # command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    # # command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
+    #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
+
+    # new command to cater for servermax where multiple UUID are returned in dmidecode.  This will take the
+    # line with a tab then UUID - other lines in server-max show \t\tService UUID although it's the same UUID
+    # command = '/usr/bin/sudo dmidecode | grep -E "\tUUID"'
+
     command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
-                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
+                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
 
     command = array_to_string(command_array)
     product_uuid = subprocess.check_output(command, shell=True).decode(). \
@@ -301,6 +310,44 @@ def get_camera_details(list_of_lists):
                 fields_dict[field_name] = result[idx]
             camera_details_dict[fields_dict['id']] = fields_dict
             fields_dict = {}
+        checkit_db = mysql.connector.connect(**db_config_checkit)
+        checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(f"SELECT camera_id, daysofweek_id FROM main_menu_camera_scheduled_days WHERE camera_id IN {list_as_string}")
+        rows = checkit_cursor.fetchall()
+        checkit_cursor.close()
+        result_dict = {}
+        for row in rows:
+            camera_id, daysofweek_id = row
+            if camera_id not in result_dict:
+                result_dict[camera_id] = []
+            result_dict[camera_id].append(daysofweek_id)
+        for camera in list_of_lists:
+            value = camera_details_dict[camera]
+            try:
+                value["daysofweek"] = result_dict[camera]
+            except KeyError:
+                value["daysofweek"] = []
+            camera_details_dict[camera] = value
+        checkit_db = mysql.connector.connect(**db_config_checkit)
+        checkit_cursor = checkit_db.cursor()
+        checkit_cursor.execute(f"SELECT camera_id, hoursinday_id FROM main_menu_camera_scheduled_hours WHERE camera_id IN {list_as_string}")
+        rows = checkit_cursor.fetchall()
+        checkit_cursor.close()
+        result_dict = {}
+        for row in rows:
+            camera_id, hoursinday_id = row
+            if camera_id not in result_dict:
+                result_dict[camera_id] = []
+            result_dict[camera_id].append(hoursinday_id)
+        for camera in list_of_lists:
+            value = camera_details_dict[camera]
+            try:
+                value["hoursinday"] = result_dict[camera]
+            except KeyError:
+                value["hoursinday"] = []
+            camera_details_dict[camera] = value
+        return camera_details_dict
+
 
     except mysql.connector.Error as err:
         if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
@@ -314,24 +361,23 @@ def get_camera_details(list_of_lists):
             # print(err, "*",merged_list_string,"*")
             return err
 
-    try:
-        password = mysql_password
-        adm_db_config = {
-            "host": CHECKIT_HOST,
-            "user": "root",
-            "password": password,
-            "database": "adm"
-        }
-        adm_db = mysql.connector.connect(**adm_db_config)
-    except mysql.connector.Error as err:
-        if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
-            logger.error(f"Invalid password")
-            return "Invalid password on admin database"
-            # TODO - this exit doesn't close properly when run from start.py
-        elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-            logger.error(f"Database not initialised")
-            return "Admin database not initialised"
-    return camera_details_dict
+    # try:
+    #     password = mysql_password
+    #     adm_db_config = {
+    #         "host": CHECKIT_HOST,
+    #         "user": "root",
+    #         "password": password,
+    #         "database": "adm"
+    #     }
+    #     adm_db = mysql.connector.connect(**adm_db_config)
+    # except mysql.connector.Error as err:
+    #     if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
+    #         logger.error(f"Invalid password")
+    #         return "Invalid password on admin database"
+    #         # TODO - this exit doesn't close properly when run from start.py
+    #     elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
+    #         logger.error(f"Database not initialised")
+    #         return "Admin database not initialised"
 
 
 def add_auth(username, password):
@@ -723,7 +769,8 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         # sql_statement = "SELECT url, camera_number, camera_name, camera_location FROM main_menu_camera WHERE id = {}".format(url_id)
         # cursor.execute(sql_statement)
         # camera_details = cursor.fetchone()
-        #
+        last_good_check = LogImage.objects.filter(url_id=url_id, action="Pass").last()
+        last_good_check_date_time = last_good_check.creation_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         # # print(camera_details)
         # camera_url = camera_details[0]
         # camera_number = camera_details[1]
@@ -733,35 +780,43 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         camera_number = camera_dict[url_id]['camera_number']
         camera_name = camera_dict[url_id]['camera_name']
         camera_location = camera_dict[url_id]['camera_location']
-        sql_statement = "SELECT image FROM main_menu_referenceimage WHERE id = " + str(reference_image_id)
+        sql_statement = "SELECT image, creation_date FROM main_menu_referenceimage WHERE id = " + str(reference_image_id)
         cursor.execute(sql_statement)
         reference_image = cursor.fetchone()
-        image = "http://" + CHECKIT_HOST + ":8000/media/" + log_image
-        reference_image = "http://" + CHECKIT_HOST + ":8000/media/" + reference_image[0]
+        reference_image_creation_date = reference_image[1].strftime("%Y-%m-%dT%H:%M:%SZ")
+        additional_data = "lastGoodCheckDatetime=" + last_good_check_date_time + "&amp;referenceImageDatetime=" + reference_image_creation_date
+        logger.error(f"additional_data {additional_data} for {url_id})")
+
+        image = "http://" + CHECKIT_HOST + "/media/" + log_image
+        reference_image = "http://" + CHECKIT_HOST + "/media/" + reference_image[0]
         message = "Error detected on camera " + camera_url \
                   + "|with matching score result " + str(matching_score) \
                   + "|at location " + str(camera_location)
         send_alarm = """<?xml version="1.0" encoding="UTF-8"?><Request command="sendAlarm" id="123">""" \
                      + "<message>" + "Checkit Alarm" + "</message> " \
                      + "<text>" + message + "</text>" \
-                     + "<camera>" + camera_name + "</camera>" \
+                     + "<cameraId>" + str(camera_number) + "</cameraId>" \
                      + "<param1>" + camera_location + "</param1>" \
-                     + "<param2>" + str(camera_number) + "</param2>" \
+                     + "<param2>" + str(camera_name) + "</param2>" \
                      + "<param3>" + str(camera_url) + "</param3>" \
                      + "<alarmType>" + "Checkit Alarm" + "</alarmType> " \
-                     + "<delimiter>|</delimiter><sourceId>2600</sourceId>" \
+                     + "<delimiter>|</delimiter><sourceId>62501</sourceId>" \
                      + "<jpeg>" + image + "</jpeg>" \
                      + "<additionalJpeg>" + reference_image + "</additionalJpeg>" \
+                     + "<hidden>" + "false" + "</hidden>" \
+                     + "<additionalData>" + additional_data + "</additionalData>" \
                      + "<autoClose>true</autoClose></Request>""" + "\x00"
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.connect((HOST, PORT))
             s.send(send_alarm.encode())
-            # logger.info(send_alarm)
+            logger.info(send_alarm)
             reply = s.recv(8192).decode().rstrip("\x00")
             # print(reply)
+            logger.info(f"Reply for Synergy {reply}")
         except socket.error as e:
             logger.error(f"Error sending to alarm server - {e}")
+
         # print(reply)
 
 
@@ -1004,11 +1059,15 @@ def no_base_image(camera, describe_data):
             directory = "/home/checkit/camera_checker/media/base_images/" + str(camera)
             try:
                 pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+                os.system(f"sudo chmod 775 {directory}")
+
                 if os.path.isfile(file_name):
                     os.remove(file_name)
                 else:
                     try:
                         able_to_write = cv2.imwrite(file_name, frame)
+                        os.system(f"sudo chmod 775 {directory}")
+
                         if not able_to_write:
                             logger.error(f"Unable to save reference image for id {camera} / "
                                           f" camera number {camera_details_dict[camera]['camera_number']}")
@@ -1036,7 +1095,12 @@ def no_base_image(camera, describe_data):
 
 
 def check(cameras, engine_state_id, user_name):
+    current_time = datetime.datetime.now()
+    current_hour = int(current_time.strftime('%H'))
+    day_of_the_week = datetime.datetime.today().weekday() + 1
+
     logger.info(f"Starting check {cameras}")
+
     for camera in cameras:
         url = camera_details_dict[camera]['url']
         camera_number = camera_details_dict[camera]['camera_number']
@@ -1046,6 +1110,20 @@ def check(cameras, engine_state_id, user_name):
         camera_password = camera_details_dict[camera]['camera_password']
         current_light_level = camera_details_dict[camera]['light_level_threshold']
         current_focus_value = camera_details_dict[camera]['focus_value_threshold']
+        hoursinday = camera_details_dict[camera]["hoursinday"]
+        daysofweek = camera_details_dict[camera]["daysofweek"]
+        try:
+            camera_object = Camera.objects.get(id=camera)
+        except ObjectDoesNotExist:
+            logger.error(f"Camera id {camera} does not exist")
+            continue
+        if int(current_hour) not in hoursinday:
+            continue
+        if day_of_the_week not in daysofweek:
+            continue
+        if camera_object.snooze:
+            continue
+
         message = f"Attempting connection to {url}\n"
 
         # print(f"Attempting connection to {url}")
@@ -1134,38 +1212,39 @@ def check(cameras, engine_state_id, user_name):
                             regions = eval(regions)
 
                         # check if the camera has hours set in the schedules
-                        current_time = datetime.datetime.now()
-                        current_hour = current_time.strftime('%H')
+
                         fields = "hour"
                         table = "main_menu_referenceimage"
                         where = "WHERE url_id = " + "\"" + str(camera) + "\""
                         long_sql = None
                         captured_reference_hours = sql_select(fields, table, where, long_sql, fetch_all=True)
-                        scheduled_hours = []
+                        captured_reference_hours_integers = []
                         # logging.info(f"hours,{camera} {captured_reference_hours} ")
+                        captured_reference_hours_integers = [int(item[0]) for item in captured_reference_hours]
+                        captured_reference_hours_integers.sort()
 
-                        if captured_reference_hours:
+                        if captured_reference_hours_integers:
 
-                            for i in range(0, len(captured_reference_hours)):
-                                scheduled_hours.append(captured_reference_hours[i][0])
-                                scheduled_hours[i] = int(scheduled_hours[i])
+                            # for i in range(0, len(captured_reference_hours)):
+                            #     captured_reference_hours_integers.append(captured_reference_hours[i][0])
+                            #     captured_reference_hours_integers[i] = int(captured_reference_hours_integers[i])
 
-                            current_hour = int(current_hour)
 
-                            if current_hour not in scheduled_hours:
+                            if current_hour not in captured_reference_hours_integers:
                                 no_base_image(camera, describe_response)
                                 increment_transaction_count()
                                 increment_engine_state_other_count(engine_state_id)
-                                continue
+                                # continue
 
                             else:
                                 # get the base image for the current camera at the current hour
-                                closest_hour = take_closest(scheduled_hours, current_hour)
-                                closest_hour = str(closest_hour).zfill(2)
+
+                                # closest_hour = take_closest(captured_reference_hours_integers, current_hour)
+                                # closest_hour = str(closest_hour).zfill(2)
                                 fields = "image, id"
                                 table = "main_menu_referenceimage"
-                                where = "WHERE url_id = " + "\"" + str(camera) + \
-                                        "\"" + " AND hour = " + "\"" + closest_hour + "\""
+                                where = "WHERE url_id = " + str(camera) + \
+                                        " AND hour = " + str(current_hour)
                                 long_sql = None
                                 result = sql_select(fields, table, where, long_sql, fetch_all=False)
                                 image = result[0]
@@ -1192,12 +1271,15 @@ def check(cameras, engine_state_id, user_name):
                                 # attempt to save log file
                                 try:
                                     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+                                    os.chmod(directory, 0o775)
+
                                 except OSError as error:
                                     logger.error(f"Error saving log file {error}")
                                     increment_transaction_count()
                                     continue
 
                                 able_to_write = cv2.imwrite(log_image_file_name, image_frame)
+                                os.chmod(log_image_file_name,0o664)
                                 capture_dimensions = image_frame.shape[:2]
                                 reference_dimensions = ()
                                 status = "failed"
@@ -1394,6 +1476,8 @@ def check_license_ok():
 @shared_task()
 def process_cameras(cameras, engine_state_id, user_name):
     get_config()
+    # camera_object = Camera.objects.get(id=cameras[0])
+    # logger.info(f"Processing camera {camera_object.camera_name}")
     if check_license_ok():
         # ret_code = ProtCheck()
         # logger.info(f"ret_code {ret_code}")
