@@ -6,6 +6,7 @@ import zipfile
 from subprocess import PIPE, Popen
 import csv
 import os
+import shutil
 import io
 import base64
 import logging
@@ -20,8 +21,6 @@ from django.utils import timezone
 from django.db.models.functions import TruncHour
 from django.db.models import Count
 from pathos.multiprocessing import cpu_count
-
-
 
 
 
@@ -110,7 +109,19 @@ number_of_cpus = cpu_count()
 #     queryset = User.objects.all().order_by('-date_joined')
 #     serializer_class = UserSerializer
 #     permission_classes = [permissions.IsAuthenticated]
-
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
 
 class CameraViewSet(viewsets.ModelViewSet):
     """
@@ -133,6 +144,7 @@ def custom_500_error_view(request):
 
 
 def reference_image_api(request):
+    session_id = request.session
     if request.method == "POST":
         if 'action' not in request.POST:
             return HttpResponse("Error: requires action field")
@@ -148,22 +160,41 @@ def reference_image_api(request):
         except ObjectDoesNotExist:
             return HttpResponse("Error: camera does not exist")
         if action.lower() == "refresh":
-            child_process = Popen(["/home/checkit/env/bin/python",
-                                   "/home/checkit/camera_checker/main_menu/start.py", camera_number],
-                                  stdout=PIPE, stderr=PIPE)
-            stdout, stderr = child_process.communicate()
-            return_code = child_process.returncode
-            # print('return_code', return_code)
-            if return_code == 33:
-                return HttpResponse("Error: Licensing Error")
-            elif return_code == 0:
-                logger.info(f"API request completed camera check for camera {camera_number}")
-                process_output = "Run Completed - No errors reported"
-                logger.info("Process Output {p}".format(p=process_output))
-                return HttpResponse(process_output)
-            else:
-                logger.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
-                return HttpResponse("Error in camera check for camera {} - {}".format(camera_number, stderr))
+            user_name = request.user.username
+            session_id = request.session
+            # child_process = Popen(["/home/checkit/env/bin/python",
+            #                        "/home/checkit/camera_checker/main_menu/start.py", camera_number],
+            #                       stdout=PIPE, stderr=PIPE)
+            # stdout, stderr = child_process.communicate()
+            # return_code = child_process.returncode
+            # # print('return_code', return_code)
+            # if return_code == 33:
+            #     return HttpResponse("Error: Licensing Error")
+            # elif return_code == 0:
+            #     logger.info(f"API request completed camera check for camera {camera_number}")
+            #     process_output = "Run Completed - No errors reported"
+            #     logger.info("Process Output {p}".format(p=process_output))
+            #     return HttpResponse(process_output)
+            # else:
+            #     logger.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
+            #     return HttpResponse("Error in camera check for camera {} - {}".format(camera_number, stderr))
+
+            camera_number = str(camera_object.camera_number)
+            camera_id = [camera_object.id]
+
+            state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+            number_of_cameras_in_run = 1
+            engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+                                              number_of_cameras_in_run=number_of_cameras_in_run)
+            engine_state_record.save()
+            engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+                                              number_of_cameras_in_run=number_of_cameras_in_run)
+            engine_state_record.save()
+            engine_state_id = engine_state_record.id
+            process_cameras(camera_id, engine_state_id, user_name)
+            logger.info(f"API request completed camera check for camera {camera_number}")
+            return HttpResponse("Run Completed - No errors reported")
+
         elif action.lower() == "delete":
             if "hour" not in request.POST:
                 return HttpResponse("Error: please provide hour for delete action")
@@ -183,6 +214,39 @@ def reference_image_api(request):
     else:
         return HttpResponse("Error: Only POST method allowed")
 
+
+def snooze_api(request):
+    if request.method == "POST":
+        if 'snooze' not in request.POST:
+            return JsonResponse({"status": "fail", "error": "requires snooze field"})
+        snooze: str = request.POST['snooze']
+        try:
+            new_value = strtobool(snooze)
+        except ValueError:
+            return JsonResponse({"status": "fail", "error": "invalid value for snooze"})
+        if 'camera_number' in request.POST:
+            camera_number = request.POST['camera_number']
+        else:
+            camera_number = None
+        try:
+            camera_object = Camera.objects.get(camera_number=camera_number)
+        except ObjectDoesNotExist:
+            return JsonResponse({"status": "fail", "error": "camera does not exist"})
+        camera_object.snooze = new_value
+        camera_object.save()
+        return JsonResponse({"status": "success"})
+    elif request.method == "GET":
+        if 'camera_number' in request.GET:
+            camera_number = request.GET['camera_number']
+        else:
+            return JsonResponse({"status": "fail", "error": "camera_number required for GET"})
+        try:
+            camera_object = Camera.objects.get(camera_number=camera_number)
+        except ObjectDoesNotExist:
+            return JsonResponse({"status": "fail", "error": "camera does not exist"})
+        return JsonResponse({"snooze": camera_object.snooze})
+    else:
+        return JsonResponse({"status": "fail", "error": "Only POST or GET methods allowed"})
 
 def get_hash(key_string):
     h = hashlib.blake2b(digest_size=64, key=checkit_secret)
@@ -285,8 +349,15 @@ def get_license_details():
     root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
     # command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
+    #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
+
+    # new command to cater for servermax where multiple UUID are returned in dmidecode.  This will take the
+    # line with a tab then UUID - other lines in server-max show \t\tService UUID although it's the same UUID
+    # command = '/usr/bin/sudo dmidecode | grep -E "\tUUID"'
+
     command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
-                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
+                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
 
     command = array_to_string(command_array)
     product_uuid = subprocess.check_output(command, shell=True).decode(). \
@@ -399,16 +470,18 @@ def get_transparent_edge(input_image, color):
     return final_image
 
 
-
-
 def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
     statvfs = os.statvfs('/home/checkit')
 
-    total_disk_giga_bytes = statvfs.f_frsize * statvfs.f_blocks / (1024 * 1024 * 1024)
-    total_disk_giga_bytes_free = round(statvfs.f_frsize * statvfs.f_bavail / (1024 * 1024 * 1024), 2)
-    total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
+    # total_disk_giga_bytes = statvfs.f_frsize * statvfs.f_blocks / (1024 * 1024 * 1024)
+    # total_disk_giga_bytes_free = round(statvfs.f_frsize * statvfs.f_bavail / (1024 * 1024 * 1024), 2)
+    # total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
+    total_disk_bytes, total_disk_bytes_used, total_disk_bytes_free = shutil.disk_usage("/home/checkit")
+    total_disk_giga_bytes = round(total_disk_bytes / (1024 ** 3), 2)
+    total_disk_giga_bytes_free = round(total_disk_bytes_free / (1024 ** 3), 2)
+    total_disk_giga_bytes_used = round(total_disk_bytes_used / (1024 ** 3), 2)
     template = loader.get_template('main_menu/dashboard.html')
     obj = EngineState.objects.last()
     if request.user.is_superuser:
@@ -722,7 +795,6 @@ def scheduler(request):
             #     return HttpResponse(template.render(context, request))
             # return HttpResponseRedirect(reverse(scheduler))
 
-
     if request.method == 'POST' and 'start_engine' in request.POST:
         template = loader.get_template('main_menu/scheduler_job_id.html')
         if not license_limits_are_ok():
@@ -753,12 +825,12 @@ def scheduler(request):
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
-        # process_cameras(camera_ids[:20], engine_state_id, user_name)
+        # process_cameras(camera_ids, engine_state_id, user_name)
         for group_of_cameras in sublists:
             # print("processing list", group_of_cameras )
             # long_task.delay(group_of_cameras)
             process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-        # # return HttpResponseRedirect(reverse(index))
+        # return HttpResponseRedirect(reverse(index))
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
 
@@ -1184,8 +1256,8 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
                 canvas_page.setFillColor(HexColor("#000000"))
                 canvas_page.setStrokeColor(HexColor("#000000"))
             canvas_page.drawString(*coord(left_margin_pos + 129, top_margin_text_pos + (count * top_margin_image_pos),
-                                page_height, mm), text="  Focus Value: " + str(int(focus_value))
-                                                       + "/" + str(int(current_focus_value)))
+                                page_height, mm), text="  Focus Value: " + str(focus_value)
+                                                       + "/" + str(current_focus_value))
             if light_level < current_light_level:
                 canvas_page.setFillColor(HexColor("#CC0000"))
                 canvas_page.setStrokeColor(HexColor("#000000"))
@@ -1573,12 +1645,13 @@ def cameras_with_missing_reference_images(request):
         "table": table
     })
 
+
 def action_per_hour_report(request):
     # Get the current time
-    current_time = timezone.now()
+    current_time = datetime.datetime.now()
 
     # Calculate the start time (e.g., last 24 hours)
-    start_time = current_time - timezone.timedelta(days=3)
+    start_time = current_time - datetime.timedelta(days=3)
 
     # Query the database to count the number of cameras for each action per hour
     results = (
