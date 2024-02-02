@@ -145,6 +145,10 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
 # STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+if DEBUG:
+    STATIC_ROOT = ''
+else:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = '/static/'
 
 # Default primary key field type
@@ -238,4 +242,7 @@ CELERYD_LOG_FILE = CELERY_LOG_FILE
 CELERYD_LOG_LEVEL = 'INFO'
 # USE_TZ = True
 CELERY_IMPORTS = ['camera_checker.celery',]
-CELERY_TIMEZONE = "Asia/Singapore"
+CELERY_TIMEZONE = "Australia/Melbourne"
+DJANGO_CELERY_BEAT_TZ_AWARE = False
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o775
+FILE_UPLOAD_PERMISSIONS = 0o660
