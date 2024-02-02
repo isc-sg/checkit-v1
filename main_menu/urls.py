@@ -31,6 +31,7 @@ urlpatterns = [
     # ), name='swagger-ui'),
     path('import/', views.simple_upload, name="import"),
     path('reference_image/', csrf_exempt(views.reference_image_api)),
+    path('snooze/', csrf_exempt(views.snooze_api)),
     path("status/", views.index, name='status'),
     path("scheduler/", views.scheduler, name='scheduler'),
     path('cameras/', views.CameraView.as_view(), name='cameras'),
