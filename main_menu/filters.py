@@ -22,11 +22,14 @@ class CameraFilter(FilterSet):
     camera_location = CharFilter(lookup_expr='icontains',
                                  widget=TextInput(attrs={'size': '18'}), label="Location contains")
     matching_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    focus_value_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+    light_level_threshold = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
     last_check_date = DateRangeFilter()
 
     class Meta:
         model = Camera
-        fields = ['camera_name', 'camera_number', 'multicast_address', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
+        fields = ['camera_name', 'camera_number', 'multicast_address', 'url', 'camera_location', 'matching_threshold',
+                  'focus_value_threshold', 'light_level_threshold', 'last_check_date']
 
 
 class CameraSelectFilter(FilterSet):
