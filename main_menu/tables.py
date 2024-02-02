@@ -26,6 +26,15 @@ class CameraTable(tables.Table):
         "td": {
             "width": 100, "align": "center"
         }})
+    focus_value_threshold = tables.Column(attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }})
+    light_level_threshold = tables.Column(attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }})
+
     last_check_date = tables.DateTimeColumn(format='d M Y, h:i A', attrs={
         "td": {
             "width": 200, "align": "left"
@@ -46,7 +55,7 @@ class CameraTable(tables.Table):
         model = Camera
         template_name = "django_tables2/bootstrap4.html"
         fields = ("camera_number", "camera_name", "camera_location", "url", "multicast_address", "multicast_port",
-                  "matching_threshold", "last_check_date")
+                  "matching_threshold", "focus_value_threshold", "light_level_threshold", "last_check_date")
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
 
 
@@ -109,7 +118,7 @@ class LogTable(tables.Table):
     def render_focus_value(self, value, record):
         camera_object = Camera.objects.get(pk=record.url_id)
         default_focus_level = camera_object.focus_value_threshold
-        if value > default_focus_level:
+        if value <= default_focus_level:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
