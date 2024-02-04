@@ -770,7 +770,10 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         # cursor.execute(sql_statement)
         # camera_details = cursor.fetchone()
         last_good_check = LogImage.objects.filter(url_id=url_id, action="Pass").last()
-        last_good_check_date_time = last_good_check.creation_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if last_good_check:
+            last_good_check_date_time = last_good_check.creation_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            last_good_check_date_time = "NONE"
         # # print(camera_details)
         # camera_url = camera_details[0]
         # camera_number = camera_details[1]
@@ -810,10 +813,10 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         try:
             s.connect((HOST, PORT))
             s.send(send_alarm.encode())
-            logger.info(send_alarm)
+            # logger.info(send_alarm)
             reply = s.recv(8192).decode().rstrip("\x00")
             # print(reply)
-            logger.info(f"Reply for Synergy {reply}")
+            # logger.info(f"Reply for Synergy {reply}")
         except socket.error as e:
             logger.error(f"Error sending to alarm server - {e}")
 
