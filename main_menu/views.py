@@ -1672,6 +1672,8 @@ def clear_logs():
     logs = LogImage.objects.filter(creation_date__lte=last_log_date)
     # print(len(logs))
     logs.delete()
+    engine_objects = EngineState.objects.filter(state_timestamp__lte=last_log_date)
+    engine_objects.delete()
     logging.info("ran clear logs")
 
 @shared_task()
