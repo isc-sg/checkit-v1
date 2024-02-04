@@ -22,9 +22,9 @@ def config_loggers(*args, **kwargs):
     dictConfig(settings.LOGGING)
 
 
-@app.task(bind=True)
-def hello_world(self):
-    print('Hello world!')
+# @app.task(bind=True)
+# def hello_world(self):
+#     print('Hello world!')
 
 app.autodiscover_tasks()
 
