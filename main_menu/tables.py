@@ -221,12 +221,11 @@ class EngineStateTable(tables.Table):
         else:
             return value
 
-
     def render_number_failed_images(self, value, column, record):
         if record.state == "STARTED":
             return " "
         else:
-            if value > 0 :
+            if value > 0:
                 return mark_safe(f'<span style="color: red;">{value}</span>')
             else:
                 return value
