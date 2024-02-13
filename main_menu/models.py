@@ -85,7 +85,7 @@ class Camera(models.Model):
                                              default=0.5)
     focus_value_threshold = models.DecimalField(max_digits=6, decimal_places=2,
                                                 validators=[MaxValueValidator(9999), MinValueValidator(0)],
-                                                default=200)
+                                                default=0.5)
     light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
                                                 validators=[MaxValueValidator(255), MinValueValidator(0)],
                                                 default=120)
@@ -132,10 +132,10 @@ class ReferenceImage(models.Model):
     #                                             validators=[MaxValueValidator(255), MinValueValidator(0)],
     #                                             default=0)
     creation_date = models.DateTimeField('date created', default=timezone.now)
-    history = HistoricalRecords()
-
+    # history = HistoricalRecords()
+    version = models.PositiveSmallIntegerField(default=1)
     def __str__(self):
-        return f'{self.url}/{self.image}'
+        return f'{self.image}'
 
 
 class LogImage(models.Model):
@@ -155,10 +155,10 @@ class LogImage(models.Model):
     reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.CASCADE,
                                         verbose_name="Reference Image", null=True, blank=True)
 
-    history = HistoricalRecords()
+    # history = HistoricalRecords()
 
     def __str__(self):
-        return f'{self.url}/{self.creation_date}'
+        return f'{self.image}'
 
 
 class Licensing(models.Model):
