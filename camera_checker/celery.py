@@ -12,6 +12,9 @@ sys.path.append(os.path.dirname(os.path.abspath("camera_checker")))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "camera_checker.settings")
 app = Celery("camera_checker")
 app.config_from_object("django.conf:settings", namespace="CELERY")
+app.conf.update(
+    broker_connection_retry_on_startup=True,
+)
 
 
 @setup_logging.connect
