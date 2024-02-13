@@ -1,3 +1,5 @@
+import math
+
 from celery import shared_task
 import sys
 import cv2
@@ -12,27 +14,30 @@ import mysql.connector
 from bisect import bisect_left
 import datetime
 import configparser
-import itertools
+# import itertools
 import main_menu.a_eye
 import main_menu.select_region
 import pathlib
 import json
 from urllib.parse import urlparse
 from celery.utils.log import get_task_logger
-import random
+# import random
 import cython
 import main_menu.dris as dris
 import skimage
+import hashlib
+
+from main_menu.dplin64py import DDProtCheck
+from cryptography.fernet import Fernet, InvalidToken
+
+from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
+from django.db import transaction
+
 
 so_directory = os.path.abspath('/home/checkit/camera_checker/main_menu')
 sys.path.append(so_directory)
-from main_menu.dplin64py import DDProtCheck
-from cryptography.fernet import Fernet, InvalidToken
-import hashlib
-
-from .models import ReferenceImage, LogImage, Camera, EngineState
-from django.core.exceptions import ObjectDoesNotExist
-
 logger = get_task_logger(__name__)
 
 MY_SDSN = 10101  # !!!! change this value to be the value of your SDSN (demo = 10101)
@@ -105,8 +110,6 @@ def get_encrypted(password):
     return h_in_hex
 
 
-
-
 def check_adm_database(password):
     adm_db_config = {
         "host": "localhost",
@@ -163,7 +166,9 @@ def check_adm_database(password):
         current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
         current_camera_limit = 0
         current_license_key = ""
-    return current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key
+        logger.error(f'Error connecting to admin: {e}')
+    return (current_transaction_count, current_transaction_limit, current_end_date,
+            current_camera_limit, current_license_key)
 
 
 def get_license_details():
@@ -242,7 +247,9 @@ def get_license_details():
     encoded_string = f.encrypt(str(license_dict).encode())
     return machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password
 
+
 machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
+
 
 def ProtCheck():
     # create the DRIS and allocate the values we want to use
@@ -336,6 +343,8 @@ def get_camera_details(list_of_lists):
         result_dict = {}
         for row in rows:
             camera_id, hoursinday_id = row
+            if hoursinday_id == 24:
+                hoursinday_id = 0
             if camera_id not in result_dict:
                 result_dict[camera_id] = []
             result_dict[camera_id].append(hoursinday_id)
@@ -347,7 +356,6 @@ def get_camera_details(list_of_lists):
                 value["hoursinday"] = []
             camera_details_dict[camera] = value
         return camera_details_dict
-
 
     except mysql.connector.Error as err:
         if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
@@ -766,6 +774,8 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         focus_value = i[5]
         light_level = i[6]
         reference_image_id = i[7]
+        if reference_image_id == None:
+            continue
         # sql_statement = "SELECT url, camera_number, camera_name, camera_location FROM main_menu_camera WHERE id = {}".format(url_id)
         # cursor.execute(sql_statement)
         # camera_details = cursor.fetchone()
@@ -788,7 +798,7 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         reference_image = cursor.fetchone()
         reference_image_creation_date = reference_image[1].strftime("%Y-%m-%dT%H:%M:%SZ")
         additional_data = "lastGoodCheckDatetime=" + last_good_check_date_time + "&amp;referenceImageDatetime=" + reference_image_creation_date
-        logger.error(f"additional_data {additional_data} for {url_id})")
+        # logger.error(f"additional_data {additional_data} for {url_id})")
 
         image = "http://" + CHECKIT_HOST + "/media/" + log_image
         reference_image = "http://" + CHECKIT_HOST + "/media/" + reference_image[0]
@@ -918,36 +928,134 @@ def sql_update_adm(table, fields, where):
 
 
 def increment_transaction_count():
-    table = "main_menu_licensing"
-    fields = "transaction_count =  transaction_count + 1"
-    where = " ORDER BY id DESC LIMIT 1"
-    sql_update(table, fields, where)
+    # table = "main_menu_licensing"
+    # fields = "transaction_count =  transaction_count + 1"
+    # where = " ORDER BY id DESC LIMIT 1"
+    # sql_update(table, fields, where)
 
-    table = "adm"
-    fields = "tx_count =  tx_count + 1"
-    where = " ORDER BY id DESC LIMIT 1"
-    sql_update_adm(table, fields, where)
+    # license_object = Licensing.objects.all().last()
+    # license_object.transaction_count += 1
+    # license_object.save()
+
+    # table = "adm"
+    # fields = "tx_count =  tx_count + 1"
+    # where = " ORDER BY id DESC LIMIT 1"
+    # sql_update_adm(table, fields, where)
+    password = mysql_password
+    adm_db_config = {
+        "host": CHECKIT_HOST,
+        "user": "root",
+        "password": password,
+        "database": "adm"
+    }
+    adm_db = mysql.connector.connect(**adm_db_config)
+    try:
+        adm_cursor = adm_db.cursor()
+        sql_statement = "SELECT id FROM adm ORDER BY id DESC LIMIT 1"
+        adm_cursor.execute(sql_statement)
+        adm_id = adm_cursor.fetchone()[0]
+        adm_cursor.execute("SELECT * FROM adm WHERE id = %s FOR UPDATE", (adm_id,))
+        row = adm_cursor.fetchone()
+        if row:
+            sql_statment = "UPDATE adm SET tx_count = tx_count + 1 ORDER BY id DESC LIMIT 1"
+            adm_cursor.execute(sql_statment)
+            adm_db.commit()
+            sql_statement = "SELECT tx_count FROM adm ORDER BY id DESC LIMIT 1"
+            adm_cursor.execute(sql_statement)
+            tx_count = adm_cursor.fetchone()[0]
+            # print("TX COUNT", tx_count)
+        else:
+            logger.error("Unbale to update transaction count on admin")
+            pass
+
+    except mysql.connector.Error as e:
+        logger.error("Error:", e)
+        adm_db.rollback()
+
+    finally:
+        adm_cursor.close()
+        adm_db.close()
+        license_object = Licensing.objects.all().last()
+        license_object.transaction_count = tx_count
+        license_object.save()
+
+    # with transaction.atomic():
+    #     try:
+    #         license_object = Licensing.objects.select_for_update().all().last()
+    #     except Licensing.DoesNotExist:
+    #         logger.error(f"Error updating transaction count")
+    #         pass
+    #     else:
+    #         license_object.transaction_count += 1
+    #         license_object.save()
+
+
+
 
 def increment_engine_state_other_count(engines_state_id):
-    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-    table = "main_menu_enginestate"
-    fields = f"number_others =  number_others + 1, state_timestamp = '{now}'"
-    where = f" WHERE id = {engines_state_id}"
-    sql_update(table, fields, where)
+    # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+    # table = "main_menu_enginestate"
+    # fields = f"number_others =  number_others + 1, state_timestamp = '{now}'"
+    # where = f" WHERE id = {engines_state_id}"
+    # sql_update(table, fields, where)
+    with transaction.atomic():
+        try:
+            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
+        except EngineState.DoesNotExist:
+            logger.error(f"Error saving engine state for run number {engines_state_id}")
+            pass
+        else:
+            engine_object.number_others += 1
+            engine_object.state_timestamp = timezone.now()
+            engine_object.save()
+    # engine_object = EngineState.objects.get(id=engines_state_id)
+    # engine_object.number_others += 1
+    # engine_object.state_timestamp = timezone.now()
+    # engine_object.save()
 
 def increment_engine_state_pass_count(engines_state_id):
-    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-    table = "main_menu_enginestate"
-    fields = f"number_pass_images =  number_pass_images + 1, state_timestamp = '{now}'"
-    where = f" WHERE id = {engines_state_id}"
-    sql_update(table, fields, where)
+    # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+    # table = "main_menu_enginestate"
+    # fields = f"number_pass_images =  number_pass_images + 1, state_timestamp = '{now}'"
+    # where = f" WHERE id = {engines_state_id}"
+    # sql_update(table, fields, where)
+    with transaction.atomic():
+        try:
+            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
+        except EngineState.DoesNotExist:
+            logger.error(f"Error saving engine state for run number {engines_state_id}")
+            pass
+        else:
+            engine_object.number_pass_images += 1
+            engine_object.state_timestamp = timezone.now()
+            engine_object.save()
+
+    # engine_object = EngineState.objects.get(id=engines_state_id)
+    # engine_object.number_pass_images += 1
+    # engine_object.state_timestamp = timezone.now()
+    # engine_object.save()
 
 def increment_engine_state_failed_count(engines_state_id):
-    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-    table = "main_menu_enginestate"
-    fields = f"number_failed_images =  number_failed_images + 1, state_timestamp = '{now}'"
-    where = f" WHERE id = {engines_state_id}"
-    sql_update(table, fields, where)
+    # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+    # table = "main_menu_enginestate"
+    # fields = f"number_failed_images =  number_failed_images + 1, state_timestamp = '{now}'"
+    # where = f" WHERE id = {engines_state_id}"
+    # sql_update(table, fields, where)
+    with transaction.atomic():
+        try:
+            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
+        except EngineState.DoesNotExist:
+            logger.error(f"Error saving engine state for run number {engines_state_id}")
+            pass
+        else:
+            engine_object.number_failed_images += 1
+            engine_object.state_timestamp = timezone.now()
+            engine_object.save()
+    # engine_object = EngineState.objects.get(id=engines_state_id)
+    # engine_object.number_failed_images += 1
+    # engine_object.state_timestamp = timezone.now()
+    # engine_object.save()
+
 
 def compare_images(base, frame, r, base_color, frame_color):
     h, w = frame.shape[:2]
@@ -1023,7 +1131,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     return full_ss, fv, region_scores, frame_brightness
 
 
-def no_base_image(camera, describe_data):
+def no_base_image(camera, describe_data, user_name, engine_state_id):
     # connection = connection_pool.get_connection()
     # checkit_cursor = connection.cursor()
     logger.info(f"Capturing base image for {camera_details_dict[camera]['url']}")
@@ -1034,12 +1142,9 @@ def no_base_image(camera, describe_data):
 
     if not capture_device.isOpened() or capture_device == "Error":
         logger.error(f"unable to open capture device {camera_details_dict[camera]['url']}")
-        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-        table = "main_menu_logimage"
-        fields = "(url_id, image, matching_score, light_level, region_scores, current_matching_threshold, " \
-                 "focus_value, action, creation_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-        values = (str(camera), "", "0", "0", "0", "0", "0", "Capture Error", now)
-        sql_insert(table, fields, values)
+        LogImage.objects.create(url_id=camera, region_scores={}, action="Capture Error",
+                                creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
+
         close_capture_device(capture_device, camera_details_dict[camera]['multicast_address'])
         return
     else:
@@ -1056,7 +1161,7 @@ def no_base_image(camera, describe_data):
         #                   f"{camera_details_dict[camera]['camera_name']}")
         else:
             logger.debug(f"Able to capture base image on {camera_details_dict[camera]['camera_name']}")
-            time_stamp = datetime.datetime.now()
+            time_stamp = timezone.localtime()
             file_name = "/home/checkit/camera_checker/media/base_images/" + str(camera) + "/" + \
                         time_stamp.strftime('%H') + ".jpg"
             directory = "/home/checkit/camera_checker/media/base_images/" + str(camera)
@@ -1073,7 +1178,8 @@ def no_base_image(camera, describe_data):
 
                         if not able_to_write:
                             logger.error(f"Unable to save reference image for id {camera} / "
-                                          f" camera number {camera_details_dict[camera]['camera_number']}")
+                                         f" camera number {camera_details_dict[camera]['camera_number']}")
+                            return
                         img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                         blur = cv2.blur(img_gray, (5, 5))
                         base_brightness = cv2.mean(blur)[0]
@@ -1083,11 +1189,15 @@ def no_base_image(camera, describe_data):
                         fv = round(fv, 2)
                         # logger.info(f"Blur A {focus_value} Blur B {fv}")
                         sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
-                        table = "main_menu_referenceimage"
-                        fields = "(url_id, image, hour, light_level, creation_date, focus_value) VALUES (%s,%s,%s,%s,%s,%s)"
-                        values = (str(camera), sql_file_name,
-                                  time_stamp.strftime('%H'), base_brightness, datetime.datetime.now(), fv)
-                        sql_insert(table, fields, values)
+                        # table = "main_menu_referenceimage"
+                        # fields = "(url_id, image, hour, light_level, creation_date, focus_value, version) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+                        # values = (str(camera), sql_file_name,
+                        #           time_stamp.strftime('%H'), base_brightness, timezone.now(), fv, 1)
+                        # sql_insert(table, fields, values)
+                        ReferenceImage.objects.create(url_id=camera, image=sql_file_name,
+                                                      hour=timezone.localtime().strftime('%H'),
+                                                      light_level=base_brightness,
+                                                      creation_date=timezone.now(), focus_value=fv, version=1)
                         # create log entry here with action as REFERENCE IMAGE
                     except:
                         logger.error(f"Unable to save reference image {file_name}")
@@ -1098,9 +1208,9 @@ def no_base_image(camera, describe_data):
 
 
 def check(cameras, engine_state_id, user_name):
-    current_time = datetime.datetime.now()
+    current_time = timezone.localtime()
     current_hour = int(current_time.strftime('%H'))
-    day_of_the_week = datetime.datetime.today().weekday() + 1
+    day_of_the_week = timezone.localtime().weekday() + 1
 
     logger.info(f"Starting check {cameras}")
 
@@ -1121,20 +1231,20 @@ def check(cameras, engine_state_id, user_name):
             logger.error(f"Camera id {camera} does not exist")
             continue
         if int(current_hour) not in hoursinday:
+            increment_engine_state_other_count(engine_state_id)
             continue
         if day_of_the_week not in daysofweek:
+            increment_engine_state_other_count(engine_state_id)
             continue
         if camera_object.snooze:
+            increment_engine_state_other_count(engine_state_id)
             continue
 
         message = f"Attempting connection to {url}\n"
 
-        # print(f"Attempting connection to {url}")
         if camera_username and camera_password:
             url_parts = url.split("//")
             url = f"{url_parts[0]}//{camera_username}:{camera_password}@{url_parts[1]}"
-        # print("Start OPTIONS")
-        check_time = time.time()
 
         has_error = False
         ip_address, url_port, scheme = extract_ip_from_url(url)
@@ -1146,34 +1256,20 @@ def check(cameras, engine_state_id, user_name):
                 message = message + f"Connected to {url}\n"
             else:
                 message = message + f"Error in OPTIONS for {url} {options_response}\n"
-                now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-                table = "main_menu_logimage"
-                fields = "(url_id, image, matching_score, region_scores, " \
-                         "current_matching_threshold, focus_value, " \
-                         "current_focus_value, light_level, current_light_level, action, " \
-                         "creation_date, user, run_number) " \
-                         "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                          now, user_name, engine_state_id)
-                sql_insert(table, fields, values)
+
+                LogImage.objects.create(url_id=camera, region_scores={}, action="Capture Error",
+                                        creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
                 increment_engine_state_other_count(engine_state_id)
-                logger.info(message)
+                logger.error(message)
                 continue
 
             describe_response, has_error = describe(url, ip_address, url_port, camera_username, camera_password)
             if has_error:
                 message = message + f"Error in DESCRIBE for url {url} {describe_response}"
-                now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-                table = "main_menu_logimage"
-                fields = "(url_id, image, matching_score, region_scores, " \
-                         "current_matching_threshold, focus_value, " \
-                         "current_focus_value, light_level, current_light_level, action, " \
-                         "creation_date, user, run_number) " \
-                         "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                          now, user_name, engine_state_id)
-                sql_insert(table, fields, values)
+
+                LogImage.objects.create(url_id=camera, region_scores={}, action="Capture Error",
+                                        creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
                 increment_engine_state_other_count(engine_state_id)
                 message = message + f"{describe_response}\n"
@@ -1182,23 +1278,11 @@ def check(cameras, engine_state_id, user_name):
             capture_device = open_capture_device(url, multicast_address, multicast_port, describe_response)
             if capture_device != "Error":
                 if not capture_device.isOpened():
-                    # print(f"Capture device not opened for {url}")
-                    # message = message + f"Capture device not opened for {url}"
-                    # logging.error(f"Capture device not opened for {url}")
-                    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
 
-                    table = "main_menu_logimage"
-                    fields = "(url_id, image, matching_score, region_scores, " \
-                             "current_matching_threshold, focus_value, " \
-                             "current_focus_value, light_level, current_light_level, action, " \
-                             "creation_date, user, run_number) " \
-                             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                    values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                              now, user_name, engine_state_id)
-                    sql_insert(table, fields, values)
+                    LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
+                                            creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                     increment_transaction_count()
                     increment_engine_state_other_count(engine_state_id)
-                    # print("Error reading video frame")
                     message = message + f"Unable to open capture device {url}\n"
                 if capture_device.isOpened():
 
@@ -1234,7 +1318,7 @@ def check(cameras, engine_state_id, user_name):
 
 
                             if current_hour not in captured_reference_hours_integers:
-                                no_base_image(camera, describe_response)
+                                no_base_image(camera, describe_response, user_name, engine_state_id)
                                 increment_transaction_count()
                                 increment_engine_state_other_count(engine_state_id)
                                 # continue
@@ -1264,7 +1348,7 @@ def check(cameras, engine_state_id, user_name):
                                 base_image = cv2.imread(base_image_location)
 
                                 # save log image
-                                time_stamp = datetime.datetime.now()
+                                time_stamp = timezone.now()
                                 time_stamp_string = datetime.datetime.strftime(time_stamp, "%Y-%m-%d %H:%M:%S.%f")
                                 directory = "/home/checkit/camera_checker/media/logs/" + str(time_stamp.year) + "/" + \
                                             str(time_stamp.month) + "/" + str(time_stamp.day)
@@ -1274,7 +1358,8 @@ def check(cameras, engine_state_id, user_name):
                                 # attempt to save log file
                                 try:
                                     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-                                    os.chmod(directory, 0o775)
+                                    # os.chmod(directory, 0o775)
+                                    os.system(f"sudo chmod 775 {directory}")
 
                                 except OSError as error:
                                     logger.error(f"Error saving log file {error}")
@@ -1282,7 +1367,8 @@ def check(cameras, engine_state_id, user_name):
                                     continue
 
                                 able_to_write = cv2.imwrite(log_image_file_name, image_frame)
-                                os.chmod(log_image_file_name,0o664)
+                                # os.chmod(log_image_file_name, 0o664)
+                                os.system(f"sudo chmod 775 {log_image_file_name}")
                                 capture_dimensions = image_frame.shape[:2]
                                 reference_dimensions = ()
                                 status = "failed"
@@ -1307,17 +1393,21 @@ def check(cameras, engine_state_id, user_name):
                                     if reference_dimensions != capture_dimensions or status == "failed":
                                         logger.error(
                                             f"Image sizes don't match on camera number {camera}")
-                                        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-                                        sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
-                                        table = "main_menu_logimage"
-                                        fields = "(url_id, image, matching_score, region_scores, " \
-                                                 "current_matching_threshold, focus_value, " \
-                                                 "current_focus_value, light_level, current_light_level, action, " \
-                                                 "creation_date, user, run_number) " \
-                                                 "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                                        values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                                                  now, user_name, engine_state_id)
-                                        sql_insert(table, fields, values)
+                                        # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+                                        # sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
+                                        # table = "main_menu_logimage"
+                                        # fields = "(url_id, image, matching_score, region_scores, " \
+                                        #          "current_matching_threshold, focus_value, " \
+                                        #          "current_focus_value, light_level, current_light_level, action, " \
+                                        #          "creation_date, user, run_number) " \
+                                        #          "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                                        # values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
+                                        #           now, user_name, engine_state_id)
+                                        # sql_insert(table, fields, values)
+                                        LogImage.objects.create(url_id=camera, region_scores={},
+                                                                action="Image Size Error",
+                                                                creation_date=timezone.now(), user=user_name,
+                                                                run_number=engine_state_id)
                                         increment_transaction_count()
                                         increment_engine_state_other_count(engine_state_id)
                                         continue
@@ -1374,20 +1464,36 @@ def check(cameras, engine_state_id, user_name):
                                                   engine_state_id,
                                                   reference_image_id
                                         )
-
-                                        sql_insert(table, fields, values)
+                                        LogImage.objects.create(url_id=camera, image=sql_file_name,
+                                                                matching_score=matching_score,
+                                                                region_scores=json.dumps(region_scores),
+                                                                current_matching_threshold=camera_details_dict[camera]['matching_threshold'],
+                                                                light_level=frame_brightness,
+                                                                focus_value=focus_value,
+                                                                action=action,
+                                                                creation_date=timezone.now(),
+                                                                current_focus_value=camera_details_dict[camera]['focus_value_threshold'],
+                                                                current_light_level=camera_details_dict[camera]['light_level_threshold'],
+                                                                user=user_name,
+                                                                run_number=engine_state_id,
+                                                                reference_image_id=reference_image_id)
+                                        # sql_insert(table, fields, values)
 
                                         table = "main_menu_camera"
                                         fields = "last_check_date = " + "\"" + time_stamp_string + "\""
                                         where = " WHERE id = " + "\"" + str(camera) + "\""
-                                        sql_update(table, fields, where)
+                                        # sql_update(table, fields, where)
+                                        camera_object = Camera.objects.get(id=camera)
+                                        camera_object.last_check_date = timezone.now()
+                                        camera_object.save()
+
                                         increment_transaction_count()
                                         if action == "Pass":
                                             increment_engine_state_pass_count(engine_state_id)
                                         if action == "Failed":
                                             increment_engine_state_failed_count(engine_state_id)
                         else:
-                            no_base_image(camera, describe_response)
+                            no_base_image(camera, describe_response, user_name, engine_state_id)
                             increment_transaction_count()
                             increment_engine_state_other_count(engine_state_id)
                             # image_frame = cv2.resize(image_frame,(960,540))
@@ -1396,49 +1502,56 @@ def check(cameras, engine_state_id, user_name):
                             # message = message + f"Writting to /tmp/{camera_number}.jpg"
                             # cv2.imwrite(f"/tmp/{camera_number}.jpg", image_frame)
                     if not able_to_read:
-                        now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-
-                        table = "main_menu_logimage"
-                        fields = "(url_id, image, matching_score, region_scores, " \
-                                 "current_matching_threshold, focus_value, " \
-                                 "current_focus_value, light_level, current_light_level, action, " \
-                                 "creation_date, user, run_number) " \
-                                 "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                        values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                                  now, user_name, engine_state_id)
-                        sql_insert(table, fields, values)
+                        # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+                        #
+                        # table = "main_menu_logimage"
+                        # fields = "(url_id, image, matching_score, region_scores, " \
+                        #          "current_matching_threshold, focus_value, " \
+                        #          "current_focus_value, light_level, current_light_level, action, " \
+                        #          "creation_date, user, run_number) " \
+                        #          "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                        # values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
+                        #           now, user_name, engine_state_id)
+                        # sql_insert(table, fields, values)
+                        LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
+                                                creation_date=timezone.now(), user=user_name,
+                                                run_number=engine_state_id)
                         increment_transaction_count()
                         increment_engine_state_other_count(engine_state_id)
                         # print("Error reading video frame")
                         message = message + "Error reading video frame\n"
                 else:
                     # logging.error(f"Unable to open capture device {url}")
-                    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-
-                    table = "main_menu_logimage"
-                    fields = "(url_id, image, matching_score, region_scores, " \
-                             "current_matching_threshold, focus_value, " \
-                             "current_focus_value, light_level, current_light_level, action, " \
-                             "creation_date, user, run_number) " \
-                             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                    values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                              now, user_name, engine_state_id)
-                    sql_insert(table, fields, values)
+                    # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+                    #
+                    # table = "main_menu_logimage"
+                    # fields = "(url_id, image, matching_score, region_scores, " \
+                    #          "current_matching_threshold, focus_value, " \
+                    #          "current_focus_value, light_level, current_light_level, action, " \
+                    #          "creation_date, user, run_number) " \
+                    #          "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                    # values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
+                    #           now, user_name, engine_state_id)
+                    # sql_insert(table, fields, values)
+                    LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
+                                            creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                     increment_transaction_count()
                     increment_engine_state_other_count(engine_state_id)
                     # print("Error reading video frame")
                     message = message + f"Unable to open capture device {url}\n"
             else:
-                now = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-                table = "main_menu_logimage"
-                fields = "(url_id, image, matching_score, region_scores, " \
-                         "current_matching_threshold, focus_value, " \
-                         "current_focus_value, light_level, current_light_level, action, " \
-                         "creation_date, user, run_number) " \
-                         "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-                values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
-                          now, user_name, engine_state_id)
-                sql_insert(table, fields, values)
+                # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+                # table = "main_menu_logimage"
+                # fields = "(url_id, image, matching_score, region_scores, " \
+                #          "current_matching_threshold, focus_value, " \
+                #          "current_focus_value, light_level, current_light_level, action, " \
+                #          "creation_date, user, run_number) " \
+                #          "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                # values = (str(camera), "", "0", "{}", "0", "0", "0", "0", "0", "Capture Error",
+                #           now, user_name, engine_state_id)
+                # sql_insert(table, fields, values)
+                LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
+                                        creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
                 increment_engine_state_other_count(engine_state_id)
                 # print("Error reading video frame")
@@ -1487,14 +1600,34 @@ def process_cameras(cameras, engine_state_id, user_name):
         # if ret_code != 0:
         #     return f"Licensing Error {ret_code}"
         # logger.info(f"{cameras}{engine_state_id}{user_name}")
+        worker_id = process_cameras.request.hostname
+        logger.info(f"Worker ID: {worker_id} Cameras {cameras}")
         camera_dict = get_camera_details(cameras)
         # logger.info(f"camera_dict {camera_dict}")
         if not isinstance(camera_details_dict, dict):
-            logger.info(f"Error in camera details - {camera_dict}")
+            logger.info(f'Error in camera details - {camera_dict}')
             sys.exit(1)
+
         check(cameras, engine_state_id, user_name)
         # logger.info(f"log_alarms {log_alarms}")
+
+        logs = LogImage.objects.filter(run_number=engine_state_id)
+        if logs:
+            last_log_time = logs.last().creation_date
+            engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
+            transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
+        # logger.info(f"Transaction rate is {transaction_rate}")
+
+            try:
+                engine_object = EngineState.objects.all().last()
+                engine_object.transaction_rate = transaction_rate
+                engine_object.save()
+            except EngineState.DoesNotExist:
+                logger.error(f"Error updating transaction rate")
+
         if log_alarms:
             send_alarms(cameras, camera_dict, engine_state_id)
+
     else:
         logger.error(f"You license has either expired or exhausted the available transactions")
+
