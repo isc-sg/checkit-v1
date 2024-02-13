@@ -40,7 +40,6 @@ urlpatterns = [
     path('logs/', views.LogView.as_view(), name="logs"),
     path("state/", views.EngineStateView.as_view(), name='state'),
     path('license/', views.licensing, name='licensing'),
-    path("date/", views.get_date, name='date'),
     path("display_regions/", views.display_regions, name='test'),
     path("export/", views.export_logs_to_csv, name='export csv logs'),
     path("images/", views.compare_images, name="images"),
