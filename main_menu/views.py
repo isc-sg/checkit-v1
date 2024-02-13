@@ -1,5 +1,6 @@
 import ast
 import datetime
+from datetime import timedelta
 import subprocess
 import time
 import zipfile
@@ -43,6 +44,7 @@ from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, 
 from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
+from django.contrib.admin.models import LogEntry
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
@@ -298,7 +300,7 @@ def check_adm_database(password):
         else:
             current_transaction_count = 0
             current_transaction_limit = 0
-            current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_end_date = timezone.now().strftime("%Y-%m-%d")
             current_camera_limit = 0
             current_license_key = ""
         # TODO clean up long lines by making this list of variables a dictionary. Helps creating long lines.
@@ -307,7 +309,7 @@ def check_adm_database(password):
     except mysql.connector.Error as e:
         current_transaction_count = 0
         current_transaction_limit = 0
-        current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+        current_end_date = timezone.now().strftime("%Y-%m-%d")
         current_camera_limit = 0
         current_license_key = ""
     return current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key
@@ -414,7 +416,7 @@ def take_closest(my_list, my_number):
 
 
 def get_base_image(reference_images_list, url_id, regions):
-    time_stamp = datetime.datetime.now()
+    time_stamp = timezone.now()
     hour = time_stamp.strftime('%H')
     hours = []
     for record in reference_images_list:
@@ -606,110 +608,11 @@ def compare_images(request):
 # @permission_required('camera_checker.main_menu')
 def scheduler(request):
     user_name = request.user.username
-    # permissions = get_user_permissions(request.user)
-    # print(permissions)
-    if request.user.is_superuser:
-        admin_user = "True"
-    else:
-        admin_user = "False"
 
     logger.info("User {u} access to Scheduler".format(u=user_name))
 
     template = loader.get_template('main_menu/scheduler.html')
-    # get the actual state from the engine here and pass it to context
-    obj = EngineState.objects.last()
-    if obj is not None:
-        # use .title() to give it correct case as the record is in upper case.
-        state = obj.state.title()
-        # pid = obj.engine_process_id
-    else:
-        state = "Run Completed"
-
-    # if state == "Started" and not is_process_running(pid):
-    #     print("State is started but pid not running")
-    #     state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-    #     record = EngineState()
-    #     record.state = "ERROR"
-    #     record.engine_process_id = 0
-    #     record.transaction_rate = 0
-    #     record.state_timestamp = state_timestamp
-    #     record.number_failed_images = 0
-    #     record.save()
-    #     state = "ERROR"
-    license_obj = Licensing.objects.last()
-    # run_schedule = license_obj.run_schedule
-    # tmp_file_name = "/tmp/" + str(uuid.uuid4())
-    command = "/usr/bin/crontab -l"
-    # tmp_file = open(tmp_file_name, "w")
-    # tmp_file.write(command)
-    # tmp_file.close()
-    try:
-        # logging.info("process")
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        out, err = process.communicate()
-        # logging.info(out, err)
-        err = err.decode()[:14]
-        if err == "no crontab for":
-            scheduler_status = "Scheduler Off"
-        elif out == b"":
-            scheduler_status = "Scheduler Off"
-        else:
-            scheduler_status = "Scheduler On"
-    except:
-        logger.error("crontab look up failed")
-    context = {'system_state': state,
-               "scheduler_status": scheduler_status, "admin_user": admin_user}
-
-    # can use pid method to check if actually running. see compare_images_v2
-    if request.method == 'POST' and 'toggle_scheduler' in request.POST:
-        # logging.info("toggle scheduler")
-        try:
-            # tmp_file_name = "/tmp/" + str(uuid.uuid4())
-            command = "/usr/bin/crontab -l"
-            # tmp_file = open(tmp_file_name, "w")
-            # tmp_file.write(command)
-            # tmp_file.close()
-            # logging.info("about to proc")
-
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            # process.wait()
-            out, err = process.communicate()
-            # logging.info("done proc", process.returncode)
-
-            # logging.info("out,err", out, err)
-            # logging.info("error on communicate")
-            err = err.decode()[:14]
-            if err == "no crontab for":
-                # logging.info("Turning on")
-                tmp_file_name = "/tmp/" + str(uuid.uuid4())
-                command = "0 */1 * * * /home/checkit/env/bin/python " \
-                          "/home/checkit/camera_checker/main_menu/start.py \n"
-                fd = open(tmp_file_name, "w")
-                fd.write(command)
-                fd.close()
-
-                command = "/usr/bin/crontab " + tmp_file_name
-                # logging.info(command)
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                time.sleep(1)
-                try:
-                    os.remove(tmp_file_name)
-                except OSError:
-                    pass
-                return HttpResponseRedirect(reverse(scheduler))
-            else:
-                # logging.info("Turning off")
-                # tmp_file_name = "/tmp/" + str(uuid.uuid4())
-                command = "/usr/bin/crontab -r"
-                # tmp_file = open(tmp_file_name, "w")
-                # tmp_file.write(command)
-                # tmp_file.close()
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                # out, err = process.communicate()
-                # logging.info("did cron")
-                return HttpResponseRedirect(reverse(scheduler))
-        except:
-            logger.error("crontab look up failed")
+    context = {}
 
     if request.FILES:
         if not license_limits_are_ok():
@@ -717,9 +620,12 @@ def scheduler(request):
             context = {"license_error": "True"}
             return HttpResponse(template.render(context, request))
         uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.replace(b'\r\n', b'\n')
         uploaded_file = uploaded_file.decode().split("\n")
         uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
-        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # filtering out any record that has snooze
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file).filter(snooze=False)
 
         # Extract the items that exist in the model
         matching_items = matching_records.values_list('camera_number', flat=True)
@@ -734,66 +640,36 @@ def scheduler(request):
                 bad_numbers.append(item)
 
         if bad_numbers:
-            context = {'system_state': state,
-               "scheduler_status": scheduler_status, "admin_user": admin_user, "error": "Invalid camera numbers in file"}
+            context = {"error": "Invalid camera numbers in file"}
             return HttpResponse(template.render(context, request))
         if good_numbers:
-            # joined_string = ' '.join(map(str, good_numbers))
-            # process_string = f"/home/checkit/camera_checker/main_menu/start.py {joined_string}"
-            # # subprocess.call(["/home/checkit/camera_checker/main_menu/start.py", joined_string])
-            # os.system(process_string)
             template = loader.get_template('main_menu/scheduler_job_id.html')
             camera_ids = []
             for number in good_numbers:
                 camera_object = Camera.objects.get(camera_number=number)
-                camera_ids.append(camera_object.id)
+                # added check for snooze - principle is if snooze selected then never check anywhere,
+                if not camera_object.snooze:
+                    camera_ids.append(camera_object.id)
             number_of_cameras_in_run = len(camera_ids)
-            x = number_of_cpus
+            x = int(number_of_cpus*2)
             num_sublists = (len(camera_ids) + x - 1) // x
             sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
             # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
-            state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-            engine_process_id = 0
-            transaction_rate = 0
+
             # create STARTED record first then create FINISHED and pass that record id to celery to have the
             # workers update the timestamp and counts as the complete check
-            engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+            engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
                                               number_of_cameras_in_run=number_of_cameras_in_run)
             engine_state_record.save()
-            engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+            engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
                                               number_of_cameras_in_run=number_of_cameras_in_run)
             engine_state_record.save()
             engine_state_id = engine_state_record.id
 
             for group_of_cameras in sublists:
-                # print("processing list", group_of_cameras )
-                # long_task.delay(group_of_cameras)
                 process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-            # return HttpResponseRedirect(reverse(index))
             context = {"jobid": engine_state_id}
             return HttpResponse(template.render(context, request))
-
-            # child_process = Popen(["/home/checkit/env/bin/python",
-            #                        process_string],
-            #                       stdout=PIPE, stderr=PIPE)
-            # stdout, stderr = child_process.communicate()
-            # return_code = child_process.returncode
-            # print('return_code', return_code)
-            # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
-            # if return_code == 33:
-            #     pass
-            #     context = {"error": "Licensing Error"}
-            #     return HttpResponse(template.render(context, request))
-            # elif return_code == 0:
-            #     logging.info(f"User {user_name} completed camera check for cameras {good_numbers}")
-            #     process_output = "Run Completed - No errors reported"
-            #     logging.info("Process Output {p}".format(p=process_output))
-            #     return HttpResponseRedirect(reverse(index))
-            # else:
-            #     logging.error("Error in camera check for cameras {} - {}".format(good_numbers, stderr))
-            #     context = {"error": "Error Checking Cameras"}
-            #     return HttpResponse(template.render(context, request))
-            # return HttpResponseRedirect(reverse(scheduler))
 
     if request.method == 'POST' and 'start_engine' in request.POST:
         template = loader.get_template('main_menu/scheduler_job_id.html')
@@ -803,95 +679,29 @@ def scheduler(request):
             return HttpResponse(template.render(context, request))
 
         logger.info("User {u} started engine".format(u=user_name))
-        camera_objects = Camera.objects.all()
+        camera_objects = Camera.objects.all().filter(snooze=False)
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
-        x = number_of_cpus
+        x = int(number_of_cpus*2)
         num_sublists = (len(camera_ids) + x - 1) // x
         sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
-        # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
-        # state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
-        # state_timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S.%f")
-        state_timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        # state_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        engine_process_id = 0
-        transaction_rate = 0
+
         # create STARTED record first then create FINISHED/ RUN COMPLETED and pass that record id to celery to have the
         # workers update the timestamp and counts as the complete check
-        engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+        engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
-        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
         # process_cameras(camera_ids, engine_state_id, user_name)
+
         for group_of_cameras in sublists:
-            # print("processing list", group_of_cameras )
-            # long_task.delay(group_of_cameras)
             process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-        # return HttpResponseRedirect(reverse(index))
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
 
-        # main_menu.compare_images_v4.main([])
-        # engine_object = EngineState.objects.last()
-        # engine_object.user = user_name
-        # engine_object.save()
-        # engine_object = EngineState.objects.order_by("-id")[1]
-        # engine_object.user = user_name
-        # engine_object.save()
-        # process = Popen(["/home/checkit/env/bin/python",
-        #                  "/home/checkit/camera_checker/main_menu/start.py"], stdout=PIPE, stderr=PIPE)
-        # stdout, stderr = process.communicate()
-        # return_code = process.returncode
-        # if return_code == 33:
-        #     context = {"error": "Licensing Error"}
-        #     return HttpResponse(template.render(context, request))
-        # elif return_code == 0:
-        #     logging.info(f"User {user_name} completed camera check for all cameras")
-        #     process_output = "Run Completed - No errors reported"
-        #     logging.info("Process Output {p}".format(p=process_output))
-        #     return HttpResponseRedirect(reverse(scheduler))
-        #
-        # else:
-        #     logging.error("Error in camera check for all cameras - {}".format(stderr))
-        #     context = {"error": "Error Checking Camera"}
-        #     return HttpResponse(template.render(context, request))
-
-    # if request.method == 'POST' and 'new_run' in request.POST:
-    #     new_run_schedule = request.POST.get('new_run')
-    #     old_run_schedule = license_obj.run_schedule
-    #     if new_run_schedule != old_run_schedule:
-    #         license_obj.run_schedule = new_run_schedule
-    #         license_obj.save()
-    #         tmp_file_name = "/tmp/" + str(uuid.uuid4())
-    #
-    #         if int(new_run_schedule) == 0:
-    #             command = "/usr/bin/crontab -r"
-    #             logging.info("User {u} set scheduler to not running".format(u=user_name))
-    #         else:
-    #
-    #             # command = "/bin/echo 0 \*" + "/" + new_run_schedule + \
-    #             #           " \* \* \* /home/checkit/camera_checker/main_menu/compare_images_v2.bin | crontab -"
-    #             tmp_file = open(tmp_file_name, "w")
-    #             tmp_file.write("0 */" + new_run_schedule +
-    #                            " * * * /home/checkit/env/bin/python /home/checkit/camera_checker/main_menu/start.py \n")
-    #             tmp_file.close()
-    #             # command = "/bin/echo 0 *" + "/" + new_run_schedule + \
-    #             #           " \* \* \* /home/checkit/env/bin/python " \
-    #             #           "/home/checkit/camera_checker/main_menu/start.py | sudo -n crontab -u www-data "
-    #             command = "crontab " + tmp_file_name
-    #
-    #         subprocess.Popen(command, shell=True)
-    #         command = "rm " + tmp_file_name
-    #         try:
-    #             subprocess.Popen(command, shell=True)
-    #         except:
-    #             pass
-    #         logging.info(f"User {user_name} modified run schedule to {new_run_schedule}"
-    #                      f" hours from {old_run_schedule} hours")
-    #     return HttpResponseRedirect(reverse(scheduler))
     if request.method == 'POST' and 'camera_check' in request.POST:
         if not license_limits_are_ok():
             template = loader.get_template('main_menu/license_error.html')
@@ -902,49 +712,25 @@ def scheduler(request):
         try:
             camera_object = Camera.objects.get(camera_number=input_number)
         except ObjectDoesNotExist:
-            obj = EngineState.objects.last()
-            state = obj.state
-            license_obj = Licensing.objects.last()
-            run_schedule = license_obj.run_schedule
-            context = {'camera_does_not_exist': input_number, 'system_state': state, 'run_schedule': run_schedule}
+
+            context = {'camera_does_not_exist': input_number}
+            template = loader.get_template('main_menu/scheduler.html')
             return HttpResponse(template.render(context, request))
-        camera_number = str(camera_object.camera_number)
+        if camera_object.snooze:
+            context = {"error": "Selected camera is on snooze mode"}
+            template = loader.get_template('main_menu/scheduler.html')
+            return HttpResponse(template.render(context, request))
         camera_id = [camera_object.id]
-        # process_output = subprocess.check_output(["/home/checkit/camera_checker/main_menu/compare_images_v2.bin",
-        #                                           camera_number])
-        # process_output = subprocess.check_output(["/home/checkit/env/bin/python",
-        #                                           "/home/checkit/camera_checker/main_menu/start.py", camera_number])
-        state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
         number_of_cameras_in_run = 1
-        engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+        engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
-        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
         process_cameras.delay(camera_id, engine_state_id, user_name)
 
-        # child_process = Popen(["/home/checkit/env/bin/python",
-        #                       "/home/checkit/camera_checker/main_menu/start.py", camera_number],
-        #                       stdout=PIPE, stderr=PIPE)
-        # stdout, stderr = child_process.communicate()
-        # return_code = child_process.returncode
-        # # print('return_code', return_code)
-        # # logging.info(f"views 619  {return_code}, {stdout}, {stderr}")
-        # if return_code == 33:
-        #     pass
-        #     context = {"error": "Licensing Error"}
-        #     return HttpResponse(template.render(context, request))
-        # elif return_code == 0:
-        #     logger.info(f"User {user_name} completed camera check for camera {camera_number}")
-        #     process_output = "Run Completed - No errors reported"
-        #     logger.info("Process Output {p}".format(p=process_output))
-        #     return HttpResponseRedirect(reverse(index))
-        # else:
-        #     logger.error("Error in camera check for camera {} - {}".format(camera_number, stderr))
-        #     context = {"error": "Error Checking Camera"}
-        #     return HttpResponse(template.render(context, request))
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
     return HttpResponse(template.render(context, request))
@@ -1027,6 +813,7 @@ def licensing(request):
                     admin_cursor = adm_db.cursor()
                     if mysql_password:
                         sql_statement = f"ALTER USER 'root'@'localhost' IDENTIFIED BY '{mysql_password}';"
+                        # TODO setup root@"%" and checkit@"%"
                         admin_cursor.execute(sql_statement)
                         sql_statement = "FLUSH PRIVILEGES;"
                         admin_cursor.execute(sql_statement)
@@ -1058,7 +845,7 @@ def licensing(request):
                         return HttpResponse(template.render(context, request))
                 else:
                     pass
-                start_date = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d")
+                start_date = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d")
                 sql_statement = """INSERT INTO adm (tx_count, tx_limit, end_date, license_key, camera_limit, 
                                    customer_name, site_name) VALUES (%s,%s,%s,%s,%s,%s,%s)"""
                 values = (remaining_transactions, uploaded_purchased_transactions, uploaded_end_date,
@@ -1113,24 +900,24 @@ class LogView(LoginRequiredMixin, SingleTableMixin, FilterView):
     ordering = '-creation_date'
 
 
-def get_date(request):
-    # if this is a POST request we need to process the form data
-    if request.method == 'POST':
-        # create a form instance and populate it with data from the request:
-        form = DateForm(request.POST)
-        # check whether it's valid:
-        if form.is_valid():
-            # process the data in form.cleaned_data as required
-            # ...
-            # redirect to a new URL:
-
-            return HttpResponse("value", form.cleaned_data)
-
-    # if a GET (or any other method) we'll create a blank form
-    else:
-        form = RegionsForm()
-
-    return render(request, 'main_menu/date.html', {'form': form})
+# def get_date(request):
+#     # if this is a POST request we need to process the form data
+#     if request.method == 'POST':
+#         # create a form instance and populate it with data from the request:
+#         form = DateForm(request.POST)
+#         # check whether it's valid:
+#         if form.is_valid():
+#             # process the data in form.cleaned_data as required
+#             # ...
+#             # redirect to a new URL:
+#
+#             return HttpResponse("value", form.cleaned_data)
+#
+#     # if a GET (or any other method) we'll create a blank form
+#     else:
+#         form = RegionsForm()
+#
+#     return render(request, 'main_menu/date.html', {'form': form})
 
 
 class EngineStateView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -1648,7 +1435,7 @@ def cameras_with_missing_reference_images(request):
 
 def action_per_hour_report(request):
     # Get the current time
-    current_time = datetime.datetime.now()
+    current_time = timezone.now()
 
     # Calculate the start time (e.g., last 24 hours)
     start_time = current_time - datetime.timedelta(days=3)
@@ -1668,38 +1455,38 @@ def action_per_hour_report(request):
 
 @shared_task()
 def clear_logs():
-    last_log_date = datetime.datetime.now() - datetime.timedelta(days=30)
+    last_log_date = timezone.now() - datetime.timedelta(days=30)
     logs = LogImage.objects.filter(creation_date__lte=last_log_date)
     # print(len(logs))
+    number_of_logs = len(logs)
     logs.delete()
     engine_objects = EngineState.objects.filter(state_timestamp__lte=last_log_date)
     engine_objects.delete()
-    logging.info("ran clear logs")
+    # Camera.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    # LogImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    # ReferenceImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    LogEntry.objects.filter(action_time__lt=timezone.now() - timedelta(days=120)).delete()
+    logging.info(f"Log file cleared from {last_log_date} - {number_of_logs} logs removed")
 
 @shared_task()
 def check_all_cameras():
     user_name = "system_scheduler"
     camera_objects = Camera.objects.all()
     camera_ids = [item.id for item in camera_objects]
-    number_of_cameras_in_run = len(camera_ids)
-    x = number_of_cpus
+    x = int(number_of_cpus*2)
     num_sublists = (len(camera_ids) + x - 1) // x
     sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
     number_of_cameras_in_run = len(camera_ids)
-    state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
-    engine_process_id = 0
-    transaction_rate = 0
+
     # create STARTED record first then create FINISHED and pass that record id to celery to have the
     # workers update the timestamp and counts as the complete check
-    engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
+    engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
                                       number_of_cameras_in_run=number_of_cameras_in_run)
     engine_state_record.save()
-    engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=state_timestamp, user=user_name,
+    engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
                                       number_of_cameras_in_run=number_of_cameras_in_run)
     engine_state_record.save()
     engine_state_id = engine_state_record.id
     for group_of_cameras in sublists:
-        # print("processing list", group_of_cameras )
-        # long_task.delay(group_of_cameras)
         status = process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-        # print("status", status)
+
