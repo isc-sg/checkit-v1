@@ -13,7 +13,7 @@ class CameraResource(resources.ModelResource):
     class Meta:
         model = Camera
         skip_unchanged = True
-        exclude = ('id',)
+        # exclude = ('id',)
         fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
                   'camera_password', 'camera_number', 'camera_name',
                   'camera_location', 'image_regions', 'matching_threshold',
@@ -24,6 +24,7 @@ class CameraResource(resources.ModelResource):
                             'focus_value_threshold', 'light_level_threshold')
         report_skipped = True
         raise_errors = True
+
 
     def import_row(self, row, instance_loader, **kwargs):
         try:
@@ -53,7 +54,7 @@ class ReferenceImageResource(resources.ModelResource):
 
     class Meta:
         model = ReferenceImage
-        exclude = ('id',)
+        # exclude = ('id',)
         fields = ('image', 'hour')
 
 #
