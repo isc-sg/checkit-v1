@@ -1,14 +1,16 @@
 import logging
+import os
+import shutil
 
 from django.contrib import admin
 from django.conf import settings
-import shutil
 from django.utils.safestring import mark_safe
 from django.template.defaultfilters import slugify
 from import_export.admin import ImportExportModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
 
 from django.contrib import admin
+from django.contrib.admin import ModelAdmin
 from django.contrib.admin.models import LogEntry, DELETION
 from django.utils.html import escape
 from django.urls import reverse
@@ -17,18 +19,19 @@ from rangefilter.filters import DateRangeFilter, DateTimeRangeFilter
 from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDropdownFilter, ChoiceDropdownFilter
 from django.views.decorators.cache import cache_control, add_never_cache_headers
 from django.utils.decorators import method_decorator
-import os
 from django_celery_beat.apps import BeatConfig
+from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay
+from .resources import CameraResource, ReferenceImageResource
 BeatConfig.verbose_name = "Checkit Clocks"
 
 # Register your models here.
 # from .models import Camera, ReferenceImage, LogImage
-from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay
-from .resources import CameraResource, ReferenceImageResource
+
 
 admin.site.site_title = "CheckIT"
 admin.site.site_header = "CheckIT"
 admin.site.index_title = "CheckIT Admin"
+
 
 class DisableClientSideCachingMiddleware(object):
     def process_response(self, request, response):
@@ -37,19 +40,21 @@ class DisableClientSideCachingMiddleware(object):
 
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
+
     massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
                          'slug']
     filter_horizontal = ('scheduled_hours', 'scheduled_days')
     resource_class = CameraResource
-    search_fields = ['url', 'camera_number', 'camera_name', 'camera_location']
-    exclude = ('id',)
+    search_fields = ['url', 'camera_number', 'camera_name', 'camera_location', 'id']
     list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
-                    'camera_location', 'matching_threshold', 'check_reference_image')
-    readonly_fields = ["creation_date", "last_check_date", 'image_regions']
+                    'camera_location', 'matching_threshold', 'unique_camera_id', 'check_reference_image')
+    readonly_fields = ["unique_camera_id","creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
                    ('scheduled_days', RelatedDropdownFilter))
-
+    history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
+    def unique_camera_id(self, obj):
+        return obj.id
     def save_model(self, request, obj, form, change):
         obj.save()
 
@@ -96,14 +101,15 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
         queryset.delete()
 
 
-class ReferenceAdmin(SimpleHistoryAdmin):
+class ReferenceAdmin(ModelAdmin):
     # model = ReferenceImage
     resource_class = ReferenceImageResource
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
-    exclude = ('id',)
+    # exclude = ('id',)
     list_display = ['url', 'hour', 'reference_image', 'get_location']
     readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date']
     list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter))
+    fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date']
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -144,7 +150,8 @@ class ReferenceAdmin(SimpleHistoryAdmin):
     #             pass
     #     queryset.delete()
 
-class LogImageAdmin(SimpleHistoryAdmin):
+
+class LogImageAdmin(ModelAdmin):
     resource_class = LogImage
     search_fields = ['url__camera_name', 'image', 'action', 'creation_date', 'url__camera_location']
     list_display = ['url', 'creation_date', 'action', 'get_location', ]
