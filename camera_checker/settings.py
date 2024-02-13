@@ -138,7 +138,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = False
+USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
@@ -243,6 +243,6 @@ CELERYD_LOG_LEVEL = 'INFO'
 # USE_TZ = True
 CELERY_IMPORTS = ['camera_checker.celery',]
 CELERY_TIMEZONE = "Australia/Melbourne"
-DJANGO_CELERY_BEAT_TZ_AWARE = False
+DJANGO_CELERY_BEAT_TZ_AWARE = True
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o775
 FILE_UPLOAD_PERMISSIONS = 0o660
