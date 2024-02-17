@@ -476,7 +476,6 @@ def index(request):
     # user_name = request.user.username
     # logging.info("User {u} access to System Status".format(u=user_name))
     statvfs = os.statvfs('/home/checkit')
-
     # total_disk_giga_bytes = statvfs.f_frsize * statvfs.f_blocks / (1024 * 1024 * 1024)
     # total_disk_giga_bytes_free = round(statvfs.f_frsize * statvfs.f_bavail / (1024 * 1024 * 1024), 2)
     # total_disk_giga_bytes_used = round(total_disk_giga_bytes - total_disk_giga_bytes_free, 2)
@@ -1468,6 +1467,7 @@ def clear_logs():
     LogEntry.objects.filter(action_time__lt=timezone.now() - timedelta(days=120)).delete()
     logging.info(f"Log file cleared from {last_log_date} - {number_of_logs} logs removed")
 
+
 @shared_task()
 def check_all_cameras():
     user_name = "system_scheduler"
@@ -1490,3 +1490,8 @@ def check_all_cameras():
     for group_of_cameras in sublists:
         status = process_cameras.delay(group_of_cameras, engine_state_id, user_name)
 
+
+def trigger_new_reference_image(selected_camera_ids):
+    for camera_id in selected_camera_ids:
+        camera = Camera.objects.get(pk=camera_id)
+        print(camera.camera_name)
