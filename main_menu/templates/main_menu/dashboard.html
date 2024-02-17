@@ -55,7 +55,7 @@
                         <ul style="list-style-type:none">
                             {% if user.is_authenticated %}
                             <li><i class="far fa-user"></i> {{ user.get_username }} <br><a
-                                    href="/accounts/password_change">Change password</a></li>
+                                    href="/accounts/password_change/">Change password</a></li>
                             {% else %}
                             <li><a href="{% url 'login'%}?next={{request.path}}"> <i class="fa fa-sign-in-alt"></i>
                                 Login</a></li>
