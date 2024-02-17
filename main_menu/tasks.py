@@ -43,7 +43,7 @@ logger = get_task_logger(__name__)
 MY_SDSN = 10101  # !!!! change this value to be the value of your SDSN (demo = 10101)
 MY_PRODCODE = "DEMO"  # !!!! change this value to be the value of the Product Code in the dongle
 
-socket_timeout = 1
+socket_timeout = 2
 camera_details_dict = {}
 CHECKIT_HOST = ""
 HOST = ""
@@ -727,21 +727,21 @@ def take_closest(my_list, my_number):
 
 
 def send_alarms(list_of_cameras, camera_dict, run_number):
-    if not log_alarms:
-        return
+    # logger.info(f"Processing list of cameras {list_of_cameras} {run_number}")
     if HOST is None or PORT == 0:
         logger.error(f"Error in config - HOST = {HOST}, PORT = {PORT}")
-
         return
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(socket_timeout)
         s.connect((HOST, PORT))
-    except socket.error as e:
-        logger.error(f"Error sending to alarm server - {e}")
-        return
-    finally:
         s.close()
+    except socket.error as e:
+        logger.error(f"Alarm Server Socket creation error: {e}")
+        return
+
+
     checkit_db = mysql.connector.connect(
                     host="localhost",
                     user="checkit",
@@ -765,7 +765,10 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
     cursor.execute(sql_statement)
     f = cursor.fetchall()
     # print(len(f))
+    # logger.info(f"log image results: {f}")
     for i in f:
+        # logger.info(f"Processing log: {i}")
+
         url_id = i[0]
         creation_date = datetime.datetime.strftime(i[1], "%Y-%m-%d %H:%M:%S.%f")
         action = i[2]
@@ -774,12 +777,15 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         focus_value = i[5]
         light_level = i[6]
         reference_image_id = i[7]
-        if reference_image_id == None:
-            continue
+        # logger.info(f"reference_image_id : {reference_image_id}")
+
+        # if reference_image_id == None:
+        #     continue
         # sql_statement = "SELECT url, camera_number, camera_name, camera_location FROM main_menu_camera WHERE id = {}".format(url_id)
         # cursor.execute(sql_statement)
         # camera_details = cursor.fetchone()
         last_good_check = LogImage.objects.filter(url_id=url_id, action="Pass").last()
+        # logger.info(f"last_good_check results: {last_good_check}")
         if last_good_check:
             last_good_check_date_time = last_good_check.creation_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         else:
@@ -793,20 +799,32 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
         camera_number = camera_dict[url_id]['camera_number']
         camera_name = camera_dict[url_id]['camera_name']
         camera_location = camera_dict[url_id]['camera_location']
-        sql_statement = "SELECT image, creation_date FROM main_menu_referenceimage WHERE id = " + str(reference_image_id)
-        cursor.execute(sql_statement)
-        reference_image = cursor.fetchone()
-        reference_image_creation_date = reference_image[1].strftime("%Y-%m-%dT%H:%M:%SZ")
+        if reference_image_id:
+            sql_statement = "SELECT image, creation_date FROM main_menu_referenceimage WHERE id = " + str(reference_image_id)
+            cursor.execute(sql_statement)
+            reference_image = cursor.fetchone()
+            reference_image_creation_date = reference_image[1].strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            reference_image = [""]
+            reference_image_creation_date = ""
         additional_data = "lastGoodCheckDatetime=" + last_good_check_date_time + "&amp;referenceImageDatetime=" + reference_image_creation_date
         # logger.error(f"additional_data {additional_data} for {url_id})")
 
         image = "http://" + CHECKIT_HOST + "/media/" + log_image
         reference_image = "http://" + CHECKIT_HOST + "/media/" + reference_image[0]
-        message = "Error detected on camera " + camera_url \
-                  + "|with matching score result " + str(matching_score) \
-                  + "|at location " + str(camera_location)
+
+        if reference_image_id:
+            message = "Error detected on camera " + camera_url \
+                      + "|with matching score result " + str(matching_score) \
+                      + "|with focus value " + str(focus_value) \
+                      + "|with light level " + str(light_level) \
+                      + "|at location " + str(camera_location)
+        else:
+            message = "Capture Error on camera " + camera_url \
+                      + "|at location " + str(camera_location)
+
         send_alarm = """<?xml version="1.0" encoding="UTF-8"?><Request command="sendAlarm" id="123">""" \
-                     + "<message>" + "Checkit Alarm" + "</message> " \
+                     + "<message>" + "Camera Scene Validation Alarm" + "</message> " \
                      + "<text>" + message + "</text>" \
                      + "<cameraId>" + str(camera_number) + "</cameraId>" \
                      + "<param1>" + camera_location + "</param1>" \
@@ -819,14 +837,17 @@ def send_alarms(list_of_cameras, camera_dict, run_number):
                      + "<hidden>" + "false" + "</hidden>" \
                      + "<additionalData>" + additional_data + "</additionalData>" \
                      + "<autoClose>true</autoClose></Request>""" + "\x00"
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        except socket.error as e:
+            logger.error(f"socket connect 2 {e}")
         try:
             s.connect((HOST, PORT))
             s.send(send_alarm.encode())
             # logger.info(send_alarm)
             reply = s.recv(8192).decode().rstrip("\x00")
             # print(reply)
-            # logger.info(f"Reply for Synergy {reply}")
+            logger.info(f"Reply for Synergy {reply}")
         except socket.error as e:
             logger.error(f"Error sending to alarm server - {e}")
 
@@ -1174,6 +1195,7 @@ def no_base_image(camera, describe_data, user_name, engine_state_id):
                 else:
                     try:
                         able_to_write = cv2.imwrite(file_name, frame)
+
                         os.system(f"sudo chmod 775 {directory}")
 
                         if not able_to_write:
@@ -1190,10 +1212,14 @@ def no_base_image(camera, describe_data, user_name, engine_state_id):
                         # logger.info(f"Blur A {focus_value} Blur B {fv}")
                         sql_file_name = file_name.strip("/home/checkit/camera_checker/media/")
                         # table = "main_menu_referenceimage"
-                        # fields = "(url_id, image, hour, light_level, creation_date, focus_value, version) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+                        # fields = "(url_id, image, hour, light_level, creation_date, focus_value) VALUES (%s,%s,%s,%s,%s,%s)"
                         # values = (str(camera), sql_file_name,
-                        #           time_stamp.strftime('%H'), base_brightness, timezone.now(), fv, 1)
+                        #           time_stamp.strftime('%H'), base_brightness, timezone.now(), fv)
                         # sql_insert(table, fields, values)
+                        # ReferenceImage.objects.create(url_id=camera, image=sql_file_name,
+                        #                               hour=timezone.localtime().strftime('%H'),
+                        #                               light_level=base_brightness,
+                        #                               creation_date=timezone.now(), focus_value=fv)
                         ReferenceImage.objects.create(url_id=camera, image=sql_file_name,
                                                       hour=timezone.localtime().strftime('%H'),
                                                       light_level=base_brightness,
@@ -1253,7 +1279,7 @@ def check(cameras, engine_state_id, user_name):
             options_response, has_error = options(url, ip_address, url_port, camera_username, camera_password)
 
             if not has_error:
-                message = message + f"Connected to {url}\n"
+                message = message + f"Connected to {url} - Unique ID {camera} - Camera Number {camera_number}"
             else:
                 message = message + f"Error in OPTIONS for {url} {options_response}\n"
 
@@ -1379,6 +1405,16 @@ def check(cameras, engine_state_id, user_name):
                                     continue
                                 else:
                                     try:
+                                        h, w, c = image_frame.shape
+                                        # logger.info(f"Dimensions = {h} {w} {c}")
+                                        if h < 720:
+                                            scale = math.ceil(720 / h)
+                                            logger.info(f"WARNING: Image size is below recommended minimum of 720p - "
+                                                        f"images are being scaled up by factor of {scale} for analysis")
+                                            image_frame = cv2.resize(image_frame, (h * scale, w * scale),
+                                                                     interpolation=cv2.INTER_AREA)
+                                            base_image = cv2.resize(base_image, (h * scale, w * scale),
+                                                                    interpolation=cv2.INTER_AREA)
                                         image_base_grey = cv2.cvtColor(base_image, cv2.COLOR_BGR2GRAY)
                                         image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
                                         reference_dimensions = image_base_grey.shape[:2]
@@ -1413,6 +1449,9 @@ def check(cameras, engine_state_id, user_name):
                                         continue
                                     else:
                                         # this is the actual comparison section
+                                        # check size of image - if image is too small then scale it up to support 720p
+                                        # need to do this otherwise a_eye won't work properly.
+
                                         (matching_score,
                                          focus_value,
                                          region_scores,
@@ -1421,7 +1460,7 @@ def check(cameras, engine_state_id, user_name):
                                                                             regions, base_image,
                                                                             image_frame)
                                         sql_file_name = log_image_file_name.strip("/home/checkit/camera_checker/media/")
-
+                                        # logger.info(f"Matching score {matching_score} cam ms {camera_details_dict[camera]['matching_threshold']}")
                                         if matching_score < camera_details_dict[camera]['matching_threshold']:
                                             action = "Failed"
                                             # logging.info("movement fail")
