@@ -39,6 +39,17 @@ class DisableClientSideCachingMiddleware(object):
         return response
 
 
+def new_reference_image(modeladmin, request, queryset):
+    # Code to run your custom function
+    # For example, call your function from views.py
+    selected_camera_ids = queryset.values_list('pk', flat=True)
+    from .views import trigger_new_reference_image
+    trigger_new_reference_image(selected_camera_ids)
+
+
+new_reference_image.short_description = "Trigger New Reference Image"
+
+
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
 
     massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
@@ -48,13 +59,17 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location', 'id']
     list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
                     'camera_location', 'matching_threshold', 'unique_camera_id', 'check_reference_image')
-    readonly_fields = ["unique_camera_id","creation_date", "last_check_date", 'image_regions']
+    readonly_fields = ["unique_camera_id", "creation_date", "last_check_date", 'image_regions']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
                    ('scheduled_days', RelatedDropdownFilter))
     history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
+    actions = [new_reference_image]
+
+
     def unique_camera_id(self, obj):
         return obj.id
+
     def save_model(self, request, obj, form, change):
         obj.save()
 
@@ -103,13 +118,16 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
 
 class ReferenceAdmin(ModelAdmin):
     # model = ReferenceImage
+
     resource_class = ReferenceImageResource
     search_fields = ['url__camera_name', 'url__camera_number', 'image']
     # exclude = ('id',)
-    list_display = ['url', 'hour', 'reference_image', 'get_location']
-    readonly_fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date']
-    list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter))
-    fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date']
+    list_display = ['url', 'hour', 'version', 'reference_image', 'get_location']
+    readonly_fields = ['url', 'hour', 'get_regions', 'reference_image',
+                       'light_level', 'focus_value', 'creation_date', 'version']
+    list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter), ('version', DropdownFilter))
+    fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date', 'version']
+    exclude = ['trigger_new_version']
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -120,6 +138,8 @@ class ReferenceAdmin(ModelAdmin):
 
     def reference_image(self, obj):
         scaling_factor = 4
+        if obj.image.width <= 720:
+            scaling_factor = 2
         if obj.image.width > 1920:
             scaling_factor = (obj.image.width / 1920) * 4
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
