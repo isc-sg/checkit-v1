@@ -49,8 +49,6 @@ urlpatterns = [
     path('progress_meter/', views.progress_meter, name='progress_meter'),
     path('missing_reference_images/', views.cameras_with_missing_reference_images, name='missing_ref'),
     path('log_summary/', views.action_per_hour_report, name='log_summary'),
-
-
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()
 urlpatterns += [
