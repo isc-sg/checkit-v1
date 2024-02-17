@@ -134,6 +134,7 @@ class ReferenceImage(models.Model):
     creation_date = models.DateTimeField('date created', default=timezone.now)
     # history = HistoricalRecords()
     version = models.PositiveSmallIntegerField(default=1)
+    trigger_new_version = models.BooleanField(default=False)
     def __str__(self):
         return f'{self.image}'
 
