@@ -650,7 +650,7 @@ def scheduler(request):
                 if not camera_object.snooze:
                     camera_ids.append(camera_object.id)
             number_of_cameras_in_run = len(camera_ids)
-            x = int(number_of_cpus*2)
+            x = int(number_of_cpus/2)
             num_sublists = (len(camera_ids) + x - 1) // x
             sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
             # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
@@ -681,10 +681,11 @@ def scheduler(request):
         camera_objects = Camera.objects.all().filter(snooze=False)
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
-        x = int(number_of_cpus*2)
+        x = int(number_of_cpus/2)
         num_sublists = (len(camera_ids) + x - 1) // x
         sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
-
+        # recommended configuration - set celery config file to have 2 x CPUs for concurrency and 2 workers
+        # dual workers should provide some redundancy.
         # create STARTED record first then create FINISHED/ RUN COMPLETED and pass that record id to celery to have the
         # workers update the timestamp and counts as the complete check
         engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
@@ -1377,6 +1378,8 @@ def display_regions(request):
                     raise ObjectDoesNotExist
                 else:
                     region_scores = log_obj.region_scores
+                    if isinstance(region_scores, str):
+                        region_scores = json.loads(region_scores)
                     creation_date = log_obj.creation_date
                     regions = []
                     scores = []
@@ -1473,7 +1476,7 @@ def check_all_cameras():
     user_name = "system_scheduler"
     camera_objects = Camera.objects.all()
     camera_ids = [item.id for item in camera_objects]
-    x = int(number_of_cpus*2)
+    x = int(number_of_cpus/2)
     num_sublists = (len(camera_ids) + x - 1) // x
     sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
     number_of_cameras_in_run = len(camera_ids)
