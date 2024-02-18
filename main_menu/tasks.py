@@ -103,6 +103,10 @@ def array_to_string(array):
     return new_string
 
 
+checkit_array = [52, 50, 52, 48, 54, 55, 49, 49, 57, 53, 54, 116, 105, 107, 99, 101, 104, 67]
+
+checkit_secret = array_to_string(checkit_array).encode()
+
 def get_encrypted(password):
     h = hashlib.blake2b(digest_size=64, key=checkit_secret)
     h.update(password.encode())
@@ -172,22 +176,16 @@ def check_adm_database(password):
 
 
 def get_license_details():
-    global checkit_secret
-    global key
 
-    checkit_array = [52, 50, 52, 48, 54, 55, 49, 49, 57, 53, 54, 116, 105, 107, 99, 101, 104, 67]
+    # checkit_key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
 
-    checkit_secret = array_to_string(checkit_array).encode()
+    checkit_key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 103,
+                         118, 101, 56, 119, 95, 70, 85,48, 89, 45, 76, 72, 78, 118, 121,
+                         103, 75, 108, 72, 105, 119, 80, 108, 74, 78, 79, 114, 54, 77, 61]
 
-    # key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
+    checkit_key = array_to_string(checkit_key_array).encode()
 
-    key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 103, 118, 101, 56, 119, 95, 70, 85, 48, 89,
-                 45,
-                 76, 72, 78, 118, 121, 103, 75, 108, 72, 105, 119, 80, 108, 74, 78, 79, 114, 54, 77, 61]
-
-    key = array_to_string(key_array).encode()
-
-    f = Fernet(key)
+    f = Fernet(checkit_key)
     machine_command_array = [47, 101, 116, 99, 47, 109, 97, 99, 104, 105, 110, 101, 45, 105, 100]
     machine_command = array_to_string(machine_command_array)
     # fd = open("/etc/machine-id", "r")
@@ -1090,7 +1088,7 @@ def compare_images(base, frame, r, base_color, frame_color):
     frame_bilateral = cv2.bilateralFilter(frame_equalised, 9, 100, 100)
     base_equalised = cv2.equalizeHist(base)
     base_bilateral = cv2.bilateralFilter(base_equalised, 9, 100, 100)
-    full_ss = main_menu.a_eye.movement(base_bilateral, frame_bilateral)
+    # logger.info(f"Regions {r}")
     count = 0
     for i in coordinates:
         (x, y), (qw, qh) = i
@@ -1116,17 +1114,18 @@ def compare_images(base, frame, r, base_color, frame_color):
         scores.append(ss)
     # logging.info(scores)
     number_of_regions = len(r)
-    scores.sort(reverse=True)
-    sum_scores = sum(scores)
+    if number_of_regions < 64:
+        # scores.sort(reverse=True)
+        sum_scores = sum(scores)
 
-    scores_average = sum_scores / number_of_regions
+        full_ss = sum_scores / number_of_regions
+    else:
+        full_ss = main_menu.a_eye.movement(base_bilateral, frame_bilateral)
 
-    if len(r) > 0:
-        full_ss = scores_average
     # if scores_average < full_ss:
     #     full_ss = scores_average
     full_ss = round(full_ss, 2)
-    scores_average = round(scores_average, 2)
+    # scores_average = round(scores_average, 2)
 
     # fv = cv2.Laplacian(frame_color, cv2.CV_64F).var()
     fv = skimage.measure.blur_effect(frame)
@@ -1134,7 +1133,7 @@ def compare_images(base, frame, r, base_color, frame_color):
 
     blur = cv2.blur(frame, (5, 5))
     frame_brightness = cv2.mean(blur)[0]
-    blur = cv2.blur(base, (5, 5))
+    # blur = cv2.blur(base, (5, 5))
     # base_brightness = cv2.mean(blur)[0]
 
     # if is_low_contrast(frame, 0.25) or frame_brightness < 50:
