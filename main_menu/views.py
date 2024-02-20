@@ -1303,13 +1303,13 @@ def input_camera_for_regions(request):
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id).last()
+                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:
                     region_scores = log_obj.region_scores
-                    if not isinstance(region_scores, dict):
-                        region_scores = {}
+                    if isinstance(region_scores, str):
+                        region_scores = json.loads(region_scores)
                     creation_date = log_obj.creation_date
                     regions = []
                     scores = []
@@ -1368,7 +1368,7 @@ def display_regions(request):
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id).last()
+                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:
