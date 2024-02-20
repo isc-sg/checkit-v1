@@ -416,26 +416,21 @@ def take_closest(my_list, my_number):
 
 
 def get_base_image(reference_images_list, url_id, regions):
-    time_stamp = timezone.now()
-    hour = time_stamp.strftime('%H')
-    hours = []
-    for record in reference_images_list:
-        hours.append(record.hour)
-    for i in range(0, len(hours)):
-        hours[i] = int(hours[i])
-    hour = int(hour)
+    hour = int(timezone.localtime().strftime('%H'))
+
+    hours = list(reference_images_list.values_list('hour', flat=True))
+
+    hours = [int(item) for item in hours]
     hours.sort()
 
-    closest_hour = take_closest(hours, hour)
-    closest_hour = str(closest_hour).zfill(2)
+    closest_hour = str(take_closest(hours, hour)).zfill(2)
     try:
-        closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour)
 
-        image = closest_reference_image.image
-        base_image_file = settings.MEDIA_ROOT + "/" + str(image)
+        closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour).image
+        base_image_file = f"{settings.MEDIA_ROOT}/{closest_reference_image}"
         img = cv2.imread(base_image_file)
 
-        regions = eval(regions)
+        regions = ast.literal_eval(regions)
         height, width, channels = img.shape
 
         co_ordinates = select_region.get_coordinates(regions, height, width)
@@ -1491,7 +1486,7 @@ def check_all_cameras():
     engine_state_record.save()
     engine_state_id = engine_state_record.id
     for group_of_cameras in sublists:
-        status = process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+        process_cameras.delay(group_of_cameras, engine_state_id, user_name)
 
 
 def trigger_new_reference_image(selected_camera_ids):
