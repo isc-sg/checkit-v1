@@ -2,3 +2,5 @@
 /logs/
 /build/
 /main_menu/migrations/
+/main_menu/dplin64py.so
+/main_menu/chkmem.py
