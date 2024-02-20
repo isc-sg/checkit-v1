@@ -19,11 +19,14 @@ from wurlitzer import pipes
 import skimage
 from main_menu import select_region
 from main_menu import a_eye
+import json
 
 from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.db import transaction
+from django.conf import settings
+
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
 
@@ -805,7 +808,7 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
                 continue
 
             # check if image is low res
-            h, w= image_frame.shape[:2]
+            h, w = image_frame.shape[:2]
             if h < 720:
                 scale = math.ceil(720 / h)
                 logger.info(f"WARNING: Image size is below recommended minimum of 720p - "
@@ -844,6 +847,57 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             focus_value = results_dict['focus value']
             region_scores = results_dict['region scores']
             light_level = results_dict['light level']
+            log_image_file_name = (f"{settings.MEDIA_ROOT}/log/{timezone.now().year}/{timezone.now().month}/"
+                                   f"{timezone.now().day}/{camera}-"
+                                   f"{timezone.now().hour}:{timezone.now().minute}:{timezone.now().second}.jpg")
+
+            sql_file_name = log_image_file_name.strip(settings.MEDIA_ROOT)
+
+            # if matching_score < camera_object.matching_threshold:
+            #     action = "Failed"
+            # else:
+            #     action = "Pass"
+            #
+            # if action != "Failed":
+            #     if focus_value > camera_object.focus_value_threshold:
+            #         action = "Failed"
+            #     else:
+            #         action = "Pass"
+            #
+            # if action != "Failed":
+            #     if light_level < camera_object.light_level_threshold:
+            #         action = "Failed"
+            #     else:
+            #         action = "Pass"
+
+            if matching_score < camera_object.matching_threshold:
+                action = "Failed"
+            elif focus_value > camera_object.focus_value_threshold:
+                action = "Failed"
+            elif light_level < camera_object.light_level_threshold:
+                action = "Failed"
+            else:
+                action = "Pass"
+
+            LogImage.objects.create(url_id=camera, image=sql_file_name,
+                                    matching_score=matching_score,
+                                    region_scores=json.dumps(region_scores),
+                                    current_matching_threshold=camera_object.matching_threshold,
+                                    light_level=light_level,
+                                    focus_value=focus_value,
+                                    action=action,
+                                    creation_date=timezone.now(),
+                                    current_focus_value=camera_object.focus_value_threshold,
+                                    current_light_level=camera_object.light_level_threshold,
+                                    user=user,
+                                    run_number=engine_state_id,
+                                    reference_image_id=reference_image_objects.get(hour=local_time_hour).id)
+
+            increment_transaction_count()
+
+            camera_object = Camera.objects.get(id=camera)
+            camera_object.last_check_date = timezone.now()
+            camera_object.save()
 
         else:
             # this should be simple imread rather than open / describe etc.
