@@ -1032,12 +1032,14 @@ def increment_engine_state_other_count(engines_state_id):
     # engine_object.state_timestamp = timezone.now()
     # engine_object.save()
 
+
 def increment_engine_state_pass_count(engines_state_id):
     # now = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
     # table = "main_menu_enginestate"
     # fields = f"number_pass_images =  number_pass_images + 1, state_timestamp = '{now}'"
     # where = f" WHERE id = {engines_state_id}"
     # sql_update(table, fields, where)
+
     with transaction.atomic():
         try:
             engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
@@ -1048,6 +1050,14 @@ def increment_engine_state_pass_count(engines_state_id):
             engine_object.number_pass_images += 1
             engine_object.state_timestamp = timezone.now()
             engine_object.save()
+
+    # def check_transaction_success():
+    #     # Check if the transaction was successfully committed
+    #     # If not, raise an exception
+    #     if not transaction.get_connection().in_atomic_block:
+    #         logger.error("Transaction did not complete successfully")
+    #
+    # transaction.on_commit(check_transaction_success)
 
     # engine_object = EngineState.objects.get(id=engines_state_id)
     # engine_object.number_pass_images += 1
@@ -1256,13 +1266,13 @@ def check(cameras, engine_state_id, user_name):
             logger.error(f"Camera id {camera} does not exist")
             continue
         if int(current_hour) not in hoursinday:
-            increment_engine_state_other_count(engine_state_id)
+            # increment_engine_state_other_count(engine_state_id)
             continue
         if day_of_the_week not in daysofweek:
-            increment_engine_state_other_count(engine_state_id)
+            # increment_engine_state_other_count(engine_state_id)
             continue
         if camera_object.snooze:
-            increment_engine_state_other_count(engine_state_id)
+            # increment_engine_state_other_count(engine_state_id)
             continue
 
         message = f"Attempting connection to {url}\n"
@@ -1285,7 +1295,7 @@ def check(cameras, engine_state_id, user_name):
                 LogImage.objects.create(url_id=camera, region_scores={}, action="Capture Error",
                                         creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
-                increment_engine_state_other_count(engine_state_id)
+                # increment_engine_state_other_count(engine_state_id)
                 logger.error(message)
                 continue
 
@@ -1296,7 +1306,7 @@ def check(cameras, engine_state_id, user_name):
                 LogImage.objects.create(url_id=camera, region_scores={}, action="Capture Error",
                                         creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
-                increment_engine_state_other_count(engine_state_id)
+                # increment_engine_state_other_count(engine_state_id)
                 message = message + f"{describe_response}\n"
 
         if not has_error:
@@ -1307,7 +1317,7 @@ def check(cameras, engine_state_id, user_name):
                     LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                                             creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                     increment_transaction_count()
-                    increment_engine_state_other_count(engine_state_id)
+                    # increment_engine_state_other_count(engine_state_id)
                     message = message + f"Unable to open capture device {url}\n"
                 if capture_device.isOpened():
 
@@ -1345,7 +1355,7 @@ def check(cameras, engine_state_id, user_name):
                             if current_hour not in captured_reference_hours_integers:
                                 no_base_image(camera, describe_response, user_name, engine_state_id)
                                 increment_transaction_count()
-                                increment_engine_state_other_count(engine_state_id)
+                                # increment_engine_state_other_count(engine_state_id)
                                 # continue
 
                             else:
@@ -1444,7 +1454,7 @@ def check(cameras, engine_state_id, user_name):
                                                                 creation_date=timezone.now(), user=user_name,
                                                                 run_number=engine_state_id)
                                         increment_transaction_count()
-                                        increment_engine_state_other_count(engine_state_id)
+                                        # increment_engine_state_other_count(engine_state_id)
                                         continue
                                     else:
                                         # this is the actual comparison section
@@ -1515,25 +1525,22 @@ def check(cameras, engine_state_id, user_name):
                                                                 user=user_name,
                                                                 run_number=engine_state_id,
                                                                 reference_image_id=reference_image_id)
-                                        # sql_insert(table, fields, values)
 
-                                        table = "main_menu_camera"
-                                        fields = "last_check_date = " + "\"" + time_stamp_string + "\""
-                                        where = " WHERE id = " + "\"" + str(camera) + "\""
-                                        # sql_update(table, fields, where)
+                                        # if action == "Pass":
+                                        #     increment_engine_state_pass_count(engine_state_id)
+                                        # if action == "Failed":
+                                        #     increment_engine_state_failed_count(engine_state_id)
+                                        increment_transaction_count()
+
                                         camera_object = Camera.objects.get(id=camera)
                                         camera_object.last_check_date = timezone.now()
                                         camera_object.save()
 
-                                        increment_transaction_count()
-                                        if action == "Pass":
-                                            increment_engine_state_pass_count(engine_state_id)
-                                        if action == "Failed":
-                                            increment_engine_state_failed_count(engine_state_id)
+
                         else:
                             no_base_image(camera, describe_response, user_name, engine_state_id)
                             increment_transaction_count()
-                            increment_engine_state_other_count(engine_state_id)
+                            # increment_engine_state_other_count(engine_state_id)
                             # image_frame = cv2.resize(image_frame,(960,540))
                             # cv2.imshow("image", image_frame)
                             # cv2.waitKey(50)
@@ -1555,7 +1562,7 @@ def check(cameras, engine_state_id, user_name):
                                                 creation_date=timezone.now(), user=user_name,
                                                 run_number=engine_state_id)
                         increment_transaction_count()
-                        increment_engine_state_other_count(engine_state_id)
+                        # increment_engine_state_other_count(engine_state_id)
                         # print("Error reading video frame")
                         message = message + "Error reading video frame\n"
                 else:
@@ -1574,7 +1581,7 @@ def check(cameras, engine_state_id, user_name):
                     LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                                             creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                     increment_transaction_count()
-                    increment_engine_state_other_count(engine_state_id)
+                    # increment_engine_state_other_count(engine_state_id)
                     # print("Error reading video frame")
                     message = message + f"Unable to open capture device {url}\n"
             else:
@@ -1591,7 +1598,7 @@ def check(cameras, engine_state_id, user_name):
                 LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                                         creation_date=timezone.now(), user=user_name, run_number=engine_state_id)
                 increment_transaction_count()
-                increment_engine_state_other_count(engine_state_id)
+                # increment_engine_state_other_count(engine_state_id)
                 # print("Error reading video frame")
                 message = message + f"Unable to open capture device {url}\n"
         # message_queue.put(message)
@@ -1650,6 +1657,9 @@ def process_cameras(cameras, engine_state_id, user_name):
         # logger.info(f"log_alarms {log_alarms}")
 
         logs = LogImage.objects.filter(run_number=engine_state_id)
+        number_of_pass = logs.filter(action="Pass").count()
+        number_of_fail = logs.filter(action="Failed").count()
+        number_of_others = logs.count() - (number_of_pass + number_of_fail)
         if logs:
             last_log_time = logs.last().creation_date
             engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
@@ -1657,8 +1667,11 @@ def process_cameras(cameras, engine_state_id, user_name):
         # logger.info(f"Transaction rate is {transaction_rate}")
 
             try:
-                engine_object = EngineState.objects.all().last()
+                engine_object = EngineState.objects.get(id=engine_state_id)
                 engine_object.transaction_rate = transaction_rate
+                engine_object.number_pass_images = number_of_pass
+                engine_object.number_failed_images = number_of_fail
+                engine_object.number_others = number_of_others
                 engine_object.save()
             except EngineState.DoesNotExist:
                 logger.error(f"Error updating transaction rate")
