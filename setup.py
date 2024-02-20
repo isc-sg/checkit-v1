@@ -11,10 +11,10 @@ fileSet.add("main_menu/admin.py")
 #fileSet.add("main_menu/resources.py")
 #fileSet.add("main_menu/select_region.py")
 #fileSet.add("main_menu/serializers.py")
-fileSet.add("main_menu/tasks.py")
+#fileSet.add("main_menu/tasks.py")
 #fileSet.add("main_menu/tables.py")
-#fileSet.add("main_menu/urls.py")
-#fileSet.add("main_menu/views.py")
+fileSet.add("main_menu/urls.py")
+fileSet.add("main_menu/views.py")
 
 setup(description='Checkit Application',
       author='Sam Corbo',
