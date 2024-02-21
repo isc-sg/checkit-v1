@@ -374,47 +374,6 @@ def send_alarms(list_of_cameras, cameras_details, run_number):
             logger.error(f"Error sending to alarm server - {e}")
 
 
-def increment_engine_state_other_count(engines_state_id):
-
-    with transaction.atomic():
-        try:
-            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
-        except EngineState.DoesNotExist:
-            logger.error(f"Error saving engine state for run number {engines_state_id}")
-        else:
-            engine_object.number_others += 1
-            engine_object.state_timestamp = timezone.now()
-            engine_object.save()
-
-
-def increment_engine_state_pass_count(engines_state_id):
-
-    with transaction.atomic():
-        try:
-            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
-        except EngineState.DoesNotExist:
-            logger.error(f"Error saving engine state for run number {engines_state_id}")
-            pass
-        else:
-            engine_object.number_pass_images += 1
-            engine_object.state_timestamp = timezone.now()
-            engine_object.save()
-
-
-def increment_engine_state_failed_count(engines_state_id):
-
-    with transaction.atomic():
-        try:
-            engine_object = EngineState.objects.select_for_update().get(id=engines_state_id)
-        except EngineState.DoesNotExist:
-            logger.error(f"Error saving engine state for run number {engines_state_id}")
-            pass
-        else:
-            engine_object.number_failed_images += 1
-            engine_object.state_timestamp = timezone.now()
-            engine_object.save()
-
-
 def increment_transaction_count():
 
     password = mysql_password
@@ -439,8 +398,11 @@ def increment_transaction_count():
             sql_statement = "SELECT tx_count FROM adm ORDER BY id DESC LIMIT 1"
             adm_cursor.execute(sql_statement)
             tx_count = adm_cursor.fetchone()[0]
+            license_object = Licensing.objects.all().last()
+            license_object.transaction_count = tx_count
+            license_object.save()
         else:
-            logger.error("Unbale to update transaction count on admin")
+            logger.error("Unable to update transaction count on admin")
             pass
 
     except mysql.connector.Error as e:
@@ -448,11 +410,11 @@ def increment_transaction_count():
         adm_db.rollback()
 
     finally:
-        adm_cursor.close()
-        adm_db.close()
-        license_object = Licensing.objects.all().last()
-        license_object.transaction_count = tx_count
-        license_object.save()
+        try:
+            adm_cursor.close()
+            adm_db.close()
+        except mysql.connector.Error:
+            pass
 
 
 def options(url, ip_address, url_port, username=None, password=None):
@@ -652,7 +614,6 @@ def log_capture_error(camera, user, engine_state_id, message):
     LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                             creation_date=timezone.now(), user=user, run_number=engine_state_id)
     increment_transaction_count()
-    increment_engine_state_other_count(engine_state_id)
     logger.error(message)
 
 
@@ -724,13 +685,10 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
         daysofweek = list(camera_object.scheduled_days.values_list('day_of_the_week', flat=True))
 
         if int(local_time_hour) not in hoursinday:
-            increment_engine_state_other_count(engine_state_id)
             continue
         if local_time_day not in daysofweek:
-            increment_engine_state_other_count(engine_state_id)
             continue
         if camera_object.snooze:
-            increment_engine_state_other_count(engine_state_id)
             continue
 
         # if user has entered a username and password set in the database then ensure that we use these
@@ -746,7 +704,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             message = (f"Error in IP address for camera "
                        f"{camera_object.camera_name} {camera_number} {camera_object.id}")
             log_capture_error(camera, user, engine_state_id, message)
-            increment_engine_state_other_count(engine_state_id)
             increment_transaction_count()
             continue
 
@@ -755,7 +712,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             if has_error:
                 message = f"Error in OPTIONS for {url} {options_response}\n"
                 log_capture_error(camera, user, engine_state_id, message)
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -763,7 +719,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             if has_error:
                 message = f"Error in DESCRIBE for url {url} {describe_response}"
                 log_capture_error(camera, user, engine_state_id, message)
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -772,7 +727,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             if capture_device == "Error" or not capture_device.isOpened():
                 message = f"Unable to open capture device {url}\n"
                 log_capture_error(camera, user, engine_state_id, message)
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -782,7 +736,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             if not able_to_read:
                 message = "Error reading video frame\n"
                 log_capture_error(camera, user, engine_state_id, message)
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -803,7 +756,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
             if not base_image:
                 message = "Error reading reference image\n"
                 log_capture_error(camera, user, engine_state_id, message)
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -826,7 +778,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
                 capture_dimensions = image_frame_grey.shape[:2]
             except cv2.error as err:
                 logger.error(f"Error in converting image {err}")
-                increment_engine_state_other_count(engine_state_id)
                 increment_transaction_count()
                 continue
 
@@ -838,7 +789,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user, camera_de
                                         creation_date=timezone.now(), user=user,
                                         run_number=engine_state_id)
                 increment_transaction_count()
-                increment_engine_state_other_count(engine_state_id)
                 continue
 
             # Do the check here
@@ -946,16 +896,20 @@ def process_cameras(camera_list, engine_state_id, user_name):
         check_cameras(camera_list, cameras_details, engine_state_id, user_name)
 
         logs = LogImage.objects.filter(run_number=engine_state_id)
+        number_of_pass = logs.filter(action="Pass").count()
+        number_of_fail = logs.filter(action="Failed").count()
+        number_of_others = logs.count() - (number_of_pass + number_of_fail)
         if logs:
             last_log_time = logs.last().creation_date
             engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
-            transaction_rate = math.floor(
-                len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
-            # logger.info(f"Transaction rate is {transaction_rate}")
+            transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
 
             try:
                 engine_object = EngineState.objects.all().last()
                 engine_object.transaction_rate = transaction_rate
+                engine_object.number_pass_images = number_of_pass
+                engine_object.number_failed_images = number_of_fail
+                engine_object.number_others = number_of_others
                 engine_object.save()
             except EngineState.DoesNotExist:
                 logger.error(f"Error updating transaction rate")
