@@ -161,7 +161,6 @@ def check_adm_database(password):
             current_end_date = datetime.datetime.now().strftime("%Y-%m-%d")
             current_camera_limit = 0
             current_license_key = ""
-        # TODO clean up long lines by making this list of variables a dictionary. Helps creating long lines.
         adm_db.close()
 
     except mysql.connector.Error as e:
@@ -367,23 +366,6 @@ def get_camera_details(list_of_lists):
             # print(err, "*",merged_list_string,"*")
             return err
 
-    # try:
-    #     password = mysql_password
-    #     adm_db_config = {
-    #         "host": CHECKIT_HOST,
-    #         "user": "root",
-    #         "password": password,
-    #         "database": "adm"
-    #     }
-    #     adm_db = mysql.connector.connect(**adm_db_config)
-    # except mysql.connector.Error as err:
-    #     if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
-    #         logger.error(f"Invalid password")
-    #         return "Invalid password on admin database"
-    #         # TODO - this exit doesn't close properly when run from start.py
-    #     elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-    #         logger.error(f"Database not initialised")
-    #         return "Admin database not initialised"
 
 
 def add_auth(username, password):
@@ -1007,8 +989,6 @@ def increment_transaction_count():
     #     else:
     #         license_object.transaction_count += 1
     #         license_object.save()
-
-
 
 
 def increment_engine_state_other_count(engines_state_id):
@@ -1637,8 +1617,7 @@ def check_license_ok():
 @shared_task()
 def process_cameras(cameras, engine_state_id, user_name):
     get_config()
-    # camera_object = Camera.objects.get(id=cameras[0])
-    # logger.info(f"Processing camera {camera_object.camera_name}")
+
     if check_license_ok():
         # ret_code = ProtCheck()
         # logger.info(f"ret_code {ret_code}")
@@ -1654,7 +1633,6 @@ def process_cameras(cameras, engine_state_id, user_name):
             sys.exit(1)
 
         check(cameras, engine_state_id, user_name)
-        # logger.info(f"log_alarms {log_alarms}")
 
         logs = LogImage.objects.filter(run_number=engine_state_id)
         number_of_pass = logs.filter(action="Pass").count()
@@ -1664,7 +1642,6 @@ def process_cameras(cameras, engine_state_id, user_name):
             last_log_time = logs.last().creation_date
             engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
             transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
-        # logger.info(f"Transaction rate is {transaction_rate}")
 
             try:
                 engine_object = EngineState.objects.get(id=engine_state_id)
