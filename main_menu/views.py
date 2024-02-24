@@ -59,6 +59,12 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.parsers import JSONParser
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+
+
 from main_menu.tasks import process_cameras
 
 from main_menu.serializers import CameraSerializer
@@ -216,6 +222,26 @@ def reference_image_api(request):
     else:
         return HttpResponse("Error: Only POST method allowed")
 
+
+class TestApi(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        # Your function logic goes here
+
+        data = {'message': 'This is a GET request'}
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        # Check if "snooze" key is present in the request data
+        if 'snooze' in request.data:
+            # "snooze" key is present
+            snooze_value = request.data['snooze']
+            camera_number = request.data['camera_number']
+            # Process snooze value as needed
+            return Response({'message': f'snooze value is {snooze_value} {camera_number}'}, status=status.HTTP_200_OK)
+        else:
+            # "snooze" key is not present
+            return Response({'message': 'No snooze value provided'}, status=status.HTTP_400_BAD_REQUEST)
 
 def snooze_api(request):
     if request.method == "POST":
