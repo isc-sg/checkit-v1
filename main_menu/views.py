@@ -60,6 +60,7 @@ from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -67,7 +68,8 @@ from rest_framework.permissions import AllowAny
 
 from main_menu.tasks import process_cameras
 
-from main_menu.serializers import CameraSerializer
+from main_menu.serializers import (CameraSerializer, LogImageSerializer,
+                                   ReferenceImageSerializer, SnoozeCameraSerializer)
 
 from celery import Celery, current_app
 import celery
@@ -131,6 +133,7 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+
 class CameraViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows cameras to be viewed or edited.
@@ -140,12 +143,36 @@ class CameraViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'camera_number'
 
+
+class LogImageViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows logs to be viewed or deleted only.
+    """
+    queryset = LogImage.objects.all().order_by('creation_date')
+    serializer_class = LogImageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    http_method_names = ['get', 'delete']
+
+
+class ReferenceImageViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows reference to be viewed or deleted only.
+    """
+    queryset = ReferenceImage.objects.all().order_by('url__camera_number')
+    serializer_class = ReferenceImageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    http_method_names = ['get', 'delete']
+
+
 def is_process_running(pid):
     try:
         process = psutil.Process(pid)
         return process.is_running()
     except psutil.NoSuchProcess:
         return False
+
 
 def custom_500_error_view(request):
     return render(request, '500.html')
@@ -223,35 +250,41 @@ def reference_image_api(request):
         return HttpResponse("Error: Only POST method allowed")
 
 
-class TestApi(APIView):
+class SnoozeCamera(GenericAPIView):
     permission_classes = [AllowAny]
-    def get(self, request):
-        # Your function logic goes here
+    serializer_class = SnoozeCameraSerializer
 
-        data = {'message': 'This is a GET request'}
-        return Response(data, status=status.HTTP_200_OK)
+    def get(self, request):
+        """
+        API endpoint to get snooze value - must contain snooze in form-data.
+        """
+        if 'camera_number' in request.data:
+            camera_number = request.data['camera_number']
+        else:
+            return JsonResponse({"status": "fail", "error": "camera_number required for GET"},
+                                status=status.HTTP_400_BAD_REQUEST)
+        try:
+            camera_object = Camera.objects.get(camera_number=camera_number)
+        except ObjectDoesNotExist:
+            return JsonResponse({"status": "fail", "error": "camera does not exist", 'data': request})
+        return JsonResponse({"snooze": camera_object.snooze}, status=status.HTTP_200_OK)
 
     def post(self, request):
-        # Check if "snooze" key is present in the request data
-        if 'snooze' in request.data:
-            # "snooze" key is present
-            snooze_value = request.data['snooze']
-            camera_number = request.data['camera_number']
-            # Process snooze value as needed
-            return Response({'message': f'snooze value is {snooze_value} {camera_number}'}, status=status.HTTP_200_OK)
-        else:
-            # "snooze" key is not present
-            return Response({'message': 'No snooze value provided'}, status=status.HTTP_400_BAD_REQUEST)
+        # schema = SnoozeCamera.schema
+        """
+        API endpoint to set snooze value - must contain snooze and camera_number in form-data
+        """
 
-def snooze_api(request):
-    if request.method == "POST":
+        # Check if "snooze" key is present in the request data
         if 'snooze' not in request.POST:
-            return JsonResponse({"status": "fail", "error": "requires snooze field"})
+            return JsonResponse({"status": "fail", "error": "requires snooze field"},
+                                status=status.HTTP_400_BAD_REQUEST)
         snooze: str = request.POST['snooze']
         try:
             new_value = strtobool(snooze)
         except ValueError:
-            return JsonResponse({"status": "fail", "error": "invalid value for snooze"})
+            return JsonResponse({"status": "fail", "error": "invalid value for snooze"},
+                                status=status.HTTP_400_BAD_REQUEST)
         if 'camera_number' in request.POST:
             camera_number = request.POST['camera_number']
         else:
@@ -259,22 +292,53 @@ def snooze_api(request):
         try:
             camera_object = Camera.objects.get(camera_number=camera_number)
         except ObjectDoesNotExist:
-            return JsonResponse({"status": "fail", "error": "camera does not exist"})
+            return JsonResponse({"status": "fail", "error": "camera does not exist"}, status=status.HTTP_404_NOT_FOUND)
         camera_object.snooze = new_value
         camera_object.save()
-        return JsonResponse({"status": "success"})
-    elif request.method == "GET":
-        if 'camera_number' in request.GET:
-            camera_number = request.GET['camera_number']
-        else:
-            return JsonResponse({"status": "fail", "error": "camera_number required for GET"})
-        try:
-            camera_object = Camera.objects.get(camera_number=camera_number)
-        except ObjectDoesNotExist:
-            return JsonResponse({"status": "fail", "error": "camera does not exist"})
-        return JsonResponse({"snooze": camera_object.snooze})
-    else:
-        return JsonResponse({"status": "fail", "error": "Only POST or GET methods allowed"})
+        return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
+    # def options(self, request, *args, **kwargs):
+    #     """
+    #     Don't include the view description in OPTIONS responses.
+    #     """
+    #     meta = self.metadata_class()
+    #     data = meta.determine_metadata(request, self)
+    #     data.pop('description')
+    #     return Response(data=data, status=status.HTTP_200_OK)
+# def snooze_api(request):
+#     permission_classes = [AllowAny]
+#
+#     if request.method == "POST":
+#         if 'snooze' not in request.POST:
+#             return JsonResponse({"status": "fail", "error": "requires snooze field"})
+#         snooze: str = request.POST['snooze']
+#         try:
+#             new_value = strtobool(snooze)
+#         except ValueError:
+#             return JsonResponse({"status": "fail", "error": "invalid value for snooze"})
+#         if 'camera_number' in request.POST:
+#             camera_number = request.POST['camera_number']
+#         else:
+#             camera_number = None
+#         try:
+#             camera_object = Camera.objects.get(camera_number=camera_number)
+#         except ObjectDoesNotExist:
+#             return JsonResponse({"status": "fail", "error": "camera does not exist"})
+#         camera_object.snooze = new_value
+#         camera_object.save()
+#         return JsonResponse({"status": "success"})
+#     elif request.method == "GET":
+#         if 'camera_number' in request.GET:
+#             camera_number = request.GET['camera_number']
+#         else:
+#             return JsonResponse({"status": "fail", "error": "camera_number required for GET"})
+#         try:
+#             camera_object = Camera.objects.get(camera_number=camera_number)
+#         except ObjectDoesNotExist:
+#             return JsonResponse({"status": "fail", "error": "camera does not exist"})
+#         return JsonResponse({"snooze": camera_object.snooze})
+#     else:
+#         return JsonResponse({"status": "fail", "error": "Only POST or GET methods allowed"})
+
 
 def get_hash(key_string):
     h = hashlib.blake2b(digest_size=64, key=checkit_secret)

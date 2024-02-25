@@ -6,34 +6,36 @@ from rest_framework import routers
 from django.views.generic import TemplateView
 from rest_framework.schemas import get_schema_view
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.schemas.openapi import AutoSchema
+
 
 
 from main_menu import views
-from .views import TestApi
+from .views import SnoozeCamera
 
 router = routers.DefaultRouter()
 # router.register(r'users', views.UserViewSet)
 # router.register(r'groups', views.GroupViewSet)
 router.register(r'^/cameras_api', views.CameraViewSet)
+router.register(r'^/logs_api', views.LogImageViewSet)
+router.register(r'^/reference_image_api', views.ReferenceImageViewSet)
+# router.register(r'^/snooze_api', views.ReferenceImageViewSet)
 # router.register(r'index', views.index)
+
 
 urlpatterns = [
     path('api', include(router.urls)),
     path('', views.index, name='home'),
 
-    path('openapi', get_schema_view(
+    path('api/schema', get_schema_view(
           title="Checkit",
           description="Checkit API",
-          version="1.0.0"
-      ), name='openapi-schema'),
-    # path('swagger-ui/', TemplateView.as_view(
-    #     template_name='swagger-ui.html',
-    #     extra_context={'schema_url': 'openapi-schema'}
-    # ), name='swagger-ui'),
+          version="1.1.0"
+      ), name='checkit-schema'),
     path('import/', views.simple_upload, name="import"),
     path('reference_image/', csrf_exempt(views.reference_image_api)),
-    path('snooze/', csrf_exempt(views.snooze_api)),
-    path('api/test_api/', TestApi.as_view(), name='test-api'),
+    # path('snooze/', csrf_exempt(views.snooze_api)),
+    path('api/snooze_api/', SnoozeCamera.as_view(), name='snooze-api'),
     path("status/", views.index, name='status'),
     path("scheduler/", views.scheduler, name='scheduler'),
     path('cameras/', views.CameraView.as_view(), name='cameras'),
