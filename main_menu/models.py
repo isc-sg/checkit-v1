@@ -117,7 +117,8 @@ class ReferenceImage(models.Model):
         # print("reference hour is", now().strftime('%H'))
         return now().strftime('%H')
 
-    url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number")
+    url = models.ForeignKey(Camera, on_delete=models.CASCADE,
+                            verbose_name="Camera Name and Number", help_text="points to camera id")
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
     light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
@@ -133,7 +134,7 @@ class ReferenceImage(models.Model):
     #                                             default=0)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     # history = HistoricalRecords()
-    version = models.PositiveSmallIntegerField(default=1)
+    version = models.PositiveSmallIntegerField(default=1, help_text="future use only - set to 1 only for now")
     trigger_new_version = models.BooleanField(default=False)
     def __str__(self):
         return f'{self.image}'
