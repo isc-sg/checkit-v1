@@ -12,6 +12,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 from django.contrib.admin.models import LogEntry, DELETION
+from django.utils import timezone
 from django.utils.html import escape
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -42,9 +43,14 @@ class DisableClientSideCachingMiddleware(object):
 def new_reference_image(modeladmin, request, queryset):
     # Code to run your custom function
     # For example, call your function from views.py
-    selected_camera_ids = queryset.values_list('pk', flat=True)
-    from .views import trigger_new_reference_image
-    trigger_new_reference_image(selected_camera_ids)
+    # selected_camera_ids = queryset.values_list('pk', flat=True)
+    # from .views import trigger_new_reference_image
+    # trigger_new_reference_image(selected_camera_ids)
+    selected_camera_ids = queryset
+    for camera in selected_camera_ids:
+        camera.trigger_new_reference_image = True
+        camera.trigger_new_reference_image_date = timezone.now()
+        camera.save()
 
 
 new_reference_image.short_description = "Trigger New Reference Image"
