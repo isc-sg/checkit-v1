@@ -94,6 +94,8 @@ class Camera(models.Model):
     scheduled_hours = models.ManyToManyField(HoursInDay, blank=True)
     scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True)
     snooze = models.BooleanField(default=False,help_text="Set to true to pause checks for this camera")
+    trigger_new_reference_image = models.BooleanField(default=False)
+    trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -135,8 +137,7 @@ class ReferenceImage(models.Model):
     creation_date = models.DateTimeField('date created', default=timezone.now)
     # history = HistoricalRecords()
     version = models.PositiveSmallIntegerField(default=1, help_text="future use only - set to 1 only for now")
-    trigger_new_version = models.BooleanField(default=False)
-    trigger_new_version_date = models.DateTimeField('date created', default=timezone.now)
+
 
     def __str__(self):
         return f'{self.image}'
