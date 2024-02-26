@@ -819,6 +819,9 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
         regions = eval(regions)
 
     reference_image_objects = ReferenceImage.objects.filter(url_id=camera)
+    # alternative method to do the above is to do the following
+    # camera.referenceimage_set.all()
+    # referenceimage_set is created by Django automatically.
     if not reference_image_objects.filter(hour=current_hour).exists():
         create_base_image(camera_object, capture_device)
         close_capture_device(capture_device, multicast_address)
