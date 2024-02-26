@@ -6,7 +6,7 @@ import cv2
 import os
 import sys
 import configparser
-import datetime
+# import datetime
 import math
 import socket
 from cryptography.fernet import Fernet
@@ -23,9 +23,9 @@ import json
 import pathlib
 
 from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
-from django.core.exceptions import ObjectDoesNotExist
+# from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
-from django.db import transaction
+# from django.db import transaction
 from django.conf import settings
 
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
@@ -92,7 +92,7 @@ def check_adm_database(password):
 
         except mysql.connector.Error as e:
             logger.error(f"Failed all attempts at accessing database  {e}")
-            return (None, None, None, None, None)
+            return None, None, None, None, None
 
     try:
         admin_cursor = adm_db.cursor(dictionary=True)
@@ -118,7 +118,6 @@ def get_license_details():
 
     # checkit_key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
 
-
     f = Fernet(checkit_key)
     machine_command_array = [47, 101, 116, 99, 47, 109, 97, 99, 104, 105, 110, 101, 45, 105, 100]
     machine_command = array_to_string(machine_command_array)
@@ -131,7 +130,7 @@ def get_license_details():
     shell_command_string = array_to_string(shell_command_array)
     # shell_output = subprocess.check_output("/bin/df", shell=True)
     shell_output = subprocess.check_output(shell_command_string, shell=True)
-    l1 = shell_output.decode('utf-8').split("\n")
+    # l1 = shell_output.decode('utf-8').split("\n")
     # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
     command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
                      101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
@@ -288,7 +287,7 @@ def check_license_ok():
             return True
 
 
-def send_alarms(list_of_cameras, cameras_details, run_number):
+def send_alarms(cameras_details, run_number):
 
     if HOST is None or PORT == 0:
         logger.error(f"Error in config - HOST = {HOST}, PORT = {PORT}")
@@ -695,7 +694,7 @@ def create_base_image(camera_object, capture_device):
         try:
             os.system(f"sudo chmod 775 {base_image_dir}/{camera_object.id}")
         except Exception as e:
-            logger.error(f"Unable to set permissions on {base_image_dir}/{camera_object.id}")
+            logger.error(f"Unable to set permissions on {base_image_dir}/{camera_object.id} {e}")
             return
 
         able_to_write = cv2.imwrite(file_name, frame)
@@ -728,8 +727,10 @@ def create_base_image(camera_object, capture_device):
                 os.remove(file_name)
 
 
-def read_frame_and_compare(camera, capture_device, user, engine_state_id, multicast_address, regions, camera_object):
-
+def read_frame_and_compare(capture_device, user, engine_state_id, camera_object):
+    multicast_address = camera_object.multicast_address
+    camera = camera_object.id
+    regions = camera_object.image_regions
     able_to_read, image_frame = capture_device.read()
 
     if not able_to_read:
@@ -849,7 +850,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
         multicast_port = camera_object.multicast_port
         camera_username = camera_object.camera_username
         camera_password = camera_object.camera_password
-        regions = camera_object.image_regions
         hoursinday = list(camera_object.scheduled_hours.values_list('hour_in_the_day', flat=True))
         daysofweek = list(camera_object.scheduled_days.values_list('day_of_the_week', flat=True))
 
@@ -918,8 +918,7 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
                 close_capture_device(capture_device, multicast_address)
                 continue
 
-            read_frame_and_compare(camera, capture_device, user, engine_state_id,
-                                   multicast_address, regions, camera_object)
+            read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
             # able_to_read, image_frame = capture_device.read()
             #
             # if not able_to_read:
@@ -1032,8 +1031,7 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
                 logger.error(f"{scheme} over multicast is currently not supported")
                 return
             capture_device = cv2.VideoCapture(camera_object.url)
-            read_frame_and_compare(camera, capture_device, user, engine_state_id,
-                                   multicast_address, regions, camera_object)
+            read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
 
 
 @shared_task()
@@ -1075,7 +1073,7 @@ def process_cameras(camera_list, engine_state_id, user_name):
                 logger.error(f"Error updating transaction rate")
 
         if log_alarms:
-            send_alarms(camera_list, cameras_details, engine_state_id)
+            send_alarms(cameras_details, engine_state_id)
 
     else:
         logger.error(f"You license has either expired or exhausted the available transactions")
