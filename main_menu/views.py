@@ -1578,8 +1578,3 @@ def check_all_cameras():
     for group_of_cameras in sublists:
         process_cameras.delay(group_of_cameras, engine_state_id, user_name)
 
-
-def trigger_new_reference_image(selected_camera_ids):
-    for camera_id in selected_camera_ids:
-        camera = Camera.objects.get(pk=camera_id)
-        print(camera.camera_name)
