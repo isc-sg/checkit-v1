@@ -48,9 +48,11 @@ def new_reference_image(modeladmin, request, queryset):
     # trigger_new_reference_image(selected_camera_ids)
     selected_camera_ids = queryset
     for camera in selected_camera_ids:
-        camera.trigger_new_reference_image = True
-        camera.trigger_new_reference_image_date = timezone.now()
-        camera.save()
+        # if we don't have existing reference images then keep current version
+        if ReferenceImage.objects.filter(url_id=camera).exists():
+            camera.trigger_new_reference_image = True
+            camera.trigger_new_reference_image_date = timezone.now()
+            camera.save()
 
 
 new_reference_image.short_description = "Trigger New Reference Image"
@@ -65,18 +67,21 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location', 'id']
     list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
                     'camera_location', 'matching_threshold', 'unique_camera_id', 'check_reference_image')
-    readonly_fields = ["unique_camera_id", "creation_date", "last_check_date", 'image_regions']
+    readonly_fields = ["unique_camera_id", "creation_date", "last_check_date", 'image_regions',
+                       'reference_image_version']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
                    ('scheduled_days', RelatedDropdownFilter))
     history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
     actions = [new_reference_image]
-
+    exclude = ['trigger_new_version']
 
     def unique_camera_id(self, obj):
         return obj.id
 
     def save_model(self, request, obj, form, change):
+        if change and form.cleaned_data['trigger_new_reference_image']:
+            obj.trigger_new_reference_image_date = timezone.now()
         obj.save()
 
         if not change:
@@ -133,7 +138,6 @@ class ReferenceAdmin(ModelAdmin):
                        'light_level', 'focus_value', 'creation_date', 'version']
     list_filter = (('hour', DropdownFilter), ('url__camera_location', DropdownFilter), ('version', DropdownFilter))
     fields = ['url', 'hour', 'get_regions', 'reference_image', 'light_level', 'focus_value', 'creation_date', 'version']
-    exclude = ['trigger_new_version']
 
     def has_add_permission(self, request, obj=None):
         return False
