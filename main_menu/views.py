@@ -639,51 +639,57 @@ def compare_images(request):
         camera_object = Camera.objects.get(pk=cam)
         camera_name = camera_object.camera_name
         camera_number = camera_object.camera_number
+        actual_reference_image = obj.reference_image_id
 
         # time_stamp = datetime.datetime.now()
         # hour = time_stamp.strftime('%H')
         reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
         hours = []
-        # TODO: need error checking if there are no reference images
-        for record in reference_images:
-            hours.append(record.hour)
-        for i in range(0, len(hours)):
-            hours[i] = int(hours[i])
-        hour = int(hour)
-        if hours:
-            absolute_difference_function = lambda list_value: abs(list_value - hour)
-            closest_hour = min(hours, key=absolute_difference_function)
-            closest_hour = str(closest_hour).zfill(2)
-            reference_images = ReferenceImage.objects.get(url_id=camera_object.id, hour=closest_hour)
-            image = reference_images.image
-            base_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(image))
-            if base_image is None:
-                context = {'result': "Capture Error", 'camera_name': camera_name,
-                           'message': " - Unable to read BASE image"}
-                return HttpResponse(template.render(context, request))
+        # TODO: dont think I need to worry about hours - each log record has its reference image in it.
+        # for record in reference_images:
+        #     hours.append(record.hour)
+        # for i in range(0, len(hours)):
+        #     hours[i] = int(hours[i])
+        # hour = int(hour)
+        # if hours:
+            # absolute_difference_function = lambda list_value: abs(list_value - hour)
+            # closest_hour = min(hours, key=absolute_difference_function)
+            # closest_hour = str(closest_hour).zfill(2)
+        try:
+            reference_image = ReferenceImage.objects.get(pk=actual_reference_image)
+        except ObjectDoesNotExist:
+            context = {'result': "Capture Error", 'camera_name': camera_name,
+                       'message': " - Unable to read Reference image"}
+            return HttpResponse(template.render(context, request))
+        image = reference_image.image
+        base_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(image))
+        if base_image is None:
+            context = {'result': "Capture Error", 'camera_name': camera_name,
+                       'message': " - Unable to read Reference image"}
+            return HttpResponse(template.render(context, request))
 
-            captured_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(obj.image))
-            if captured_image is None:
-                context = {'result': "Capture Error", 'camera_name': camera_name,
-                           'message': " - Unable to read LOG image"}
-                return HttpResponse(template.render(context, request))
+        captured_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(obj.image))
+        if captured_image is None:
+            context = {'result': "Capture Error", 'camera_name': camera_name,
+                       'message': " - Unable to read LOG image"}
+            return HttpResponse(template.render(context, request))
 
-            captured_image_transparent = get_transparent_edge(captured_image, [0, 0, 255])
+        captured_image_transparent = get_transparent_edge(captured_image, [0, 0, 255])
 
-            captured_image_transparent = captured_image_transparent[:, :, :3]
+        captured_image_transparent = captured_image_transparent[:, :, :3]
 
-            if captured_image_transparent.shape != base_image.shape:
-                context = {'result': "Image Size Error", 'camera_name': camera_name,
-                           'message': " - Base image and capture image size changed"}
-                return HttpResponse(template.render(context, request))
+        if captured_image_transparent.shape != base_image.shape:
+            context = {'result': "Image Size Error", 'camera_name': camera_name,
+                       'message': " - Base image and capture image size changed"}
+            return HttpResponse(template.render(context, request))
 
-            merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
-            merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
-            base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
-            context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
-                       'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
-        else:
-            context = {'result': result, 'camera_name': camera_name, 'camera_number': camera_number}
+        merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
+        merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
+        base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
+        context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
+                   'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
+        # else:
+        #     context = {'result': result, 'camera_name': camera_name, 'camera_number': camera_number}
         return HttpResponse(template.render(context, request))
     else:
         return redirect('logs')
@@ -814,7 +820,8 @@ def scheduler(request):
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
-        process_cameras.delay(camera_id, engine_state_id, user_name)
+        # process_cameras.delay(camera_id, engine_state_id, user_name)
+        process_cameras(camera_id, engine_state_id, user_name)
 
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
