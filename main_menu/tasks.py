@@ -731,7 +731,7 @@ def compare_images(base, frame, regions):
             "region scores": region_scores, "light level": light_level, "noise_level": noise_level}
 
 
-def create_base_image(camera_object, capture_device):
+def create_base_image(camera_object, capture_device, version):
 
     logger.info(f"Attempting capture of reference image for {camera_object.url} - "
                 f"camera number {camera_object.camera_number}")
@@ -748,7 +748,7 @@ def create_base_image(camera_object, capture_device):
 
     base_image_dir = f"{settings.MEDIA_ROOT}/base_images"
 
-    file_name = f"{base_image_dir}/{camera_object.id}/{timezone.localtime().strftime('%H')}.jpg"
+    file_name = f"{base_image_dir}/{camera_object.id}/{str(version).zfill(4)}-{timezone.localtime().strftime('%H')}.jpg"
     try:
         pathlib.Path(base_image_dir+f"/{camera_object.id}").mkdir(parents=True, exist_ok=True)
         os.system(f"sudo chmod 775 {base_image_dir}/{camera_object.id}")
@@ -779,7 +779,7 @@ def create_base_image(camera_object, capture_device):
             blur = cv2.blur(img_gray, (5, 5))
             base_brightness = cv2.mean(blur)[0]
 
-            noise_level = estimate_noise(frame)
+            noise_level = estimate_noise(img_gray)
             # logger.info(f"Noise Level {noise_level}")
             focus_value = skimage.measure.blur_effect(img_gray)
             focus_value = round(focus_value, 2)
@@ -789,7 +789,7 @@ def create_base_image(camera_object, capture_device):
             ReferenceImage.objects.create(url_id=camera_object.id, image=image_file_name,
                                           hour=timezone.localtime().strftime('%H'),
                                           light_level=base_brightness,
-                                          creation_date=timezone.now(), focus_value=focus_value, version=1)
+                                          creation_date=timezone.now(), focus_value=focus_value, version=version)
             # create log entry here with action as REFERENCE IMAGE
         except Exception as e:
             logger.error(f"Unable to save reference image {file_name} for camera id {camera_object.id} - error {e}")
@@ -818,16 +818,46 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
     else:
         regions = eval(regions)
 
-    reference_image_objects = ReferenceImage.objects.filter(url_id=camera)
-    # alternative method to do the above is to do the following
+    # alternative method to do the below function is to do the following
     # camera.referenceimage_set.all()
     # referenceimage_set is created by Django automatically.
-    if not reference_image_objects.filter(hour=current_hour).exists():
-        create_base_image(camera_object, capture_device)
+
+    reference_image_objects = ReferenceImage.objects.filter(url_id=camera)
+
+    # now lets make sure we get the last version of the reference image.
+    # we do this by getting the last of reference_image_objects.
+    # from there get the version number.
+    last_version = camera_object.reference_image_version
+    if camera_object.trigger_new_reference_image_date:
+        last_version += 1
+    elapsed_time = timezone.now() - camera_object.trigger_new_reference_image_date
+
+    if (camera_object.trigger_new_reference_image and
+            not reference_image_objects.filter(url_id=camera, hour=current_hour, version=last_version).exists()):
+
+        if elapsed_time < timezone.timedelta(hours=24):
+            create_base_image(camera_object, capture_device, last_version)
+            close_capture_device(capture_device, multicast_address)
+            return
+        else:
+            camera_object.trigger_new_reference_image = False
+            camera_object.reference_image_version = last_version + 1
+            camera_object.save()
+
+    if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
+        create_base_image(camera_object, capture_device, last_version)
         close_capture_device(capture_device, multicast_address)
         return
+    # if trigger reference image lets do that
+    # go back into create_base_image
+    # then close capture device and return.
+    # if camera_object.trigger_new_reference_image and (camera_object.trigger_new_reference_image_date)
 
-    file_name = reference_image_objects.get(hour=current_hour).image
+
+
+
+    # this now becomes our version we append to file name and also add this to the get below.
+    file_name = reference_image_objects.get(hour=current_hour, version=last_version).image
     base_image_name = f"{settings.MEDIA_ROOT}/{file_name}"
     base_image = cv2.imread(base_image_name)
     if base_image is None:
@@ -839,6 +869,8 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
 
     # check if image is low res
     h, w = image_frame.shape[:2]
+    # keep original image for saving in case it's smaller than 720
+    original_image_frame = image_frame
     if h < 720:
         scale = math.ceil(720 / h)
         logger.info(f"WARNING: Image size is below recommended minimum of 720p - "
@@ -877,7 +909,7 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
     focus_value = results_dict['focus value']
     region_scores = results_dict['region scores']
     light_level = results_dict['light level']
-    base_image_directory = (f"{settings.MEDIA_ROOT}/log/{timezone.now().year}"
+    base_image_directory = (f"{settings.MEDIA_ROOT}/logs/{timezone.now().year}"
                             f"/{timezone.now().month}/{timezone.now().day}")
     log_image_file_name = (f"{base_image_directory}/"
                            f"{camera}-"
@@ -890,7 +922,7 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
         logger.error(f"Unable to create or set permissions on log directory {base_image_directory} - {e}")
         return
 
-    able_to_write = cv2.imwrite(log_image_file_name, image_frame)
+    able_to_write = cv2.imwrite(log_image_file_name, original_image_frame)
     if not able_to_write:
         logger.error(f"Unable to write log file {log_image_file_name}")
         increment_transaction_count()
@@ -920,7 +952,7 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
                             current_light_level=camera_object.light_level_threshold,
                             user=user,
                             run_number=engine_state_id,
-                            reference_image_id=reference_image_objects.get(hour=current_hour).id)
+                            reference_image_id=reference_image_objects.get(hour=current_hour, version=last_version).id)
 
     increment_transaction_count()
 
@@ -1012,111 +1044,6 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
                 continue
 
             read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
-            # able_to_read, image_frame = capture_device.read()
-            #
-            # if not able_to_read:
-            #     message = "Error reading video frame\n"
-            #     log_capture_error(camera, user, engine_state_id, message)
-            #     increment_transaction_count()
-            #     close_capture_device(capture_device, multicast_address)
-            #     continue
-            #
-            # if regions == '0' or regions == "[]":
-            #     regions = []
-            #     regions.extend(range(1, 65))
-            # else:
-            #     regions = eval(regions)
-            #
-            # reference_image_objects = ReferenceImage.objects.filter(url_id=camera)
-            # if not reference_image_objects.filter(hour=timezone.localtime().hour).exists():
-            #     create_base_image(camera_object,  capture_device)
-            #     close_capture_device(capture_device, multicast_address)
-            #     continue
-            #
-            # file_name = reference_image_objects.get(hour=timezone.localtime().hour).image
-            # base_image = cv2.imread("/home/checkit/camera_checker/media/" + file_name)
-            # if not base_image:
-            #     message = "Error reading reference image\n"
-            #     log_capture_error(camera, user, engine_state_id, message)
-            #     increment_transaction_count()
-            #     close_capture_device(capture_device, multicast_address)
-            #     continue
-            #
-            # # check if image is low res
-            # h, w = image_frame.shape[:2]
-            # if h < 720:
-            #     scale = math.ceil(720 / h)
-            #     logger.info(f"WARNING: Image size is below recommended minimum of 720p - "
-            #                 f"images are being scaled up by factor of {scale} for analysis")
-            #     image_frame = cv2.resize(image_frame, (h * scale, w * scale),
-            #                              interpolation=cv2.INTER_AREA)
-            #     base_image = cv2.resize(base_image, (h * scale, w * scale),
-            #                             interpolation=cv2.INTER_AREA)
-            #
-            # # prepare images for checking - need grey scale
-            # try:
-            #     image_base_grey = cv2.cvtColor(base_image, cv2.COLOR_BGR2GRAY)
-            #     image_frame_grey = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-            #     reference_dimensions = image_base_grey.shape[:2]
-            #     capture_dimensions = image_frame_grey.shape[:2]
-            # except cv2.error as err:
-            #     logger.error(f"Error in converting image {err}")
-            #     increment_transaction_count()
-            #     close_capture_device(capture_device, multicast_address)
-            #     continue
-            #
-            # if reference_dimensions != capture_dimensions:
-            #     logger.error(
-            #         f"Image sizes don't match on camera number {camera}")
-            #     LogImage.objects.create(url_id=camera, region_scores={},
-            #                             action="Image Size Error",
-            #                             creation_date=timezone.now(), user=user,
-            #                             run_number=engine_state_id)
-            #     increment_transaction_count()
-            #     close_capture_device(capture_device, multicast_address)
-            #     continue
-            #
-            # # Do the check here
-            # results_dict = compare_images(image_base_grey, image_frame_grey, regions)
-            # matching_score = results_dict['matching score']
-            # focus_value = results_dict['focus value']
-            # region_scores = results_dict['region scores']
-            # light_level = results_dict['light level']
-            # log_image_file_name = (f"{settings.MEDIA_ROOT}/log/{timezone.now().year}/{timezone.now().month}/"
-            #                        f"{timezone.now().day}/{camera}-"
-            #                        f"{timezone.now().hour}:{timezone.now().minute}:{timezone.now().second}.jpg")
-            #
-            # sql_file_name = log_image_file_name.strip(settings.MEDIA_ROOT)
-            #
-            # if matching_score < camera_object.matching_threshold:
-            #     action = "Failed"
-            # elif focus_value > camera_object.focus_value_threshold:
-            #     action = "Failed"
-            # elif light_level < camera_object.light_level_threshold:
-            #     action = "Failed"
-            # else:
-            #     action = "Pass"
-            #
-            # LogImage.objects.create(url_id=camera, image=sql_file_name,
-            #                         matching_score=matching_score,
-            #                         region_scores=json.dumps(region_scores),
-            #                         current_matching_threshold=camera_object.matching_threshold,
-            #                         light_level=light_level,
-            #                         focus_value=focus_value,
-            #                         action=action,
-            #                         creation_date=timezone.now(),
-            #                         current_focus_value=camera_object.focus_value_threshold,
-            #                         current_light_level=camera_object.light_level_threshold,
-            #                         user=user,
-            #                         run_number=engine_state_id,
-            #                         reference_image_id=reference_image_objects.get(hour=timezone.localtime().hour).id)
-            #
-            # increment_transaction_count()
-            #
-            # camera_object = Camera.objects.get(id=camera)
-            # camera_object.last_check_date = timezone.now()
-            # camera_object.save()
-            # close_capture_device(capture_device, multicast_address)
 
         else:
             # this should be simple imread rather than open / describe etc.
@@ -1124,8 +1051,20 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
                 logger.error(f"{scheme} over multicast is currently not supported")
                 return
             capture_device = cv2.VideoCapture(camera_object.url)
-            read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
-
+            if not capture_device.isOpened():
+                count = 0
+                while count < 2:
+                    capture_device = cv2.VideoCapture(camera_object.url)
+                    if capture_device.isOpened():
+                        break
+                    count += 1
+            if capture_device.isOpened():
+                read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
+            else:
+                message = f"Unable to open capture device {url}\n"
+                log_capture_error(camera, user, engine_state_id, message)
+                increment_transaction_count()
+                close_capture_device(capture_device, multicast_address)
 
 @shared_task()
 def process_cameras(camera_list, engine_state_id, user_name):
