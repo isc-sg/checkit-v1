@@ -88,14 +88,16 @@ class Camera(models.Model):
                                                 default=0.5)
     light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
                                                 validators=[MaxValueValidator(255), MinValueValidator(0)],
-                                                default=120)
+                                                default=80)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
-    scheduled_hours = models.ManyToManyField(HoursInDay, blank=True)
-    scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True)
+    scheduled_hours = models.ManyToManyField(HoursInDay, blank=True, help_text="List format 0-23")
+    scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True, help_text="List format 1-7")
     snooze = models.BooleanField(default=False,help_text="Set to true to pause checks for this camera")
-    trigger_new_reference_image = models.BooleanField(default=False)
+    trigger_new_reference_image = models.BooleanField(default=False, help_text="Set to true to enable the initiation"
+                                                                               " of a new reference image")
     trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
+    reference_image_version = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(9999)])
     history = HistoricalRecords()
 
     def __str__(self):
@@ -135,9 +137,8 @@ class ReferenceImage(models.Model):
     #                                             validators=[MaxValueValidator(255), MinValueValidator(0)],
     #                                             default=0)
     creation_date = models.DateTimeField('date created', default=timezone.now)
+    version = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(9999)])
     # history = HistoricalRecords()
-    version = models.PositiveSmallIntegerField(default=1, help_text="future use only - set to 1 only for now")
-
 
     def __str__(self):
         return f'{self.image}'
