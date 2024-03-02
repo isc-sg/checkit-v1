@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User, Group
 from .models import Camera, LogImage, ReferenceImage
 from rest_framework import serializers
-
+from django.utils import timezone
+from datetime import timedelta
 
 
 #
@@ -34,10 +35,33 @@ class CameraSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'multicast_address', 'multicast_port', 'camera_username', 'camera_password',
                   'camera_number', 'camera_name', 'camera_location',
                   'matching_threshold', 'focus_value_threshold', 'light_level_threshold',
-                  'scheduled_hours', 'scheduled_days', 'snooze']
+                  'scheduled_hours', 'scheduled_days', 'snooze', 'trigger_new_reference_image']
         # extra_kwargs = {
         #     'url': {'lookup_field': 'hoursinday'}
         # }
+
+    def create(self, validated_data):
+        trigger_new_reference_image = validated_data.get('trigger_new_reference_image', False)
+
+        instance = super().create(validated_data)
+
+        if trigger_new_reference_image:
+            instance.trigger_new_reference_image_date = timezone.now() + timedelta(hours=24)
+            instance.save()
+
+        return instance
+
+    def update(self, instance, validated_data):
+        trigger_new_reference_image = validated_data.get('trigger_new_reference_image',
+                                                         instance.trigger_new_reference_image)
+
+        instance = super().update(instance, validated_data)
+
+        if trigger_new_reference_image:
+            instance.trigger_new_reference_image_date = timezone.now() + timedelta(hours=24)
+            instance.save()
+
+        return instance
 
 
 class LogImageSerializer(serializers.ModelSerializer):
