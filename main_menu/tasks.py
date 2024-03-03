@@ -150,7 +150,7 @@ def get_license_details():
                      110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
 
     command = array_to_string(command_array) + root_dev
-    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+    _root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
 
     # # command = "/usr/bin/sudo dmidecode | grep -i uuid"
     # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
@@ -167,7 +167,7 @@ def get_license_details():
     prod_uuid = subprocess.check_output(command, shell=True).decode(). \
         strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
-    finger_print = (root_fs_uuid + _machine_uuid + prod_uuid)
+    finger_print = (_root_fs_uuid + _machine_uuid + prod_uuid)
     fingerprint_encrypted = get_encrypted(finger_print)
     db_password = fingerprint_encrypted[10:42][::-1]
     adm_details = check_adm_database(db_password)
@@ -186,10 +186,10 @@ def get_license_details():
                     "purchased_cameras": current_camera_limit,
                     "license_key": current_license_key,
                     "machine_uuid": _machine_uuid,
-                    "root_fs_uuid": root_fs_uuid,
+                    "root_fs_uuid": _root_fs_uuid,
                     "product_uuid": prod_uuid}
     string_encoded = f.encrypt(str(license_dict).encode())
-    return _machine_uuid, root_fs_uuid, prod_uuid, string_encoded, db_password
+    return _machine_uuid, _root_fs_uuid, prod_uuid, string_encoded, db_password
 
 
 machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
