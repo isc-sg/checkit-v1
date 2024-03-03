@@ -217,7 +217,8 @@ def reference_image_api(request):
             camera_number = str(camera_object.camera_number)
             camera_id = [camera_object.id]
 
-            state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+            # state_timestamp = datetime.datetime.strftime(timezone.now(), "%Y-%m-%d %H:%M:%S.%f")
+            state_timestamp = timezone.now()
             number_of_cameras_in_run = 1
             engine_state_record = EngineState(state="STARTED", state_timestamp=state_timestamp, user=user_name,
                                               number_of_cameras_in_run=number_of_cameras_in_run)
@@ -236,8 +237,12 @@ def reference_image_api(request):
             else:
                 hour = request.POST['hour']
                 # look up reference image and make sure it exists.
+                # this currently can only delete the version set in camera - will need to
+                # add version as a key to enable deleting earlier versions.
+                # if we are a part way through a version change then it will not delete the latest version.
                 try:
-                    reference_image_object = ReferenceImage.objects.get(url_id=camera_object.id, hour=hour)
+                    reference_image_object = ReferenceImage.objects.get(url_id=camera_object.id, hour=hour,
+                                                                        version=camera_object.reference_image_version)
                     try:
                         reference_image_object.delete()
                     except Exception:
@@ -368,41 +373,26 @@ def check_adm_database(password):
 
         except mysql.connector.Error as e:
             logger.error(f"Failed all attempts at accessing database  {e}")
+            return None, None, None, None, None
+
     try:
-        admin_cursor = adm_db.cursor()
+        admin_cursor = adm_db.cursor(dictionary=True)
         sql_statement = "SELECT * FROM adm ORDER BY id DESC LIMIT 1"
         admin_cursor.execute(sql_statement)
         result = admin_cursor.fetchone()
-        if result:
-            field_names = [i[0] for i in admin_cursor.description]
-
-            current_transaction_count_index = field_names.index('tx_count')
-            current_transaction_limit_index = field_names.index('tx_limit')
-            current_end_date_index = field_names.index('end_date')
-            current_camera_limit_index = field_names.index('camera_limit')
-            current_license_key = field_names.index('license_key')
-
-            current_transaction_count = result[current_transaction_count_index]
-            current_transaction_limit = result[current_transaction_limit_index]
-            current_end_date = result[current_end_date_index]
-            current_camera_limit = result[current_camera_limit_index]
-            current_license_key = result[current_license_key]
-        else:
-            current_transaction_count = 0
-            current_transaction_limit = 0
-            current_end_date = timezone.now().strftime("%Y-%m-%d")
-            current_camera_limit = 0
-            current_license_key = ""
-        # TODO clean up long lines by making this list of variables a dictionary. Helps creating long lines.
+        if not result:
+            result = {'tx_count': 0, 'tx_limit': 0,
+                      'end_date': timezone.now().strftime("%Y-%m-%d"), 'camera_limit': 0,
+                      'license_key': ""}
+            logger.error("System not licensed")
         adm_db.close()
 
     except mysql.connector.Error as e:
-        current_transaction_count = 0
-        current_transaction_limit = 0
-        current_end_date = timezone.now().strftime("%Y-%m-%d")
-        current_camera_limit = 0
-        current_license_key = ""
-    return current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key
+        result = {'tx_count': 0, 'tx_limit': 0,
+                  'end_date': timezone.now().strftime("%Y-%m-%d"), 'camera_limit': 0,
+                  'license_key': ""}
+        logger.error(f'Error connecting to admin: {e}')
+    return result
 
 
 def get_encrypted(password):
@@ -458,7 +448,13 @@ def get_license_details():
     finger_print = (root_fs_uuid + machine_uuid + product_uuid)
     fingerprint_encrypted = get_encrypted(finger_print)
     mysql_password = fingerprint_encrypted[10:42][::-1]
-    current_transaction_count, current_transaction_limit, current_end_date, current_camera_limit, current_license_key = check_adm_database(mysql_password)
+    adm_details = check_adm_database(mysql_password)
+    current_transaction_limit = adm_details['tx_limit']
+    current_end_date = adm_details['end_date']
+    current_camera_limit = adm_details['camera_limit']
+    current_license_key = adm_details['license_key']
+    if not current_license_key:
+        return None, None, None, None, None
 
     # check adm DB if license details exist - if so load them.  Need to modify compare_images_v4 and process_list
     # with new logic to get password license details.
@@ -505,7 +501,7 @@ def take_closest(my_list, my_number):
         return before
 
 
-def get_base_image(reference_images_list, url_id, regions):
+def get_base_image(reference_images_list, url_id, regions, version):
     hour = int(timezone.localtime().strftime('%H'))
 
     hours = list(reference_images_list.values_list('hour', flat=True))
@@ -516,7 +512,8 @@ def get_base_image(reference_images_list, url_id, regions):
     closest_hour = str(take_closest(hours, hour)).zfill(2)
     try:
 
-        closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour).image
+        closest_reference_image = ReferenceImage.objects.get(url_id=url_id, hour=closest_hour,
+                                                             version=version).image
         base_image_file = f"{settings.MEDIA_ROOT}/{closest_reference_image}"
         img = cv2.imread(base_image_file)
 
@@ -1396,9 +1393,9 @@ def input_camera_for_regions(request):
         form = RegionsForm(initial=initial_data)
 
         url_id = camera_object.id
-        reference_images = ReferenceImage.objects.filter(url_id=url_id)
+        reference_images = ReferenceImage.objects.filter(url_id=url_id, version=camera_object.reference_image_version)
         if reference_images:
-            base64_image = get_base_image(reference_images, url_id, regions)
+            base64_image = get_base_image(reference_images, url_id, regions, camera_object.reference_image_version)
             try:
                 log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
                 if not log_obj:
@@ -1461,9 +1458,10 @@ def display_regions(request):
         form = RegionsForm(initial=initial_data)
 
         url_id = camera_object.id
-        reference_images = ReferenceImage.objects.filter(url_id=camera_object.id)
+        reference_images = ReferenceImage.objects.filter(url_id=camera_object.id,
+                                                         version=camera_object.reference_image_version)
         if reference_images:
-            base64_image = get_base_image(reference_images, url_id, regions)
+            base64_image = get_base_image(reference_images, url_id, regions, camera_object.reference_image_version)
             try:
                 log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
                 if not log_obj:
