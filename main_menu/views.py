@@ -64,6 +64,8 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
+
 
 
 from main_menu.tasks import process_cameras
@@ -143,6 +145,56 @@ class CameraViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'camera_number'
 
+    @action(detail=True, methods=['post'])
+    def snooze(self, request, camera_number=None):
+        """
+        Must contain snooze in form-body and be true or false type.
+        Values such as Yes or No also accepted
+        """
+        instance = self.get_object()
+
+        camera_id = [instance.id]
+        snooze: str = request.data.get('snooze')
+        print('camera_id', camera_id, snooze, camera_number)
+        if not snooze:
+            return JsonResponse({"status": "fail", "error": "requires snooze field"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            new_value = strtobool(snooze)
+        except ValueError:
+            return JsonResponse({"status": "fail", "error": "invalid value for snooze"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        instance.snooze = new_value
+        instance.save()
+        return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
+
+
+    @action(detail=True, methods=['post'])
+    def refresh_reference_image(self, request, camera_number=None):
+        """
+        Will initiate a check on camera.  If reference image previously deleted then a new one will be created.
+        Checks are governed by schedule and only occur at current hour according to the schedule.
+        """
+        instance = self.get_object()
+
+        user_name = request.user.username
+
+        camera_id = [instance.id]
+
+        number_of_cameras_in_run = 1
+        engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_id = engine_state_record.id
+        process_cameras(camera_id, engine_state_id, user_name)
+        logger.info(f"API request completed refresh for camera {instance.camera_number}")
+        return Response({'message': 'Camera refresh submitted.'})
+
 
 class LogImageViewSet(viewsets.ModelViewSet):
     """
@@ -163,6 +215,7 @@ class ReferenceImageViewSet(viewsets.ModelViewSet):
     serializer_class = ReferenceImageSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'id'
+    # http_method_names = ['get', 'delete', 'post']
     http_method_names = ['get', 'delete']
 
 
