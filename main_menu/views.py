@@ -1312,7 +1312,8 @@ def export_logs_to_csv(request):
                         continue
                     camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
-                    base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
+                    # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
+                    base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image)
                     if not os.path.exists(base_image):
                         logger.error(f"missing baseimage for logs {base_image}")
                         continue
