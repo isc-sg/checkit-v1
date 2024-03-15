@@ -217,7 +217,6 @@ class LogImageAdmin(ModelAdmin):
     get_location.short_description = "Location"
 
 
-
 @admin.register(LogEntry)
 class LogEntryAdmin(admin.ModelAdmin):
     date_hierarchy = 'action_time'
