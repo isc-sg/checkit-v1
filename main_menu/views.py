@@ -916,6 +916,7 @@ def licensing(request):
     current_end_date = ""
     current_transaction_limit = ""
     current_transaction_count = ""
+    current_camera_limit = ""
     license_owner = ""
     site_name = ""
 
@@ -926,11 +927,12 @@ def licensing(request):
         current_end_date = datetime.datetime.strftime(current_end_date, "%d-%B-%Y")
         current_transaction_limit = obj.transaction_limit
         current_transaction_count = obj.transaction_count
+        current_camera_limit = obj.camera_limit
         license_owner = obj.license_owner
         site_name = obj.site_name
     context = {'start_date': start_date, 'end_date': current_end_date, 'site_name': site_name,
                'transaction_limit': current_transaction_limit, 'license_owner': license_owner,
-               'transaction_count': current_transaction_count}
+               'transaction_count': current_transaction_count, "camera_limit": current_camera_limit}
 
     if request.method == 'POST' and 'download_license' in request.POST:
         machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
