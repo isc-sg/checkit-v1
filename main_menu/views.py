@@ -457,48 +457,76 @@ def get_encrypted(password):
 
 def get_license_details():
     f = Fernet(key)
+    # there are currently 3 primary elements we gather in licensing. machine-id, root_fs_id and product_id/UUID
+    # which is really just the UUID from dmidecode System Information
+    # this approach mostly limits this to linux machines and needs reconsideration if moving to a different OS.
+
+    # Below is the machine_id
     machine_command_array = [47, 101, 116, 99, 47, 109, 97, 99, 104, 105, 110, 101, 45, 105, 100]
-    machine_command = array_to_string(machine_command_array)
+    machine_file = array_to_string(machine_command_array)
     # fd = open("/etc/machine-id", "r")
     # use ascii_to_string to obfuscate the command after compile
-    fd = open(machine_command, "r")
-    machine_uuid = fd.read()
-    machine_uuid = machine_uuid.strip("\n")
-    shell_command_array = [47, 98, 105, 110, 47, 100, 102]
-    shell_command_string = array_to_string(shell_command_array)
-    # shell_output = subprocess.check_output("/bin/df", shell=True)
-    shell_output = subprocess.check_output(shell_command_string, shell=True)
-    l1 = shell_output.decode('utf-8').split("\n")
-    # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
-    command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
-                     101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
+    fd = open(machine_file, "r")
+    _machine_uuid = fd.read()
+    _machine_uuid = _machine_uuid.strip("\n")
 
+    # Below is the code for getting the root_fs_id
+    # firstly we need to know the device that root is mounted on
+    # command = "mount | grep 'on / type'"
+    command_array = [109, 111, 117, 110, 116, 32, 124, 32, 103, 114, 101, 112, 32, 39, 111, 110, 32, 47, 32, 116, 121,
+                     112, 101, 39]
     command = array_to_string(command_array)
-    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+    command_output = subprocess.check_output(command, shell=True).decode()
+    root_device = command_output.split()[0]
 
-    # command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
-    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105,
-                     110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    # command = "/usr/bin/sudo /sbin/blkid | grep "
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105, 110, 47, 98,
+                     108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    # convert the array to a string then add the root device to the end to complete the command.
+    command = array_to_string(command_array) + root_device
+    command_output = subprocess.check_output(command, shell=True).decode()
+    _root_fs_uuid = command_output.split()[1].strip("UUID=").strip("\"")
 
-    command = array_to_string(command_array) + root_dev
-    root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
-
-    # command = "/usr/bin/sudo dmidecode | grep -i uuid"
+    # shell_command_array = [47, 98, 105, 110, 47, 100, 102]
+    # shell_command_string = array_to_string(shell_command_array)
+    # # shell_output = subprocess.check_output("/bin/df", shell=True)
+    # shell_output = subprocess.check_output(shell_command_string, shell=True)
+    # # l1 = shell_output.decode('utf-8').split("\n")
+    # # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    # command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
+    #                  101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
+    #
+    # command = array_to_string(command_array)
+    # root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+    #
+    # # command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105,
+    #                  110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    #
+    # command = array_to_string(command_array) + root_dev
+    # _root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
+    # # command = "/usr/bin/sudo dmidecode | grep -i uuid"
     # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
     #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
-
     # new command to cater for servermax where multiple UUID are returned in dmidecode.  This will take the
     # line with a tab then UUID - other lines in server-max show \t\tService UUID although it's the same UUID
     # command = '/usr/bin/sudo dmidecode | grep -E "\tUUID"'
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
+    #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
+    #
+    # command = array_to_string(command_array)
+    # prod_uuid = subprocess.check_output(command, shell=True).decode(). \
+    #     strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
-    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
-                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
-
+    # Below is the code for getting the prod_uuid.  This is an improvement over earlier versions which
+    # used grep to extract UUID. This version uses output directly from dmidecode to provide this value.
+    # command = '/usr/bin/sudo dmidecode -s system-uuid'
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100, 101, 99, 111,
+                     100, 101, 32, 45, 115, 32, 115, 121, 115, 116, 101, 109, 45, 117, 117, 105, 100]
     command = array_to_string(command_array)
-    product_uuid = subprocess.check_output(command, shell=True).decode(). \
-        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
+    product_uuid = subprocess.check_output(command, shell=True).decode().strip("\n")
 
-    finger_print = (root_fs_uuid + machine_uuid + product_uuid)
+    finger_print = (_root_fs_uuid + _machine_uuid + product_uuid)
     fingerprint_encrypted = get_encrypted(finger_print)
     mysql_password = fingerprint_encrypted[10:42][::-1]
     adm_details = check_adm_database(mysql_password)
@@ -516,11 +544,11 @@ def get_license_details():
                     "purchased_transactions": current_transaction_limit,
                     "purchased_cameras": current_camera_limit,
                     "license_key": current_license_key,
-                    "machine_uuid": machine_uuid,
-                    "root_fs_uuid": root_fs_uuid,
+                    "machine_uuid": _machine_uuid,
+                    "root_fs_uuid": _root_fs_uuid,
                     "product_uuid": product_uuid}
     encoded_string = f.encrypt(str(license_dict).encode())
-    return machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password
+    return _machine_uuid, _root_fs_uuid, product_uuid, encoded_string, mysql_password
 
 
 def license_limits_are_ok():
