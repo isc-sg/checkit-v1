@@ -27,6 +27,7 @@ import numpy as np
 from scipy.signal import convolve2d
 from scipy.ndimage import convolve
 from scipy.stats import skew, kurtosis
+import inspect
 
 
 from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
@@ -50,6 +51,7 @@ HOST = ""
 PORT = 0
 network_interface = ""
 log_alarms = False
+mysql_password = None
 
 
 def array_to_string(array):
@@ -58,6 +60,11 @@ def array_to_string(array):
         new_string += chr(element)
     return new_string
 
+def string_to_array(string):
+    new_array = []
+    for element in string:
+        new_array.append(ord(element))
+    return new_array
 
 checkit_array = [52, 50, 52, 48, 54, 55, 49, 49, 57, 53, 54, 116, 105, 107, 99, 101, 104, 67]
 
@@ -70,7 +77,20 @@ checkit_key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 10
 checkit_key = array_to_string(checkit_key_array).encode()
 
 
-def get_encrypted(password):
+def format_datetime_with_milliseconds(dt):
+    # Format datetime with milliseconds
+    formatted_datetime = dt.strftime("%Y-%m-%d %H:%M:%S,")
+
+    # Extract milliseconds (padded to 3 characters)
+    milliseconds = str(dt.microsecond // 1000).zfill(3)
+
+    # Combine formatted datetime and milliseconds
+    formatted_datetime_with_ms = f"{formatted_datetime}{milliseconds}"
+
+    return formatted_datetime_with_ms
+
+
+def get_hash(password):
     h = hashlib.blake2b(digest_size=64, key=checkit_secret)
     h.update(password.encode())
     h_in_hex = h.hexdigest().upper()
@@ -122,54 +142,79 @@ def check_adm_database(password):
 
 
 def get_license_details():
-
-    # checkit_key = b'Bu-VMdySIPreNgve8w_FU0Y-LHNvygKlHiwPlJNOr6M='
-
     f = Fernet(checkit_key)
+    # there are currently 3 primary elements we gather in licensing. machine-id, root_fs_id and product_id/UUID
+    # which is really just the UUID from dmidecode System Information
+    # this approach mostly limits this to linux machines and needs reconsideration if moving to a different OS.
+
+    # Below is the machine_id
     machine_command_array = [47, 101, 116, 99, 47, 109, 97, 99, 104, 105, 110, 101, 45, 105, 100]
-    machine_command = array_to_string(machine_command_array)
+    machine_file = array_to_string(machine_command_array)
     # fd = open("/etc/machine-id", "r")
     # use ascii_to_string to obfuscate the command after compile
-    fd = open(machine_command, "r")
+    fd = open(machine_file, "r")
     _machine_uuid = fd.read()
     _machine_uuid = _machine_uuid.strip("\n")
-    shell_command_array = [47, 98, 105, 110, 47, 100, 102]
-    shell_command_string = array_to_string(shell_command_array)
-    # shell_output = subprocess.check_output("/bin/df", shell=True)
-    shell_output = subprocess.check_output(shell_command_string, shell=True)
-    # l1 = shell_output.decode('utf-8').split("\n")
-    # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
-    command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
-                     101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
 
+    # Below is the code for getting the root_fs_id
+    # firstly we need to know the device that root is mounted on
+    # command = "mount | grep 'on / type'"
+    command_array = [109, 111, 117, 110, 116, 32, 124, 32, 103, 114, 101, 112, 32, 39, 111, 110, 32, 47, 32, 116, 121,
+                     112, 101, 39]
     command = array_to_string(command_array)
-    root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+    command_output = subprocess.check_output(command, shell=True).decode()
+    root_device = command_output.split()[0]
 
-    # command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
-    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105,
-                     110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    # command = "/usr/bin/sudo /sbin/blkid | grep "
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105, 110, 47, 98,
+                     108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    # convert the array to a string then add the root device to the end to complete the command.
+    command = array_to_string(command_array) + root_device
+    command_output = subprocess.check_output(command, shell=True).decode()
+    _root_fs_uuid = command_output.split()[1].strip("UUID=").strip("\"")
 
-    command = array_to_string(command_array) + root_dev
-    _root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
-
+    # shell_command_array = [47, 98, 105, 110, 47, 100, 102]
+    # shell_command_string = array_to_string(shell_command_array)
+    # # shell_output = subprocess.check_output("/bin/df", shell=True)
+    # shell_output = subprocess.check_output(shell_command_string, shell=True)
+    # # l1 = shell_output.decode('utf-8').split("\n")
+    # # command = "mount | sed -n 's|^/dev/\(.*\) on / .*|\\1|p'"
+    # command_array = [109, 111, 117, 110, 116, 32, 124, 32, 115, 101, 100, 32, 45, 110, 32, 39, 115, 124, 94, 47, 100,
+    #                  101, 118, 47, 92, 40, 46, 42, 92, 41, 32, 111, 110, 32, 47, 32, 46, 42, 124, 92, 49, 124, 112, 39]
+    #
+    # command = array_to_string(command_array)
+    # root_dev = subprocess.check_output(command, shell=True).decode().strip("\n")
+    #
+    # # command = "/usr/bin/sudo /sbin/blkid | grep " + root_dev
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 47, 115, 98, 105,
+    #                  110, 47, 98, 108, 107, 105, 100, 32, 124, 32, 103, 114, 101, 112, 32]
+    #
+    # command = array_to_string(command_array) + root_dev
+    # _root_fs_uuid = subprocess.check_output(command, shell=True).decode().split(" ")[1].split("UUID=")[1].strip("\"")
     # # command = "/usr/bin/sudo dmidecode | grep -i uuid"
     # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
     #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 105, 32, 117, 117, 105, 100]
-
     # new command to cater for servermax where multiple UUID are returned in dmidecode.  This will take the
     # line with a tab then UUID - other lines in server-max show \t\tService UUID although it's the same UUID
     # command = '/usr/bin/sudo dmidecode | grep -E "\tUUID"'
+    # command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
+    #                  101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
+    #
+    # command = array_to_string(command_array)
+    # prod_uuid = subprocess.check_output(command, shell=True).decode(). \
+    #     strip("\n").strip("\t").split("UUID:")[1].strip(" ")
 
-    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100,
-                     101, 99, 111, 100, 101, 32, 124, 32, 103, 114, 101, 112, 32, 45, 69, 32, 34, 9, 85, 85, 73, 68, 34]
-
+    # Below is the code for getting the prod_uuid.  This is an improvement over earlier versions which
+    # used grep to extract UUID. This version uses output directly from dmidecode to provide this value.
+    # command = '/usr/bin/sudo dmidecode -s system-uuid'
+    command_array = [47, 117, 115, 114, 47, 98, 105, 110, 47, 115, 117, 100, 111, 32, 100, 109, 105, 100, 101, 99, 111,
+                     100, 101, 32, 45, 115, 32, 115, 121, 115, 116, 101, 109, 45, 117, 117, 105, 100]
     command = array_to_string(command_array)
-    prod_uuid = subprocess.check_output(command, shell=True).decode(). \
-        strip("\n").strip("\t").split("UUID:")[1].strip(" ")
+    product_uuid = subprocess.check_output(command, shell=True).decode().strip("\n")
 
-    finger_print = (_root_fs_uuid + _machine_uuid + prod_uuid)
-    fingerprint_encrypted = get_encrypted(finger_print)
-    db_password = fingerprint_encrypted[10:42][::-1]
+    finger_print = (_root_fs_uuid + _machine_uuid + product_uuid)
+    fingerprint_hashed = get_hash(finger_print)
+    db_password = fingerprint_hashed[10:42][::-1]
     adm_details = check_adm_database(db_password)
     current_transaction_limit = adm_details['tx_limit']
     current_end_date = adm_details['end_date']
@@ -187,16 +232,10 @@ def get_license_details():
                     "license_key": current_license_key,
                     "machine_uuid": _machine_uuid,
                     "root_fs_uuid": _root_fs_uuid,
-                    "product_uuid": prod_uuid}
-    string_encoded = f.encrypt(str(license_dict).encode())
-    return _machine_uuid, _root_fs_uuid, prod_uuid, string_encoded, db_password
-
-
-machine_uuid, root_fs_uuid, product_uuid, encoded_string, mysql_password = get_license_details()
-
-if not (machine_uuid and root_fs_uuid and product_uuid):
-    logger.error("Licensing error - no license details - unable to proceed")
-    sys.exit(1)
+                    "product_uuid": product_uuid,
+                    "db_password": db_password}
+    # string_encoded = f.encrypt(str(license_dict).encode())
+    return license_dict
 
 
 def extract_ip_from_url(url):
@@ -285,6 +324,56 @@ def get_camera_details(camera_list):
 
 
 def check_license_ok():
+    global mysql_password
+
+    license_dict = get_license_details()
+    license_key = license_dict['license_key']
+    machine_uuid = license_dict['machine_uuid']
+    root_fs_uuid = license_dict['root_fs_uuid']
+    product_uuid = license_dict['product_uuid']
+    mysql_password = license_dict['db_password']
+    purchased_transactions = license_dict['purchased_transactions']
+    end_date = license_dict['end_date']
+    purchased_cameras = license_dict['purchased_cameras']
+    finger_print = (root_fs_uuid + machine_uuid + product_uuid)
+    finger_print_hashed = get_hash(finger_print)
+    # license_key_check_finger_print = get_hash(f"{purchased_transactions}{end_date}{finger_print_hashed}{purchased_cameras}")
+    # it's important to use order_by as we will want to be sure we get the second last object later. Here we order by id
+    # in descending order ( highest first ).
+    license_objects = Licensing.objects.order_by('-id')
+
+    # take first as we have reversed the order of the list - this represents the last and current license record
+    license_object_first = license_objects.first()
+
+    if license_objects.count() == 1:
+        license_key_check = get_hash(
+            f"{license_object_first.transaction_limit}"
+            f"{license_object_first.end_date.strftime('%Y-%m-%d')}"
+            f"{finger_print_hashed}"
+            f"{purchased_cameras}")
+        # print(license_object_first.end_date.strftime('%Y-%m-%d'))
+        # logger.info(license_key_check)
+        if license_key_check != license_object_first.license_key:
+            logger.error(f"License corrupted")
+            return False
+    else:
+        # the line below will get the second last object because the list is in descending order so 1 is the
+        # second object and 0 is the first, therefore 1 is the second last object in this list.
+        license_object_previous = license_objects[1]
+        license_key_previous = license_object_previous.license_key
+
+        license_check_licensing_info = get_hash(f"{license_object_first.transaction_limit}"
+                                                f"{license_object_first.end_date.strftime('%Y-%m-%d')}"
+                                                f"{license_key_previous}"
+                                                f"{purchased_cameras}")
+        if license_check_licensing_info != license_key:
+            logger.error(f"License corrupted")
+            return False
+
+    if not (machine_uuid and root_fs_uuid and product_uuid):
+        logger.error("Licensing error - no license details - unable to proceed")
+        return False
+
     license_object = Licensing.objects.all().last()
     end_of_day_datetime_naive = datetime.datetime.combine(license_object.end_date, datetime.time.max)
     end_of_day_datetime = timezone.make_aware(end_of_day_datetime_naive, timezone.get_current_timezone())
@@ -391,7 +480,11 @@ def increment_transaction_count():
         "password": password,
         "database": "adm"
     }
-    adm_db = mysql.connector.connect(**adm_db_config)
+    try:
+        adm_db = mysql.connector.connect(**adm_db_config)
+    except mysql.connector.errors as error:
+        logger.error(f"Error connection to database {error}")
+
     try:
         adm_cursor = adm_db.cursor()
         sql_statement = "SELECT id FROM adm ORDER BY id DESC LIMIT 1"
@@ -485,8 +578,8 @@ def open_capture_device(url, multicast_address, multicast_port, describe_data):
         # the rtsp servers port
         ip_address, url_port, scheme = extract_ip_from_url(url)
         if not ip_address:
-            logger.error(f"Error in URL for camera url {url}")
-            return "Error"
+            # logger.error(f"Error in URL for camera url {url}")
+            return "Fail", f"Error in URL for camera url {url}\n"
 
         # remove all lines that are not sdp file compliant - must have single_char then =
         describe_data = [item for item in describe_data if len(item) >= 2 and item[1] == "="]
@@ -558,12 +651,13 @@ def open_capture_device(url, multicast_address, multicast_port, describe_data):
         error_output = err.read()
         if "File exists" not in error_output:
             if error_output:
-                logger.error(f"Unable to join multicast group - {error_output}")
+                # logger.error(f"Unable to join multicast group - {error_output}")
                 try:
                     os.remove(f"/tmp/{ip_address}.sdp")
                 except OSError:
                     pass
-                return "Error"
+                return "Fail", f"Unable to join multicast group - {error_output}\n"
+
         cap = None
         try:
             os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'protocol_whitelist;file,rtp,udp'
@@ -585,25 +679,34 @@ def open_capture_device(url, multicast_address, multicast_port, describe_data):
                 os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
                 cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             except cv2.error as err:
-                logger.error(f"Error opening camera {url} - {err} ")
+                # logger.error(f"Error opening camera {url} - {err} ")
+                return "Fail", f"Unable to open camera {url} using UDP - {err}\n"
 
         if not cap.isOpened():
             try:
                 os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
                 cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             except cv2.error as err:
-                logger.error(f"Error opening camera {url} - {err}")
-                return "Error"
+                # logger.error(f"Error opening camera {url} - {err}")
+                return "Fail", f"Unable to open camera {url} using TCP - {err}\n"
     else:
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'timeout;5000'
+
         cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        # timeout_ms = 5000  # 5 seconds timeout
+        # cap.set(cv2.CAP_PROP_OPENNI2_SYNC, timeout_ms)
         if not cap.isOpened():
             os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
-            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            return "Error"
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'timeout;5000'
 
-    return cap
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            # timeout_ms = 5000  # 5 seconds timeout
+            # cap.set(cv2.CAP_PROP_OPENNI2_SYNC, timeout_ms)
+        if not cap.isOpened():
+            return "Fail", f"Error opening non-multicast camera {url} using UDP or TCP\n"
+
+    return "Success", cap
 
 
 def close_capture_device(cap, multicast_address):
@@ -621,11 +724,10 @@ def close_capture_device(cap, multicast_address):
             logger.error(f"Unable to leave multicast group - {error_output}")
 
 
-def log_capture_error(camera, user, engine_state_id, message):
+def log_capture_error(camera, user, engine_state_id):
     LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                             creation_date=timezone.now(), user=user, run_number=engine_state_id)
     increment_transaction_count()
-    logger.error(message)
 
 
 def estimate_noise(image):
@@ -733,15 +835,13 @@ def compare_images(base, frame, regions):
 
 def create_base_image(camera_object, capture_device, version):
 
-    logger.info(f"Attempting capture of reference image for {camera_object.url} - "
-                f"camera number {camera_object.camera_number}")
     time.sleep(3)
 
     able_to_read, frame = capture_device.read()
     if not able_to_read:
-        logger.error(f"Unable to read from device for "
-                     f"camera id {camera_object.id} / camera number {camera_object.camera_number}")
-        return
+        message = (f"Unable to read from device for "
+                   f"camera id {camera_object.id} / camera number {camera_object.camera_number}")
+        return message
 
     logger.debug(f"Successfully captured reference image on"
                  f" {camera_object.camera_name} {camera_object.id} {camera_object.camera_number}")
@@ -753,8 +853,8 @@ def create_base_image(camera_object, capture_device, version):
         pathlib.Path(base_image_dir+f"/{camera_object.id}").mkdir(parents=True, exist_ok=True)
         os.system(f"sudo chmod 775 {base_image_dir}/{camera_object.id}")
     except Exception as e:
-        logger.error(f"Unable to create or set permissions on reference image directory {e}")
-        return
+        message = f"Unable to create or set permissions on reference image directory {e}"
+        return message
 
     if os.path.isfile(file_name):
         os.remove(file_name)
@@ -763,15 +863,15 @@ def create_base_image(camera_object, capture_device, version):
         try:
             os.system(f"sudo chmod 775 {base_image_dir}/{camera_object.id}")
         except Exception as e:
-            logger.error(f"Unable to set permissions on {base_image_dir}/{camera_object.id} {e}")
-            return
+            message = f"Unable to set permissions on {base_image_dir}/{camera_object.id} {e}"
+            return message
 
         able_to_write = cv2.imwrite(file_name, frame)
 
         if not able_to_write:
-            logger.error(f"Unable to save reference image for id {camera_object.id} / "
-                         f" camera number {camera_object.camera_number}")
-            return
+            message = (f"Unable to save reference image for id {camera_object.id} / "
+                       f" camera number {camera_object.camera_number}")
+            return message
 
         try:
 
@@ -792,25 +892,41 @@ def create_base_image(camera_object, capture_device, version):
                                           creation_date=timezone.now(), focus_value=focus_value, version=version)
             # create log entry here with action as REFERENCE IMAGE
         except Exception as e:
-            logger.error(f"Unable to save reference image {file_name} for camera id {camera_object.id} - error {e}")
+            message = f"Unable to save reference image {file_name} for camera id {camera_object.id} - error {e}"
             # remove file created earlier as transaction failed.
             if os.path.isfile(file_name):
                 os.remove(file_name)
+            return message
+    return "Capture succeeded"
 
 
-def read_frame_and_compare(capture_device, user, engine_state_id, camera_object):
+def read_and_compare(capture_device, user, engine_state_id, camera_object):
     multicast_address = camera_object.multicast_address
     camera = camera_object.id
     regions = camera_object.image_regions
+    # logger.info(f"{camera} Start read at {round(time.time(), 2)}")
+    task_timer = time.time()
+    # message = (f"{camera} Start read at {round(time.time(), 2)}\n")
+    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'timeout;5000'
     able_to_read, image_frame = capture_device.read()
+    end_time = time.time()
+    # logger.info(f"{camera} End read at {round(time.time(), 2)}")
+    frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
+    function_name = frame.function
+    dt = format_datetime_with_milliseconds(datetime.datetime.now())
+    message = (f"[{dt}] INFO [{function_name}] -"
+               f" Completed low level read in {round(end_time - task_timer, 2)}\n")
+
     current_hour = str(timezone.localtime().hour).zfill(2)
 
     if not able_to_read:
-        message = "Error reading video frame\n"
-        log_capture_error(camera, user, engine_state_id, message)
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] ERROR [{function_name}] -" 
+                   f" Error reading video frame for camera id {camera} camera number {camera_object.camera_number}\n")
+        log_capture_error(camera, user, engine_state_id)
         increment_transaction_count()
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
 
     if regions == '0' or regions == "[]":
         regions = []
@@ -828,7 +944,7 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
     # we do this by getting the last of reference_image_objects.
     # from there get the version number.
     last_version = camera_object.reference_image_version
-    if camera_object.trigger_new_reference_image_date:
+    if camera_object.trigger_new_reference_image:
         last_version += 1
     elapsed_time = timezone.now() - camera_object.trigger_new_reference_image_date
 
@@ -836,36 +952,44 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
             not reference_image_objects.filter(url_id=camera, hour=current_hour, version=last_version).exists()):
 
         if elapsed_time < timezone.timedelta(hours=24):
-            create_base_image(camera_object, capture_device, last_version)
+            message = (message + f"[{dt}] INFO [{function_name}] -"
+                                 f" Attempting capture of reference image\n")
+            response = create_base_image(camera_object, capture_device, last_version)
+            message = (message + f"[{dt}] INFO [{function_name}] -"
+                                 f" {response}\n")
             close_capture_device(capture_device, multicast_address)
-            return
+            return message
         else:
             camera_object.trigger_new_reference_image = False
             camera_object.reference_image_version = last_version + 1
             camera_object.save()
 
     if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
-        create_base_image(camera_object, capture_device, last_version)
+        message = (message + f"[{dt}] INFO [{function_name}] -"
+                             f" Attempting capture of reference image\n")
+        response = create_base_image(camera_object, capture_device, last_version)
+        message = (message + f"[{dt}] INFO [{function_name}] -"
+                             f" {response}\n")
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
     # if trigger reference image lets do that
     # go back into create_base_image
     # then close capture device and return.
     # if camera_object.trigger_new_reference_image and (camera_object.trigger_new_reference_image_date)
-
-
-
 
     # this now becomes our version we append to file name and also add this to the get below.
     file_name = reference_image_objects.get(hour=current_hour, version=last_version).image
     base_image_name = f"{settings.MEDIA_ROOT}/{file_name}"
     base_image = cv2.imread(base_image_name)
     if base_image is None:
-        message = "Error reading reference image\n"
-        log_capture_error(camera, user, engine_state_id, message)
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] INFO [{function_name}] -" 
+                             f" Error reading reference image for "
+                             f"camera id {camera} camera number {camera_object.camera_number}\n")
+        log_capture_error(camera, user, engine_state_id)
         increment_transaction_count()
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
 
     # check if image is low res
     h, w = image_frame.shape[:2]
@@ -873,8 +997,11 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
     original_image_frame = image_frame
     if h < 720:
         scale = math.ceil(720 / h)
-        logger.info(f"WARNING: Image size is below recommended minimum of 720p - "
-                    f"images are being scaled up by factor of {scale} for analysis")
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = message + (f"[{dt}] WARNING [{function_name}] -"
+                             f" Image size is below recommended minimum of 720p - "
+                             f"images are being scaled up by factor of {scale} for analysis "
+                             f"for camera id {camera} camera number {camera_object.camera_number}\n")
         image_frame = cv2.resize(image_frame, (h * scale, w * scale),
                                  interpolation=cv2.INTER_AREA)
         base_image = cv2.resize(base_image, (h * scale, w * scale),
@@ -887,21 +1014,24 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
         reference_dimensions = image_base_grey.shape[:2]
         capture_dimensions = image_frame_grey.shape[:2]
     except cv2.error as err:
-        logger.error(f"Error in converting image {err}")
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = message + (f"[{dt}] ERROR [{function_name}] -"
+                             f" Error in converting image {err}\n")
         increment_transaction_count()
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
 
     if reference_dimensions != capture_dimensions:
-        logger.error(
-            f"Image sizes don't match on camera number {camera}")
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] ERROR [{function_name}] -"
+                             f"Image sizes don't match on camera number {camera}\n")
         LogImage.objects.create(url_id=camera, region_scores={},
                                 action="Image Size Error",
                                 creation_date=timezone.now(), user=user,
                                 run_number=engine_state_id)
         increment_transaction_count()
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
 
     # Do the check here
     results_dict = compare_images(image_base_grey, image_frame_grey, regions)
@@ -919,15 +1049,19 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
         pathlib.Path(f"{base_image_directory}").mkdir(parents=True, exist_ok=True)
         os.system(f"sudo chmod 775 {base_image_directory}")
     except Exception as e:
-        logger.error(f"Unable to create or set permissions on log directory {base_image_directory} - {e}")
-        return
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] ERROR [{function_name}] -"
+                             f"Unable to create or set permissions on log directory {base_image_directory} - {e}")
+        return message
 
     able_to_write = cv2.imwrite(log_image_file_name, original_image_frame)
     if not able_to_write:
-        logger.error(f"Unable to write log file {log_image_file_name}")
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] ERROR [{function_name}] -"
+                             f"Unable to write log file {log_image_file_name}")
         increment_transaction_count()
         close_capture_device(capture_device, multicast_address)
-        return
+        return message
 
     sql_file_name = log_image_file_name.strip(settings.MEDIA_ROOT)
 
@@ -960,14 +1094,15 @@ def read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
     camera_object.last_check_date = timezone.now()
     camera_object.save()
     close_capture_device(capture_device, multicast_address)
-    logger.info(f"Checked camera {camera}")
+    return message
 
 
-def check_cameras(camera_list, cameras_details, engine_state_id, user):
+def check_the_camera(camera_list, cameras_details, engine_state_id, user):
 
     logger.info(f"Starting check {camera_list}")
 
     for camera in camera_list:
+        start_timer = time.time()
         camera_object = cameras_details.get(id=camera)
         url = camera_object.url
         camera_number = camera_object.camera_number
@@ -978,11 +1113,32 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
         hoursinday = list(camera_object.scheduled_hours.values_list('hour_in_the_day', flat=True))
         daysofweek = list(camera_object.scheduled_days.values_list('id', flat=True))
 
+        frame = inspect.stack()[0]
+        function_name = frame.function
+        message = f"Starting check for camera id {camera} camera number {camera_object.camera_number}\n"
+
         if int(timezone.localtime().hour) not in hoursinday:
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = (message + f"[{dt}] INFO [{function_name}] -"
+                                 f"Not in scheduled hours "
+                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
+            logger.info(message)
             continue
+
         if (timezone.localtime().weekday() + 1) not in daysofweek:
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = (message + f"[{dt}] INFO [{function_name}] -"
+                                 f"Not in scheduled days "
+                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
+            logger.info(message)
             continue
+
         if camera_object.snooze:
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = (message + f"[{dt}] INFO [{function_name}] -"
+                                 f"Camera set to snooze "
+                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
+            logger.info(message)
             continue
 
         # if user has entered a username and password set in the database then ensure that we use these
@@ -995,10 +1151,13 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
         ip_address, url_port, scheme = extract_ip_from_url(url)
 
         if ip_address == "Error":
-            message = (f"Error in IP address for camera "
-                       f"{camera_object.camera_name} {camera_number} {camera_object.id}")
-            log_capture_error(camera, user, engine_state_id, message)
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = (f"[{dt}] ERROR [{function_name}] -"
+                       f" Error in IP address for camera "
+                       f"{camera_object.camera_name} {camera_number} {camera_object.id}\n")
+            log_capture_error(camera, user, engine_state_id)
             increment_transaction_count()
+            logger.error(message)
             continue
 
         if scheme not in [
@@ -1016,40 +1175,70 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
             "tcp",
             "sftp"
         ]:
-            logger.error(f"Unsupported URL scheme {scheme}")
-            return
+            logger.error(f"Unsupported URL scheme {scheme} "
+                         f"for camera id {camera} camera number {camera_object.camera_number}\n")
+            continue
 
         if scheme in ["rtsp", "rtsps"]:
+            task_timer = time.time()
             options_response, has_error = options(url, ip_address, url_port, camera_username, camera_password)
+            end_timer = time.time()
+            frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
+            function_name = frame.function
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = message + (f"[{dt}] INFO [{function_name}] -"
+                                 f" Completed OPTIONS in {round(end_timer - task_timer, 2)} seconds\n")
             if has_error:
-                message = f"Error in OPTIONS for {url} {options_response}\n"
-                log_capture_error(camera, user, engine_state_id, message)
+                end_timer = time.time()
+                message = (f"[{dt}] ERROR [{function_name}] -"
+                           f" Error in OPTIONS for {url} {options_response} "
+                           f"total time {round(end_timer - start_timer, 2)} seconds\n")
+                log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
+                logger.error(message)
                 continue
-
+            task_timer = time.time()
             describe_response, has_error = describe(url, ip_address, url_port, camera_username, camera_password)
+            end_timer = time.time()
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = message + (f"[{dt}] INFO [{function_name}] -"
+                                 f" Completed DESCRIBE in {round(end_timer - task_timer, 2)} seconds\n")
+
             if has_error:
-                message = f"Error in DESCRIBE for url {url} {describe_response}"
-                log_capture_error(camera, user, engine_state_id, message)
+                end_timer = time.time()
+                message = (f"[{dt}] ERROR [{function_name}] -"
+                           f" Error in DESCRIBE for url {url} {describe_response} "
+                           f"total time {round(end_timer - start_timer, 2)} seconds\n")
+                log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
+                logger.error(message)
                 continue
 
-            capture_device = open_capture_device(url, multicast_address, multicast_port, describe_response)
+            status, capture_device = open_capture_device(url, multicast_address, multicast_port, describe_response)
 
-            if capture_device == "Error" or not capture_device.isOpened():
-                message = f"Unable to open capture device {url}\n"
-                log_capture_error(camera, user, engine_state_id, message)
+            if status == "Fail" or not capture_device.isOpened():
+                # code below is ugly - capture_device holds the error message in case it does not open
+                message = f"{capture_device}"
+                log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
                 close_capture_device(capture_device, multicast_address)
+                logger.error(message)
                 continue
 
-            read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
-
+            task_timer = time.time()
+            message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
+            end_timer = time.time()
+            dt = format_datetime_with_milliseconds(datetime.datetime.now())
+            message = message + (f"[{dt}] INFO [{function_name}] -"
+                                 f" Read and compare completed in {round(end_timer - task_timer, 2)} seconds\n")
         else:
             # this should be simple imread rather than open / describe etc.
             if camera_object.multicast_address:
-                logger.error(f"{scheme} over multicast is currently not supported")
-                return
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = (message + f"[{dt}] ERROR [{function_name}] -"
+                                     f" {scheme} over multicast is currently not supported\n")
+                logger.error(message)
+                continue
             capture_device = cv2.VideoCapture(camera_object.url)
             if not capture_device.isOpened():
                 count = 0
@@ -1059,12 +1248,31 @@ def check_cameras(camera_list, cameras_details, engine_state_id, user):
                         break
                     count += 1
             if capture_device.isOpened():
-                read_frame_and_compare(capture_device, user, engine_state_id, camera_object)
+                task_timer = time.time()
+                message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
+                end_timer = time.time()
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = message + (f"[{dt}] INFO [{function_name}] -"
+                                     f" Completed read for camera id {camera} camera number {camera_object.camera_number} "
+                                     f"in {round(end_timer - task_timer, 2)} seconds\n")
             else:
-                message = f"Unable to open capture device {url}\n"
-                log_capture_error(camera, user, engine_state_id, message)
+                end_timer = time.time()
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = (f"[{dt}] ERROR [{function_name}] -"
+                           f" Unable to open capture device {url} "
+                           f"total time {round(end_timer - start_timer,2)} seconds\n")
+                log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
                 close_capture_device(capture_device, multicast_address)
+                logger.error(message)
+                continue
+
+        end_timer = time.time()
+        dt = format_datetime_with_milliseconds(datetime.datetime.now())
+        message = (message + f"[{dt}] INFO [{function_name}] -"
+                             f" Check complete - total time {round(end_timer - start_timer, 2)} seconds\n ")
+        logger.info(message)
+
 
 @shared_task()
 def process_cameras(camera_list, engine_state_id, user_name):
@@ -1080,10 +1288,10 @@ def process_cameras(camera_list, engine_state_id, user_name):
         logger.info(f"Worker ID: {worker_id} Cameras {camera_list}")
         cameras_details = get_camera_details(camera_list)
         if not cameras_details:
-            logger.info(f'"Error - camera list does not contain any cameras" - {camera_list}')
+            logger.error(f'"Error - camera list does not contain any cameras" - {camera_list}')
             sys.exit(1)
 
-        check_cameras(camera_list, cameras_details, engine_state_id, user_name)
+        check_the_camera(camera_list, cameras_details, engine_state_id, user_name)
 
         logs = LogImage.objects.filter(run_number=engine_state_id)
         number_of_pass = logs.filter(action="Pass").count()
@@ -1095,7 +1303,7 @@ def process_cameras(camera_list, engine_state_id, user_name):
             transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
 
             try:
-                engine_object = EngineState.objects.all().last()
+                engine_object = EngineState.objects.get(id=engine_state_id)
                 engine_object.transaction_rate = transaction_rate
                 engine_object.number_pass_images = number_of_pass
                 engine_object.number_failed_images = number_of_fail
@@ -1109,4 +1317,4 @@ def process_cameras(camera_list, engine_state_id, user_name):
             send_alarms(cameras_details, engine_state_id)
 
     else:
-        logger.error(f"You license has either expired or exhausted the available transactions")
+        logger.error(f"Licensing error - please contact your software vendor for assistance")
