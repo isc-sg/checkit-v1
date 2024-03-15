@@ -180,12 +180,12 @@ class Licensing(models.Model):
     license_key = models.CharField(max_length=256, null=False, blank=False, default="None")
     license_owner = models.CharField(max_length=256, null=False, blank=False, default="None")
     site_name = models.CharField(max_length=256, null=False, blank=False, default="None")
-    run_schedule = models.PositiveIntegerField(null=False, blank=False, default=1,
+    camera_limit = models.PositiveIntegerField(null=False, blank=False, default=1,
                                                validators=[
-                                                   MaxValueValidator(168),
+                                                   MaxValueValidator(99999),
                                                    MinValueValidator(1)]
                                                )
-    # TODO run_schedule seems like its not being used - check and remove
+
 
 class EngineState(models.Model):
     state = models.CharField(choices=STATE_CHOICES, max_length=32)
