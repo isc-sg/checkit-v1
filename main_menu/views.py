@@ -1030,7 +1030,7 @@ def licensing(request):
                                            license_key=uploaded_license_key,
                                            license_owner=uploaded_customer_name,
                                            site_name=uploaded_site_name,
-                                           run_schedule=1)
+                                           camera_limit=uploaded_purchased_cameras)
                 try:
                     license_record.save()
                 except Exception as e:
