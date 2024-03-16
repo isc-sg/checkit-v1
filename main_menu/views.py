@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.db.models.functions import TruncHour
 from django.db.models import Count
 from pathos.multiprocessing import cpu_count
+import configparser
 
 
 
@@ -112,6 +113,52 @@ key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 103, 118, 
 key = array_to_string(key_array).encode()
 
 number_of_cpus = cpu_count()
+socket_timeout = 1
+CHECKIT_HOST = ""
+HOST = ""
+PORT = 0
+network_interface = ""
+log_alarms = False
+mysql_password = None
+log_retention_period_days = 30
+
+def get_config():
+    config = configparser.ConfigParser()
+    config.read('/home/checkit/camera_checker/main_menu/config/config.cfg')
+    global CHECKIT_HOST
+    global HOST
+    global PORT
+    global network_interface
+    global log_alarms
+    global log_retention_period_days
+
+    try:
+        if config.has_option('DEFAULT', 'log_alarms'):
+            try:
+                log_alarms = config.getboolean('DEFAULT', 'log_alarms')
+            except ValueError:
+                log_alarms = False
+        else:
+            log_alarms = False
+        network_interface = config['DEFAULT']['network_interface']
+        HOST = None
+        if config.has_option('DEFAULT', 'synergy_host', ):
+            try:
+                HOST = config.get('DEFAULT', 'synergy_host', fallback=None)
+            except ValueError:
+                logger.error("Please check config file for synergy host address")
+
+        PORT = 0
+        if config.has_option('DEFAULT', 'synergy_port',):
+            try:
+                PORT = config.getint('DEFAULT', 'synergy_port', fallback=0)
+            except ValueError:
+                logger.error("Please check config file for synergy port number")
+
+        CHECKIT_HOST = config['DEFAULT']['checkit_host']
+    except configparser.NoOptionError:
+        logger.error("Unable to read config file")
+
 
 #
 # class UserViewSet(viewsets.ModelViewSet):
@@ -1631,7 +1678,7 @@ def action_per_hour_report(request):
 
 @shared_task()
 def clear_logs():
-    last_log_date = timezone.now() - datetime.timedelta(days=30)
+    last_log_date = timezone.now() - datetime.timedelta(days=log_retention_period_days)
     logs = LogImage.objects.filter(creation_date__lte=last_log_date)
     # print(len(logs))
     number_of_logs = len(logs)
