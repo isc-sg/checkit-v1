@@ -28,6 +28,7 @@ from scipy.signal import convolve2d
 from scipy.ndimage import convolve
 from scipy.stats import skew, kurtosis
 import inspect
+import requests
 
 
 from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
@@ -54,6 +55,20 @@ log_alarms = False
 mysql_password = None
 
 
+def check_web_server(site, port):
+    try:
+        response = requests.get(f"http://{site}:{port}/", timeout=1)
+        response.raise_for_status()  # Raise exception for non-2xx status codes
+        return "http"
+    except requests.exceptions.RequestException:
+        try:
+            response = requests.get(f"https://{site}:{port}/", timeout=1)
+            response.raise_for_status()  # Raise exception for non-2xx status codes
+            return "https"
+        except requests.exceptions.RequestException:
+            return "not running"
+        
+        
 def array_to_string(array):
     new_string = ""
     for element in array:
@@ -385,7 +400,7 @@ def check_license_ok():
             return True
 
 
-def send_alarms(cameras_details, run_number):
+def send_alarms(cameras_details, run_number, web_server_type):
 
     if HOST is None or PORT == 0:
         logger.error(f"Error in config - HOST = {HOST}, PORT = {PORT}")
@@ -433,8 +448,8 @@ def send_alarms(cameras_details, run_number):
         additional_data = ("lastGoodCheckDatetime=" + last_good_check_date_time +
                            "&amp;referenceImageDatetime=" + reference_image_creation_date)
 
-        image = "http://" + CHECKIT_HOST + "/media/" + log_image
-        reference_image = "http://" + CHECKIT_HOST + "/media/" + reference_image
+        image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + log_image
+        reference_image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + reference_image
 
         if reference_image_id:
             message = "Error detected on camera " + camera_url \
@@ -1314,7 +1329,21 @@ def process_cameras(camera_list, engine_state_id, user_name):
                 logger.error(f"Error updating transaction rate")
 
         if log_alarms:
-            send_alarms(cameras_details, engine_state_id)
+            # hard code localhost as I don't expect using webserver off the main host
+            # hard code for 3 scenarios only 8000, 80 and 443.  
+            site = CHECKIT_HOST
+            port = 8000
+            web_server_type = check_web_server(site, port)
+            if web_server_type not in ["http", "https"]:
+                port = 80
+                web_server_type = check_web_server(site, port)
+            if web_server_type not in ["http", "https"]:
+                port = 443
+                web_server_type = check_web_server(site, port)
+            if web_server_type in ["http", "https"]:
+                send_alarms(cameras_details, engine_state_id, web_server_type)
+            else:
+                logger.error("Unable to connect to local server while sending alarm")
 
     else:
         logger.error(f"Licensing error - please contact your software vendor for assistance")
