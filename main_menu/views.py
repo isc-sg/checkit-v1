@@ -25,7 +25,6 @@ from pathos.multiprocessing import cpu_count
 import configparser
 
 
-
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
@@ -66,7 +65,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
-
 
 
 from main_menu.tasks import process_cameras
@@ -581,8 +579,8 @@ def get_license_details():
     current_end_date = adm_details['end_date']
     current_camera_limit = adm_details['camera_limit']
     current_license_key = adm_details['license_key']
-    if not current_license_key:
-        return None, None, None, None, None
+    # if not current_license_key:
+    #     return None, None, None, None, None
 
     # check adm DB if license details exist - if so load them.  Need to modify compare_images_v4 and process_list
     # with new logic to get password license details.
