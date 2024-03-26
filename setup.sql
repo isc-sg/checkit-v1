@@ -1,6 +1,10 @@
 CREATE USER 'checkit'@'localhost' IDENTIFIED BY 'checkit';
 GRANT ALL PRIVILEGES ON checkit.* TO 'checkit'@'localhost';
+CREATE USER 'checkit'@'%' IDENTIFIED BY 'checkit';
+GRANT ALL PRIVILEGES ON checkit.* TO 'checkit'@'%';
 ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
+CREATE USER 'root'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
 FLUSH PRIVILEGES;
 CREATE DATABASE checkit;
 CREATE DATABASE adm;
