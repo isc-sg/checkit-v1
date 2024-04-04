@@ -283,8 +283,8 @@ input::file-selector-button {
 <!--                            </form>-->
 <!--                        </div>-->
 <!--                    </div>-->
-                    <div class="col-md-3 pr-md-1">
-                        <div class="bordered-form">
+                    <div class="col-md-6 pr-md-1">
+                        <div class="col-md-12 border-round">
                                             <h3>Run on a single camera</h3>
 
                             <form method="post">
@@ -296,18 +296,20 @@ input::file-selector-button {
                                 {% else %}
                                 <input type="number" class="form-control" min=1 required name="camera_check"/>
                                 {% endif %}
-
+                            <br>
                             </form>
 
                         </div>
                     <br>
                     <br>
-                    <div class="bordered-form">
+                    <div class="col-md-12 border-round">
                     <h3>Load cameras from file</h3>
                                                 <form method="post" enctype="multipart/form-data">
                                 {% csrf_token %}
                                 <input type="file" class="btn btn-round" name="camera_list" accept="text/pain,.csv,.txt">
                                 <button class="btn btn-round" type="submit">Upload Cameras</button>
+                                                    <br>
+                                                    <br>
                             </form>
                     </div>
                 </div>
