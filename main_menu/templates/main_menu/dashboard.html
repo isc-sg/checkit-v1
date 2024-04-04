@@ -204,7 +204,7 @@
                                                 <p></p>
                     <h3></h3>
                     <h3>Disk Space</h3>
-                             <div class="col-md-4">
+                             <div class="col-md-12">
                                 <canvas id="myChart" style="width:100%;max-width:800px"></canvas>
 
                                 <script>
@@ -243,13 +243,13 @@
                 </div>
                     <div id="container2">
                         <div id="row2_1" class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                     <br>
                     <h1></h1>
                                 <form method="post">
                                     {% csrf_token %}
                                                         {% if admin_user == "True" %}
-                                    <button class="btn" type="submit" name="download_logs">Download System Logs</button>
+                                    <button class="btn btn-round" type="submit" name="download_logs">Download System Logs</button>
                                                         {% endif %}
 
                                     <br>

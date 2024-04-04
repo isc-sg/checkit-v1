@@ -7402,6 +7402,10 @@ button.bg-darker:focus {
   border: 0.0625rem solid #e9ecef !important;
 }
 
+.border-round {
+  border: 0.0625rem solid #e9ecef !important;
+  border-radius: 0.5rem;
+}
 .border-top {
   border-top: 0.0625rem solid #e9ecef !important;
 }
