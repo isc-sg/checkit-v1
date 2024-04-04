@@ -1,0 +1,169 @@
+<!doctype html>
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
+<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
+
+<head>
+    {% load static %}
+
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
+
+    <title>
+        Check IT
+    </title>
+    <!--     Fonts and icons     -->
+
+<!--    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/> -->
+    <!-- Nucleo Icons -->
+        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+        <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
+        <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
+        <link rel="mask-icon" href="{% static 'safari-pinned-tab.svg' %}" color="#073683">
+        <link rel="manifest" href="{% static '/site.webmanifest' %}">
+        <meta name="msapplication-TileColor" content="#da532c">
+        <meta name="theme-color" content="#ffffff">
+<!--    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/nucleo-icons.css' %}"/>-->
+    <!-- CSS Files -->
+    <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
+    <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
+    <!-- CSS Just for demo purpose, don't include it in your project -->
+        <style>
+    .table-container {
+        width: 90%;
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-2">
+            <div class="sidebar" data="blue">
+                <!--
+                  Tip 1: You can change the color of the sidebar using: data-color="blue | green | orange | red"
+              -->
+
+
+                <div class="sidebar-wrapper">
+                    <div class="logo">
+                        <a>
+                            <img src="{% static 'isc_logo.png' %}" height="40px"/>
+                        </a>
+                        <a href="/" style="color:#FFFFFF">
+                            CheckIT
+                        </a>
+                        <ul style="list-style-type:none">
+                            {% if user.is_authenticated %}
+                            <li><i class="far fa-user"></i> {{ user.get_username }} <br><a
+                                    href="/accounts/password_change/">Change password</a></li>
+                            {% else %}
+                            <li><a href="{% url 'login'%}?next={{request.path}}"> <i class="fa fa-sign-in-alt"></i>
+                                Login</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <ul class="nav">
+                        <li>
+                            <a href="/status/">
+                                <i class="fas fa-person-running"></i>
+                                <p> System Status</p>
+                            </a>
+                        </li>
+                        <li class="active">
+                            <a href="/cameras/">
+
+                                <i class="fas fa-video" style="color:#4890fe"></i>
+                                <p style="color:#4890fe">Cameras</p>
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="/logs/">
+                                <i class="fas fa-bell"></i>
+                                <p>Results</p>
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="/state/">
+                                <i class="fas fa-download"></i>
+                                <p>Export</p>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/license/">
+                                <i class="fas fa-cogs"></i>
+                                <p>Licensing</p>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/scheduler/">
+                                <i class="fas fa-clock"></i>
+                                <p>Scheduler</p>
+                            </a>
+                        </li>
+                                                <li>
+                            <a href="/regions/">
+                                    <i class="fas fa-th"></i>
+
+                                <p>Regions</p>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/admin/">
+<!--                                <i class="tim-icons icon-settings"></i>-->
+                                    <i class="fas fa-tools"></i>
+
+                                <p>Admin</p>
+                            </a>
+                        </li>
+                        {% if user.is_authenticated %}
+                        <li>
+                            <a href="/accounts/logout/">
+                                <i class="fas fa-power-off"></i>
+                                <p>Logout</p>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    <div class="main-panel">
+                    <div class="content">
+                                    <div class="row">
+
+        <div class="col-sm-10">
+
+            <div class="content">
+                <h1>Best Regions</h1>
+
+
+            </div>
+            <div class="container-fluid">
+            </div>
+
+
+            {% render_table table 'django_tables2/bootstrap.html' %}
+                <script language="JavaScript">
+                    function toggle(source) {
+                    checkboxes = document.getElementsByName('selection');
+                    for(var i in checkboxes)
+                        checkboxes[i].checked = source.checked;
+                                            }
+                </script>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+            crossorigin="anonymous"></script>
+</div>
+</div>
+    </div>
+</div>
+</body>
+</html>

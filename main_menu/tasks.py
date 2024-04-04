@@ -1347,3 +1347,62 @@ def process_cameras(camera_list, engine_state_id, user_name):
 
     else:
         logger.error(f"Licensing error - please contact your software vendor for assistance")
+
+
+@shared_task()
+def find_best_regions(camera_list):
+    # cameras = Camera.objects.all()
+    # camera_list = list(cameras.values_list('id', flat=True))
+    return_list= []
+    for camera in camera_list:
+        logs = LogImage.objects.filter(url_id=camera)
+
+        pass_count = logs.filter(action="Pass").count()
+        fail_count = logs.filter(action="Failed").count()
+        capture_error_count = logs.filter(action="Capture Error").count()
+
+        try:
+            ratio_count = fail_count/(pass_count+fail_count+capture_error_count)
+        except ZeroDivisionError:
+            ratio_count = 1
+        average_scores = {}
+        if ratio_count < 0.1:
+            continue
+
+        for log in logs:
+            creation_date = log.creation_date
+            action = log.action
+            # potentially just work on cameras that have had a certain percentage of failures only.
+            # no need to change those that are working.
+            # do a count of pass and fail and if ratio is greater than 1/3 fail work on it
+            if action not in ("Pass", "Failed"):
+                continue
+            regions_score_values = list(log.region_scores.values())
+
+            # Dictionary to store average scores for each cell
+
+            # Populate the dictionary with scores for each cell
+            for i, cell_value in enumerate(regions_score_values):
+                cell_number = i + 1  # Cell numbering starts from 1
+                if cell_value >= 0.5:  # Consider only scores above or equal to 0.5
+                    if cell_number not in average_scores:
+                        average_scores[cell_number] = []
+                    average_scores[cell_number].append(cell_value)
+
+        if not average_scores:
+            print("Unable to find good region for camera", camera)
+            return
+            # Calculate average scores for each cell and eliminate cells with scores below 0.5
+        for cell_number, scores in average_scores.items():
+            average_scores[cell_number] = np.mean(scores) if len(scores) > 0 else 0
+
+            # Group cells into quartiles based on average scores
+        quartile_thresholds = np.percentile(list(average_scores.values()), [0, 25, 50, 75, 100])
+
+        # Identify cells in the top quartile
+        top_quartile_cells = [cell_number for cell_number, avg_score in average_scores.items() if
+                              avg_score >= quartile_thresholds[3]]
+        # logger.info(f"{ratio_count}, {pass_count}, {fail_count}, {capture_error_count}, {top_quartile_cells}")
+        return_list.append((camera, top_quartile_cells))
+
+    return return_list

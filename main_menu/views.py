@@ -29,7 +29,7 @@ from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http40
 from django.template import loader
 from django.shortcuts import render, reverse, redirect
 from tablib import Dataset
-from django_tables2 import SingleTableMixin
+from django_tables2 import SingleTableMixin, SingleTableView, LazyPaginator
 from django_filters.views import FilterView
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.decorators import login_required, permission_required
@@ -38,9 +38,10 @@ from django.conf import settings
 from django.views.decorators.cache import cache_control
 from django.contrib.auth.models import Permission, User, Group
 
+
 from .resources import CameraResource
-from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay
-from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable
+from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay, BestRegionResult
+from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable, BestRegionsTable
 from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
@@ -67,14 +68,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 
 
-from main_menu.tasks import process_cameras
+from main_menu.tasks import process_cameras, find_best_regions
 
 from main_menu.serializers import (CameraSerializer, LogImageSerializer,
                                    ReferenceImageSerializer, SnoozeCameraSerializer)
 
 from celery import Celery, current_app
 import celery
-from celery import shared_task
+from celery import shared_task, group
+from celery.result import AsyncResult, GroupResult
+from celery.exceptions import *
 
 # import main_menu.compare_images_v4
 
@@ -1111,10 +1114,12 @@ class CameraSelectView(LoginRequiredMixin, SingleTableMixin, FilterView):
 class LogView(LoginRequiredMixin, SingleTableMixin, FilterView):
     model = LogImage
     table_class = LogTable
+    # table_data = LogImage.objects.all()
+    # paginator_class = LazyPaginator
     template_name = 'main_menu/log_table.html'
     paginate_by = 18
     filterset_class = LogFilter
-    ordering = '-creation_date'
+    ordering = '-id'
 
 
 # def get_date(request):
@@ -1503,6 +1508,73 @@ def export_logs_to_csv(request):
 def input_camera_for_regions(request):
     user_name = request.user.username
     logger.info("User {u} access to Regions".format(u=user_name))
+
+    if request.method == 'POST' and 'find_best_regions' in request.POST:
+        # print("Got best regions")
+
+        camera_objects = Camera.objects.all()
+        camera_ids = [item.id for item in camera_objects]
+        number_of_cameras_in_run = len(camera_ids)
+        x = int(number_of_cpus * 4)
+        num_sublists = (len(camera_ids) + x - 1) // x
+        sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+        task_signatures = [find_best_regions.s(numbers) for numbers in sublists]
+        job = group(task_signatures)
+        result = job.apply_async()
+        try:
+            result.save()
+        except AttributeError:
+            pass
+        # result = find_best_regions.delay(camera_ids)
+        # for group_of_cameras in sublists:
+        #     find_best_regions.delay(group_of_cameras)
+
+        # while not result.ready():
+        #     time.sleep(1)
+        # message = result.get()
+        message = result.id
+        # print(message, result.backend)
+        request.session['task_id'] = result.id
+        request.session.save()  # Save session data
+        message = ""
+        return render(request, 'main_menu/regions.html', {'message': message})
+
+    if request.method == 'POST' and 'status' in request.POST:
+        task_id = request.session.get('task_id')
+        # print(task_id)
+
+        if task_id:
+            # Retrieve AsyncResult object using task ID
+            # result = AsyncResult(task_id)
+            try:
+                result = GroupResult.restore(task_id)
+            except AttributeError:
+                return custom_500_error_view(request)
+            # print(result.ready())
+
+            if result.ready():
+                # print(result.get())  # Return task result if ready
+                try:
+                    BestRegionResult.objects.all().delete()
+                except:
+                    pass
+                for data in result.get():
+                    instances = [BestRegionResult(camera_id=str(item[0]), regions=item[1]) for item in data]
+
+                    BestRegionResult.objects.bulk_create(instances)
+                table = BestRegionsTable(BestRegionResult.objects.all())
+
+                return render(request, "main_menu/best_regions_table.html", {
+                    "table": table
+                })
+                # message = ""
+                # return render(request, 'main_menu/regions.html', {'message': message})
+            else:
+                message = ""
+                return render(request, 'main_menu/regions.html', {'message': message})
+        else:
+            message = ""
+            return render(request, 'main_menu/regions.html', {'message': message})
 
     if request.method == 'POST':
 

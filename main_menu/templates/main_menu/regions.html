@@ -14,7 +14,7 @@
     </title>
     <!--     Fonts and icons     -->
 
-<!---    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/> -->
+    <!---    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/> -->
     <!-- Nucleo Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
@@ -31,24 +31,20 @@
     <!-- CSS Just for demo purpose, don't include it in your project -->
     <style>
         #id_regions li {
-  border: 1px transparent solid;
-  display:inline-block;
-  width:4em;
-}
+            border: 1px transparent solid;
+            display: inline-block;
+            width: 4em;
+        }
 
 
-      ::placeholder {
-        color: red;
-        opacity: 1;
-      }
-      :placeholder-shown {
-        border: 1px solid red;
-      }
+        ::placeholder {
+            color: red;
+            opacity: 1;
+        }
 
-
-
-
-
+        :placeholder-shown {
+            border: 1px solid red;
+        }
 
 
     </style>
@@ -72,30 +68,30 @@
                 </a>
                 <ul style="list-style-type:none">
                     {% if user.is_authenticated %}
-                    <li><i class="far fa-user"></i> {{ user.get_username }} <br><a
-                            href="/accounts/password_change/">Change password</a></li>
+                        <li><i class="far fa-user"></i> {{ user.get_username }} <br><a
+                                href="/accounts/password_change/">Change password</a></li>
                     {% else %}
-                    <li><a href="{% url 'login'%}?next={{request.path}}"> <i class="fa fa-sign-in-alt"></i>
-                        Login</a></li>
+                        <li><a href="{% url 'login' %}?next={{ request.path }}"> <i class="fa fa-sign-in-alt"></i>
+                            Login</a></li>
                     {% endif %}
                 </ul>
             </div>
             <ul class="nav">
                 {% if user.is_authenticated %}
-                <li>
-                    <a href="/status/">
-                        <i class="fas fa-person-running"></i>
-                        <p> System Status</p>
-                    </a>
-                </li>
+                    <li>
+                        <a href="/status/">
+                            <i class="fas fa-person-running"></i>
+                            <p> System Status</p>
+                        </a>
+                    </li>
                 {% else %}
-                <li>
-                    <a href="/status/">
-                        <!--                                <i class="tim-icons icon-user-run"></i>-->
-                        <i class="fas fa-person-running"></i>
-                        <p>Status</p>
-                    </a>
-                </li>
+                    <li>
+                        <a href="/status/">
+                            <!--                                <i class="tim-icons icon-user-run"></i>-->
+                            <i class="fas fa-person-running"></i>
+                            <p>Status</p>
+                        </a>
+                    </li>
                 {% endif %}
                 <li>
                     <a href="/cameras/">
@@ -146,12 +142,12 @@
                     </a>
                 </li>
                 {% if user.is_authenticated %}
-                <li>
-                    <a href="/accounts/logout/">
-                        <i class="fas fa-power-off"></i>
-                        <p>Logout</p>
-                    </a>
-                </li>
+                    <li>
+                        <a href="/accounts/logout/">
+                            <i class="fas fa-power-off"></i>
+                            <p>Logout</p>
+                        </a>
+                    </li>
                 {% endif %}
             </ul>
         </div>
@@ -160,30 +156,58 @@
         <div class="content">
             <div class="row">
                 <div class="col-sm-10">
-                </div>
-                <div class="container-fluid">
-                    <h3>Select Regions to Check</h3>
-                    <div class="col-md-3 pr-md-1">
-                        <div class="form-group">
-                            <form action="/regions/" method="post">
+                    <div class="container-fluid">
+                        <h3>Select Regions to Check</h3>
+                        <div class="col-md-8 pr-md-1 border-round">
+                            <div class="form-group">
+                                <form action="/regions/" method="post">
+                                    {% csrf_token %}
+                                <br>
+                                    <label style="color: white">Enter camera number</label>
+                                    {% if message %}
+                                        <input type="number" style="::placeholder {color: red;}"
+                                               placeholder="{{ message }}" class="form-control"
+                                               name="camera_number" required min="1"/>
+                                    {% else %}
+                                        <input type="number" class="form-control" name="camera_number" required
+                                               min="1"/>
+                                    {% endif %}
+                                <br>
+                                </form>
+                            </div>
+                        </div>
+                        <br>
+                        <br>
+                        <div class="col-md-8 border-round">
+                            <br>
+                            <form method="post">
                                 {% csrf_token %}
-                                <label>Enter camera number</label>
-                                {% if message %}
-                                <input type="number" style="::placeholder {color: red;}"
-                                       placeholder="{{message}}" class="form-control"
-                                       name="camera_number" required min="1"/>
-                                {% else %}
-                                <input type="number" class="form-control" name="camera_number" required min="1"/>
-                                {% endif %}
+                                <button class="btn btn-round" type="submit" name="find_best_regions">Refresh Suggested
+                                    Regions
+                                </button>
+
+                                <br>
+
+                            </form>
+                            <br>
+
+
+                            <form method="post">
+                                {% csrf_token %}
+                                <button class="btn btn-round" type="submit" name="status">Get Results</button>
+
+                                <br>
+                                <br>
+
                             </form>
                         </div>
+
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-</div>
+    </div>
 
 </body>
 

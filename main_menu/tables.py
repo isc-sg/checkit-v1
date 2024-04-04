@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from django_tables2 import TemplateColumn
-from .models import Camera, LogImage, EngineState
+from .models import Camera, LogImage, EngineState, BestRegionResult, ReferenceImage
 from django.utils.safestring import mark_safe
 from urllib.parse import urlparse
 
@@ -266,13 +266,50 @@ class CameraSelectTable(tables.Table):
                     'multicast_port', 'matching_threshold', 'focus_value_threshold', 'light_level_threshold')
         order_by = 'camera_number'
 
+
 class LogSummaryTable(tables.Table):
     action = tables.Column()
     hour = tables.Column()
     count = tables.Column()
+
     class Meta:
         model = LogImage
         template_name = "django_tables2/bootstrap4.html"
         fields = ('hour', 'action', 'count')
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = '-hour'
+
+
+class BestRegionsTable(tables.Table):
+    selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
+                                      attrs={"td": {
+                                          "width": 50, "align": "center"
+                                      }, "th__input": {"onclick": "toggle(this)"}})
+    regions = tables.Column()
+    camera_number = tables.Column(empty_values=(),  attrs={
+        "td": {
+            "width": 100, "align": "left"
+        }})
+    camera_name = tables.Column(empty_values=(), attrs={
+        "td": {
+            "width": 250, "align": "left"
+        }})
+    # image = tables.Column(empty_values=())
+
+    def render_camera_name(self, value, record):
+        camera = Camera.objects.get(pk=record.camera_id)
+        return camera.camera_name
+
+    def render_camera_number(self, value, record):
+        camera = Camera.objects.get(pk=record.camera_id)
+        return camera.camera_number
+
+    # def render_image(self, value, record):
+    #     camera = ReferenceImage.objects.filter(url_id=record.camera_id).last()
+    #     return camera.image
+    class Meta:
+        model = BestRegionResult
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('selection', 'camera_number', 'camera_name', 'regions')
+        attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
+        order_by = 'camera_id'
