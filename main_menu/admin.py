@@ -189,6 +189,9 @@ class LogImageAdmin(ModelAdmin):
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',
                        'creation_date', 'log_image', 'user', 'run_number')
     list_filter = (('creation_date', DateTimeRangeFilter), ('action', DropdownFilter), ('url__camera_location', DropdownFilter))
+    list_per_page = 100
+    show_full_result_count = False
+    # ordering = ('-id', )
 
     def log_image(self, obj):
         return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
@@ -216,6 +219,11 @@ class LogImageAdmin(ModelAdmin):
         return obj.url.camera_location
     get_location.short_description = "Location"
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        # Use select_related for related fields
+        queryset = queryset.prefetch_related('reference_image')
+        return queryset
 
 @admin.register(LogEntry)
 class LogEntryAdmin(admin.ModelAdmin):
