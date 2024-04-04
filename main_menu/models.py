@@ -166,6 +166,12 @@ class LogImage(models.Model):
     def __str__(self):
         return f'{self.image}'
 
+    class Meta:
+        # Define indexes for the model
+        indexes = [
+            models.Index(fields=['creation_date', 'action'])
+        ]
+
 
 class Licensing(models.Model):
     start_date = models.DateField('license start date', null=False, blank=False, default=timezone.now)
@@ -205,3 +211,8 @@ class EngineState(models.Model):
                     / self.number_of_cameras_in_run) * 100
         else:
             return 0  # Handle division by zero or other cases
+
+
+class BestRegionResult(models.Model):
+    camera_id = models.CharField(max_length=100, unique=False)
+    regions = models.JSONField()
