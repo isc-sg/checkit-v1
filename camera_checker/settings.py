@@ -26,6 +26,10 @@ SECRET_KEY = 'chkit-123-xyz-abc-xj7-*0@(dee!94ulm@sx)08_mvdymn^ggf@ku1$a)4zhnpw0
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+# INTERNAL_IPS = ['127.0.0.1']
+# DEBUG_TOOLBAR_CONFIG = {
+#     'SHOW_TOOLBAR_CALLBACK': lambda request: True,
+# }
 
 ALLOWED_HOSTS = ['*']
 
@@ -68,6 +72,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
+
 ]
 
 ROOT_URLCONF = 'camera_checker.urls'
@@ -150,11 +155,13 @@ if DEBUG:
 else:
     STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# STATICFILES_DIRS = [BASE_DIR / "main_menu/static"]
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
@@ -237,9 +244,11 @@ CELERY_RESULT_SERIALIZER = 'json'
 # CELERY_TASK_TRACK_STARTED = True
 CELERY_LOG_FILE = '/home/checkit/camera_checker/logs/engine.log'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-CELERYD_LOG_FORMAT = '[%(asctime)s] [%(levelname)s] [%(task_name)s(%(task_id)s)] %(message)s'
+CELERY_WORKER_LOG_FORMAT = '[%(asctime)s] [%(levelname)s] [%(task_name)s(%(task_id)s)] %(message)s'
 CELERYD_LOG_FILE = CELERY_LOG_FILE
 CELERYD_LOG_LEVEL = 'INFO'
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 10
+CELERT_WORKER_MAX_MEMORY_PER_CHILD = 12000
 # USE_TZ = True
 CELERY_IMPORTS = ['camera_checker.celery',]
 CELERY_TIMEZONE = "Australia/Melbourne"
