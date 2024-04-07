@@ -8,13 +8,21 @@ from urllib.parse import urlparse
 class CameraTable(tables.Table):
     camera_name = tables.Column(verbose_name="Camera Name", attrs={
         "td": {
-            "width": 180, "align": "left"
+            "width": 250, "align": "left"
+        }})
+    camera_location = tables.Column(verbose_name="Camera Location", attrs={
+        "td": {
+            "width": 250, "align": "left"
         }})
     url = tables.Column(verbose_name="IP Address", attrs={
         "td": {
             "width": 150, "align": "center"
         }})
     multicast_address = tables.Column(verbose_name="Multicast Address", attrs={
+        "td": {
+            "width": 150, "align": "center"
+        }})
+    multicast_port = tables.Column(verbose_name="Multicast Port", attrs={
         "td": {
             "width": 150, "align": "center"
         }})
