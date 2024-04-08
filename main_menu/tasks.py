@@ -92,6 +92,31 @@ checkit_key_array = [66, 117, 45, 86, 77, 100, 121, 83, 73, 80, 114, 101, 78, 10
 checkit_key = array_to_string(checkit_key_array).encode()
 
 
+def custom_luminosity_scale(x):
+    if x <= 0.2:
+        # Map values in [0, 0.2] to [0, 0.5]
+        scaled_value = 0.5 * x / 0.2
+    else:
+        # Map values in (0.2, 2] to (0.5, 1]
+        scaled_value = 0.5 + 0.5 * (x - 0.2) / 1.8
+    return scaled_value
+
+def get_luminosity(frame):
+    # Convert the tuple returned by cv2.split() to a list
+    color = list(cv2.split(frame))
+
+    # Apply luminance coefficients
+    color[0] = np.uint8(color[0] * 0.299)
+    color[1] = np.uint8(color[1] * 0.587)
+    color[2] = np.uint8(color[2] * 0.114)
+
+    lum = cv2.add(color[0], cv2.add(color[1], color[2]))
+
+    summ = cv2.sumElems(lum)
+
+    brightness = summ[0] / ((2 ** 8 - 1) * frame.shape[0] * frame.shape[1]) * 2  # percentage conversion factor
+    return custom_luminosity_scale(brightness)
+
 def format_datetime_with_milliseconds(dt):
     # Format datetime with milliseconds
     formatted_datetime = dt.strftime("%Y-%m-%d %H:%M:%S,")
@@ -1054,6 +1079,9 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     focus_value = results_dict['focus value']
     region_scores = results_dict['region scores']
     light_level = results_dict['light level']
+    # use the function below to provide an alternative method for light level.
+    # luminosity = get_luminosity(image_frame)
+
     base_image_directory = (f"{settings.MEDIA_ROOT}/logs/{timezone.now().year}"
                             f"/{timezone.now().month}/{timezone.now().day}")
     log_image_file_name = (f"{base_image_directory}/"
