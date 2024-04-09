@@ -83,12 +83,18 @@ class Camera(models.Model):
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
                                              validators=[MaxValueValidator(1), MinValueValidator(0)],
                                              default=0.5)
+    # matching_threshold_range = models.DecimalField(max_digits=5, decimal_places=2, default=0)  # Default to 0%
+
     focus_value_threshold = models.DecimalField(max_digits=6, decimal_places=2,
                                                 validators=[MaxValueValidator(9999), MinValueValidator(0)],
                                                 default=0.5)
+    # focus_value_threshold_range = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
     light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
                                                 validators=[MaxValueValidator(255), MinValueValidator(0)],
                                                 default=80)
+    # light_level_threshold_range = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     scheduled_hours = models.ManyToManyField(HoursInDay, blank=True, help_text="List format 0-23")
@@ -98,6 +104,7 @@ class Camera(models.Model):
                                                                                " of a new reference image")
     trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
     reference_image_version = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(9999)])
+
     history = HistoricalRecords()
 
     def __str__(self):

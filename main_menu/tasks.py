@@ -1117,6 +1117,44 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     else:
         action = "Pass"
 
+    # code below allows for upper and lower range % on thresholds.
+    # threshold_ranges = {
+    #     'matching_score': camera_object.matching_threshold_range / 100.0 * camera_object.matching_threshold,
+    #     'focus_value': camera_object.focus_value_threshold_range / 100.0 * camera_object.focus_value_threshold,
+    #     'light_level': camera_object.light_level_threshold_range / 100.0 * camera_object.light_level_threshold
+    # }
+    #
+    # if camera_object.matching_threshold_range == 0:
+    #     matching_threshold_lower = camera_object.matching_threshold
+    #     matching_threshold_upper = camera_object.matching_threshold
+    # else:
+    #     matching_threshold_lower = camera_object.matching_threshold - threshold_ranges['matching_score']
+    #     matching_threshold_upper = camera_object.matching_threshold + threshold_ranges['matching_score']
+    #
+    # if camera_object.focus_value_threshold_range == 0:
+    #     focus_value_threshold_lower = camera_object.focus_value_threshold
+    #     focus_value_threshold_upper = camera_object.focus_value_threshold
+    # else:
+    #     focus_value_threshold_lower = camera_object.focus_value_threshold - threshold_ranges['focus_value']
+    #     focus_value_threshold_upper = camera_object.focus_value_threshold + threshold_ranges['focus_value']
+    #
+    # if camera_object.light_level_threshold_range == 0:
+    #     light_level_threshold_lower = camera_object.light_level_threshold
+    #     light_level_threshold_upper = camera_object.light_level_threshold
+    # else:
+    #     light_level_threshold_lower = camera_object.light_level_threshold - threshold_ranges['light_level']
+    #     light_level_threshold_upper = camera_object.light_level_threshold + threshold_ranges['light_level']
+    #
+    # if matching_score < matching_threshold_lower or matching_score > matching_threshold_upper:
+    #     action = "Failed"
+    # elif focus_value < focus_value_threshold_lower or focus_value > focus_value_threshold_upper:
+    #     action = "Failed"
+    # elif light_level < light_level_threshold_lower or light_level > light_level_threshold_upper:
+    #     action = "Failed"
+    # else:
+    #     action = "Pass"
+
+
     LogImage.objects.create(url_id=camera, image=sql_file_name,
                             matching_score=matching_score,
                             region_scores=json.dumps(region_scores),
