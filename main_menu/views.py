@@ -1549,8 +1549,12 @@ def input_camera_for_regions(request):
             try:
                 result = GroupResult.restore(task_id)
             except AttributeError:
-                return custom_500_error_view(request)
-            # print(result.ready())
+                message = ""
+                return render(request, 'main_menu/regions.html', {'message': message})
+
+            if not result:
+                message = ""
+                return render(request, 'main_menu/regions.html', {'message': message})
 
             if result.ready():
                 # print(result.get())  # Return task result if ready
