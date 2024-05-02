@@ -1549,11 +1549,11 @@ def input_camera_for_regions(request):
             try:
                 result = GroupResult.restore(task_id)
             except AttributeError:
-                message = ""
+                message = "No Result"
                 return render(request, 'main_menu/regions.html', {'message': message})
 
             if not result:
-                message = ""
+                message = "Not Ready"
                 return render(request, 'main_menu/regions.html', {'message': message})
 
             if result.ready():
