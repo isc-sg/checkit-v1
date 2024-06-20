@@ -116,25 +116,25 @@ class LogTable(tables.Table):
         }})
 
     def render_light_level(self, value, record):
-        camera_object = Camera.objects.get(pk=record.url_id)
-        default_light_level = camera_object.light_level_threshold
-        if value > default_light_level:
+        # camera_object = Camera.objects.get(pk=record.url_id)
+        # default_light_level = camera_object.light_level_threshold
+        if value > record.current_light_level:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
 
     def render_focus_value(self, value, record):
-        camera_object = Camera.objects.get(pk=record.url_id)
-        default_focus_level = camera_object.focus_value_threshold
-        if value <= default_focus_level:
+        # camera_object = Camera.objects.get(pk=record.url_id)
+        # default_focus_level = camera_object.focus_value_threshold
+        if value < record.current_focus_value:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
 
     def render_matching_score(self, value, record):
-        camera_object = Camera.objects.get(pk=record.url_id)
-        default_matching_threshold = camera_object.matching_threshold
-        if value >= default_matching_threshold:
+        # camera_object = Camera.objects.get(pk=record.url_id)
+        # default_matching_threshold = camera_object.matching_threshold
+        if value >= record.current_matching_threshold:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
