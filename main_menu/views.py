@@ -61,7 +61,7 @@ from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -255,17 +255,44 @@ class LogImageViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'delete']
 
 
-class ReferenceImageViewSet(viewsets.ModelViewSet):
+class ReferenceImageListCreateAPIView(ListAPIView):
     """
     API endpoint that allows reference to be viewed or deleted only.
     """
-    queryset = ReferenceImage.objects.all().order_by('url__camera_number')
-    serializer_class = ReferenceImageSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'id'
-    # http_method_names = ['get', 'delete', 'post']
-    http_method_names = ['get', 'delete']
 
+    # def get_queryset(self):
+    #     url = self.kwargs['url']
+    #     return ReferenceImage.objects.filter(url=url)
+    # def get_queryset(self):
+    #     """
+    #     Optionally restricts the returned purchases to a given user,
+    #     by filtering against a `username` query parameter in the URL.
+    #     """
+    #     queryset = ReferenceImage.objects.all()
+    #     url = self.request.query_params.get('url')
+    #     if url is not None:
+    #         queryset = queryset.filter(url_id=url)
+    #     return queryset
+    serializer_class = ReferenceImageSerializer
+
+    def get_queryset(self):
+        queryset = ReferenceImage.objects.all()
+        camera_number = self.request.query_params.get('camera_number', None)
+        if camera_number:
+            queryset = queryset.filter(url__camera_number=camera_number)
+        return queryset
+    # model = ReferenceImage
+    # queryset = ReferenceImage.objects.all().order_by('url__camera_number')
+    # queryset = ReferenceImage.objects.all()
+    # permission_classes = [permissions.IsAuthenticated]
+    # lookup_field = 'url'
+    # http_method_names = ['get', 'delete', 'post']
+    # http_method_names = ['get', 'delete']
+
+
+class ReferenceImagesDetailAPIView(RetrieveDestroyAPIView):
+    queryset = ReferenceImage.objects.all()
+    serializer_class = ReferenceImageSerializer
 
 def is_process_running(pid):
     try:

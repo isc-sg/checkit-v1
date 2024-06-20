@@ -18,12 +18,15 @@ router = routers.DefaultRouter()
 # router.register(r'groups', views.GroupViewSet)
 router.register(r'^/cameras_api', views.CameraViewSet)
 router.register(r'^/logs_api', views.LogImageViewSet)
-router.register(r'^/reference_image_api', views.ReferenceImageViewSet)
+# router.register(r'^/reference_image_api', views.ReferenceImageListCreateAPIView.as_view, 'reference-images-list')
+# router.register(r'^/reference_image_api/<int:pk>/', views.ReferenceImagesDetailAPIView.as_view  , 'reference-images-detail')
 # router.register(r'^/snooze_api', views.ReferenceImageViewSet)
 # router.register(r'index', views.index)
 
 
 urlpatterns = [
+    path("reference_image_api/", views.ReferenceImageListCreateAPIView.as_view(),  name='reference-images-list-create'),
+    path('reference_image_api/<int:pk>/', views.ReferenceImagesDetailAPIView.as_view(), name='reference-images-detail'),
     path('api', include(router.urls)),
     path('', views.index, name='home'),
 
