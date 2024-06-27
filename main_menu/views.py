@@ -160,6 +160,11 @@ def get_config():
     except configparser.NoOptionError:
         logger.error("Unable to read config file")
 
+        if config.has_option('DEFAULT', 'log_retention_period_days',):
+            try:
+                PORT = config.getint('DEFAULT', 'log_retention_period_days', fallback=30)
+            except ValueError:
+                logger.error("Please check config file for log_retention_period_days")
 
 #
 # class UserViewSet(viewsets.ModelViewSet):
@@ -973,8 +978,8 @@ def scheduler(request):
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
-        # process_cameras.delay(camera_id, engine_state_id, user_name)
-        process_cameras(camera_id, engine_state_id, user_name)
+        process_cameras.delay(camera_id, engine_state_id, user_name)
+        # process_cameras(camera_id, engine_state_id, user_name)
 
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
