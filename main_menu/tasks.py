@@ -29,7 +29,8 @@ from scipy.ndimage import convolve
 from scipy.stats import skew, kurtosis
 import inspect
 import requests
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from .models import ReferenceImage, LogImage, Camera, EngineState, Licensing
 from django.core.exceptions import ObjectDoesNotExist
@@ -48,6 +49,7 @@ MY_PRODCODE = "DEMO"  # !!!! change this value to be the value of the Product Co
 
 socket_timeout = 1
 CHECKIT_HOST = ""
+WEB_SERVER_PORT = None
 HOST = ""
 PORT = 0
 network_interface = ""
@@ -56,18 +58,25 @@ mysql_password = None
 
 
 def check_web_server(site, port):
+    if port:
+        ip_portion_and_port = f"{site}:{port}"
+    else:
+        ip_portion_and_port = f"{site}"
+
+    results = {}
     try:
-        response = requests.get(f"http://{site}:{port}/", timeout=1)
-        response.raise_for_status()  # Raise exception for non-2xx status codes
-        return "http"
-    except requests.exceptions.RequestException:
-        try:
-            response = requests.get(f"https://{site}:{port}/", timeout=1)
-            response.raise_for_status()  # Raise exception for non-2xx status codes
-            return "https"
-        except requests.exceptions.RequestException:
-            return "not running"
-        
+        response = requests.get(f"https://{ip_portion_and_port}/", timeout=1, verify=False)
+        results['https'] = (response.status_code, response.url)
+        return results
+    except requests.exceptions.RequestException as e:
+        results['https'] = f'Error: {e}'
+    try:
+        response = requests.get(f"http://{ip_portion_and_port}/", timeout=1, verify=False)
+        results['http'] = (response.status_code, response.url)
+    except requests.exceptions.RequestException as e:
+        results['http'] = f'Error: {e}'
+        return results
+    return "Web server not running"
         
 def array_to_string(array):
     new_string = ""
@@ -139,18 +148,17 @@ def get_hash(password):
 
 def check_adm_database(password):
     adm_db_config = {
-        "host": "localhost",
+        "host": CHECKIT_HOST,
         "user": "root",
         "password": password,
         "database": "adm"
     }
-
     try:
         adm_db = mysql.connector.connect(**adm_db_config)
     except mysql.connector.Error:
         try:
             adm_db_config = {
-                "host": "localhost",
+                "host": CHECKIT_HOST,
                 "user": "root",
                 "password": "",
                 "database": "adm"
@@ -316,6 +324,7 @@ def get_config():
     global CHECKIT_HOST
     global HOST
     global PORT
+    global WEB_SERVER_PORT
     global network_interface
     global log_alarms
 
@@ -342,7 +351,18 @@ def get_config():
             except ValueError:
                 logger.error("Please check config file for synergy port number")
 
-        CHECKIT_HOST = config['DEFAULT']['checkit_host']
+        WEB_SERVER_PORT = None
+        try:
+            WEB_SERVER_PORT = config.getint('DEFAULT', 'web_server_port', fallback=None)
+        except ValueError:
+            logger.error("Please check config file for web_server_port")
+
+        CHECKIT_HOST = "localhost"
+        if config.has_option('DEFAULT', 'checkit_host',):
+            try:
+                CHECKIT_HOST = config['DEFAULT']['checkit_host']
+            except ValueError:
+                logger.error("Please check config file for checkit_host")
     except configparser.NoOptionError:
         logger.error("Unable to read config file")
 
@@ -457,7 +477,10 @@ def send_alarms(cameras_details, run_number, web_server_type):
         else:
             last_good_check_date_time = "NONE"
 
-        camera_url = cameras_details.get(id=url_id).url
+        try:
+            camera_url = cameras_details.get(id=url_id).url
+        except ObjectDoesNotExist:
+            continue
         camera_number = cameras_details.get(id=url_id).camera_number
         camera_name = cameras_details.get(id=url_id).camera_name
         camera_location = cameras_details.get(id=url_id).camera_location
@@ -473,8 +496,8 @@ def send_alarms(cameras_details, run_number, web_server_type):
         additional_data = ("lastGoodCheckDatetime=" + last_good_check_date_time +
                            "&amp;referenceImageDatetime=" + reference_image_creation_date)
 
-        image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + log_image
-        reference_image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + reference_image
+        image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + log_image.name
+        reference_image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + str(reference_image)
 
         if reference_image_id:
             message = "Error detected on camera " + camera_url \
@@ -512,8 +535,8 @@ def send_alarms(cameras_details, run_number, web_server_type):
 
 
 def increment_transaction_count():
-
     password = mysql_password
+
     adm_db_config = {
         "host": CHECKIT_HOST,
         "user": "root",
@@ -823,7 +846,7 @@ def niqe(image):
 
 
 def compare_images(base, frame, regions):
-    time.sleep(3)
+    time.sleep(1)
     h, w = frame.shape[:2]
     all_regions = []
     all_regions.extend(range(1, 65))
@@ -875,7 +898,7 @@ def compare_images(base, frame, regions):
 
 def create_base_image(camera_object, capture_device, version):
 
-    time.sleep(3)
+    time.sleep(1)
 
     able_to_read, frame = capture_device.read()
     if not able_to_read:
@@ -1397,15 +1420,13 @@ def process_cameras(camera_list, engine_state_id, user_name):
         if log_alarms:
             # hard code localhost as I don't expect using webserver off the main host
             # hard code for 3 scenarios only 8000, 80 and 443.  
-            site = CHECKIT_HOST
-            port = 8000
-            web_server_type = check_web_server(site, port)
-            if web_server_type not in ["http", "https"]:
-                port = 80
-                web_server_type = check_web_server(site, port)
-            if web_server_type not in ["http", "https"]:
-                port = 443
-                web_server_type = check_web_server(site, port)
+            web_server_type = check_web_server(CHECKIT_HOST, WEB_SERVER_PORT)
+            if web_server_type.get("http"):
+                web_server_type = "http"
+            elif web_server_type.get("https"):
+                web_server_type = "https"
+            else:
+                web_server_type = "Web server not running"
             if web_server_type in ["http", "https"]:
                 send_alarms(cameras_details, engine_state_id, web_server_type)
             else:
