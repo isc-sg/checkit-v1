@@ -25,8 +25,8 @@ router.register(r'^/logs_api', views.LogImageViewSet)
 
 
 urlpatterns = [
-    path("reference_image_api/", views.ReferenceImageListCreateAPIView.as_view(),  name='reference-images-list-create'),
-    path('reference_image_api/<int:pk>/', views.ReferenceImagesDetailAPIView.as_view(), name='reference-images-detail'),
+    path("api/reference_image_api/", views.ReferenceImageListCreateAPIView.as_view(),  name='reference-images-list-create'),
+    path('api/reference_image_api/<int:pk>/', views.ReferenceImagesDetailAPIView.as_view(), name='reference-images-detail'),
     path('api', include(router.urls)),
     path('', views.index, name='home'),
 
