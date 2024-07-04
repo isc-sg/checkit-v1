@@ -1380,7 +1380,8 @@ def export_logs_to_csv(request):
                 except ObjectDoesNotExist:
                     start = current_record.state_timestamp
                 end = current_record.state_timestamp
-                logs = LogImage.objects.filter(creation_date__range=(start, end))
+                # logs = LogImage.objects.filter(creation_date__range=(start, end))
+                logs = LogImage.objects.filter(run_number=i)
                 for log in logs:
                     log_list.append(log.id)
                     # print(log_list)
@@ -1417,15 +1418,16 @@ def export_logs_to_csv(request):
                 if log.action == "Failed":
                     camera_name = log.url.camera_name
                     camera_number = log.url.camera_number
-                    hour = str(log.creation_date.hour).zfill(2)
+                    # hour = str(log.creation_date.hour).zfill(2)
                     log_image = settings.MEDIA_ROOT + "/" + str(log.image)
                     if not os.path.exists(log_image):
                         logger.error(f"missing logfile {log_image}")
                         continue
-                    camera = Camera.objects.filter(id=log.url_id)
+                    # camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
                     # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
-                    base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image)
+                    # base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image)
+                    base_image = settings.MEDIA_ROOT + str(log.reference_image.image)
                     if not os.path.exists(base_image):
                         logger.error(f"missing baseimage for logs {base_image}")
                         continue
@@ -1482,14 +1484,16 @@ def export_logs_to_csv(request):
                 if log.action == "Pass":
                     camera_name = log.url.camera_name
                     camera_number = log.url.camera_number
-                    hour = str(log.creation_date.hour).zfill(2)
-                    log_image = settings.MEDIA_ROOT + "/" + str(log.image)
+                    # hour = str(log.creation_date.hour).zfill(2)
+                    # log_image = settings.MEDIA_ROOT + "/" + str(log.image)
+                    log_image = settings.MEDIA_ROOT + str(log.image)
                     if not os.path.exists(log_image):
                         logger.error(f"missing logfile {log_image}")
                         continue
                     camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
-                    base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
+                    # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
+                    base_image = settings.MEDIA_ROOT + str(log.reference_image.image)
                     if not os.path.exists(base_image):
                         logger.error(f"missing baseimage for logs {base_image}")
                         continue
