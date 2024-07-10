@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from django_tables2 import TemplateColumn
-from .models import Camera, LogImage, EngineState, BestRegionResult, ReferenceImage
+from .models import Camera, LogImage, EngineState, SuggestedValues, ReferenceImage
 from django.utils.safestring import mark_safe
 from urllib.parse import urlparse
 
@@ -288,7 +288,7 @@ class LogSummaryTable(tables.Table):
         order_by = '-hour'
 
 
-class BestRegionsTable(tables.Table):
+class SuggestedValuesTable(tables.Table):
     selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
                                       attrs={"td": {
                                           "width": 50, "align": "center"
@@ -316,7 +316,7 @@ class BestRegionsTable(tables.Table):
     #     camera = ReferenceImage.objects.filter(url_id=record.camera_id).last()
     #     return camera.image
     class Meta:
-        model = BestRegionResult
+        model = SuggestedValues
         template_name = "django_tables2/bootstrap4.html"
         fields = ('selection', 'camera_number', 'camera_name', 'regions')
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
