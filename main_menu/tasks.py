@@ -77,7 +77,7 @@ def check_web_server(site, port):
         results['http'] = f'Error: {e}'
         return results
     return "Web server not running"
-        
+
 def array_to_string(array):
     new_string = ""
     for element in array:
@@ -1177,7 +1177,6 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     # else:
     #     action = "Pass"
 
-
     LogImage.objects.create(url_id=camera, image=sql_file_name,
                             matching_score=matching_score,
                             region_scores=json.dumps(region_scores),
@@ -1223,26 +1222,65 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
 
         if int(timezone.localtime().hour) not in hoursinday:
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (message + f"[{dt}] INFO [{function_name}] -"
+            message = (message + f"[{dt}] INFO [{function_name}] - "
                                  f"Not in scheduled hours "
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
+            LogImage.objects.create(url_id=camera, image=None,
+                                    matching_score=None,
+                                    region_scores=json.dumps(None),
+                                    current_matching_threshold=camera_object.matching_threshold,
+                                    light_level=None,
+                                    focus_value=None,
+                                    action="Skipped",
+                                    creation_date=timezone.now(),
+                                    current_focus_value=camera_object.focus_value_threshold,
+                                    current_light_level=camera_object.light_level_threshold,
+                                    user=user,
+                                    run_number=engine_state_id,
+                                    reference_image_id=None)
             continue
 
         if (timezone.localtime().weekday() + 1) not in daysofweek:
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (message + f"[{dt}] INFO [{function_name}] -"
+            message = (message + f"[{dt}] INFO [{function_name}] - "
                                  f"Not in scheduled days "
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
+            LogImage.objects.create(url_id=camera, image=None,
+                                    matching_score=None,
+                                    region_scores=json.dumps(None),
+                                    current_matching_threshold=camera_object.matching_threshold,
+                                    light_level=None,
+                                    focus_value=None,
+                                    action="Skipped",
+                                    creation_date=timezone.now(),
+                                    current_focus_value=camera_object.focus_value_threshold,
+                                    current_light_level=camera_object.light_level_threshold,
+                                    user=user,
+                                    run_number=engine_state_id,
+                                    reference_image_id=None)
             continue
 
         if camera_object.snooze:
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (message + f"[{dt}] INFO [{function_name}] -"
+            message = (message + f"[{dt}] INFO [{function_name}] - "
                                  f"Camera set to snooze "
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
+            LogImage.objects.create(url_id=camera, image=None,
+                                    matching_score=None,
+                                    region_scores=json.dumps(None),
+                                    current_matching_threshold=camera_object.matching_threshold,
+                                    light_level=None,
+                                    focus_value=None,
+                                    action="Skipped",
+                                    creation_date=timezone.now(),
+                                    current_focus_value=camera_object.focus_value_threshold,
+                                    current_light_level=camera_object.light_level_threshold,
+                                    user=user,
+                                    run_number=engine_state_id,
+                                    reference_image_id=None)
             continue
 
         # if user has entered a username and password set in the database then ensure that we use these
@@ -1256,8 +1294,8 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
 
         if ip_address == "Error":
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (f"[{dt}] ERROR [{function_name}] -"
-                       f" Error in IP address for camera "
+            message = (f"[{dt}] ERROR [{function_name}] - "
+                       f"Error in IP address for camera "
                        f"{camera_object.camera_name} {camera_number} {camera_object.id}\n")
             log_capture_error(camera, user, engine_state_id)
             increment_transaction_count()
@@ -1294,8 +1332,8 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                  f" Completed OPTIONS in {round(end_timer - task_timer, 2)} seconds\n")
             if has_error:
                 end_timer = time.time()
-                message = (f"[{dt}] ERROR [{function_name}] -"
-                           f" Error in OPTIONS for {url} {options_response} "
+                message = (f"[{dt}] ERROR [{function_name}] - "
+                           f"Error in OPTIONS for {url} {options_response} "
                            f"total time {round(end_timer - start_timer, 2)} seconds\n")
                 log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
@@ -1305,13 +1343,13 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
             describe_response, has_error = describe(url, ip_address, url_port, camera_username, camera_password)
             end_timer = time.time()
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = message + (f"[{dt}] INFO [{function_name}] -"
-                                 f" Completed DESCRIBE in {round(end_timer - task_timer, 2)} seconds\n")
+            message = message + (f"[{dt}] INFO [{function_name}] - "
+                                 f"Completed DESCRIBE in {round(end_timer - task_timer, 2)} seconds\n")
 
             if has_error:
                 end_timer = time.time()
-                message = (f"[{dt}] ERROR [{function_name}] -"
-                           f" Error in DESCRIBE for url {url} {describe_response} "
+                message = (f"[{dt}] ERROR [{function_name}] - "
+                           f"Error in DESCRIBE for url {url} {describe_response} "
                            f"total time {round(end_timer - start_timer, 2)} seconds\n")
                 log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
@@ -1333,14 +1371,14 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
             message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
             end_timer = time.time()
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = message + (f"[{dt}] INFO [{function_name}] -"
-                                 f" Read and compare completed in {round(end_timer - task_timer, 2)} seconds\n")
+            message = message + (f"[{dt}] INFO [{function_name}] - "
+                                 f"Read and compare completed in {round(end_timer - task_timer, 2)} seconds\n")
         else:
             # this should be simple imread rather than open / describe etc.
             if camera_object.multicast_address:
                 dt = format_datetime_with_milliseconds(datetime.datetime.now())
-                message = (message + f"[{dt}] ERROR [{function_name}] -"
-                                     f" {scheme} over multicast is currently not supported\n")
+                message = (message + f"[{dt}] ERROR [{function_name}] - "
+                                     f"{scheme} over multicast is currently not supported\n")
                 logger.error(message)
                 continue
             capture_device = cv2.VideoCapture(camera_object.url)
@@ -1356,14 +1394,14 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                 message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
                 end_timer = time.time()
                 dt = format_datetime_with_milliseconds(datetime.datetime.now())
-                message = message + (f"[{dt}] INFO [{function_name}] -"
-                                     f" Completed read for camera id {camera} camera number {camera_object.camera_number} "
+                message = message + (f"[{dt}] INFO [{function_name}] - "
+                                     f"Completed read for camera id {camera} camera number {camera_object.camera_number} "
                                      f"in {round(end_timer - task_timer, 2)} seconds\n")
             else:
                 end_timer = time.time()
                 dt = format_datetime_with_milliseconds(datetime.datetime.now())
-                message = (f"[{dt}] ERROR [{function_name}] -"
-                           f" Unable to open capture device {url} "
+                message = (f"[{dt}] ERROR [{function_name}] - "
+                           f"Unable to open capture device {url} "
                            f"total time {round(end_timer - start_timer,2)} seconds\n")
                 log_capture_error(camera, user, engine_state_id)
                 increment_transaction_count()
@@ -1373,8 +1411,8 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
 
         end_timer = time.time()
         dt = format_datetime_with_milliseconds(datetime.datetime.now())
-        message = (message + f"[{dt}] INFO [{function_name}] -"
-                             f" Check complete - total time {round(end_timer - start_timer, 2)} seconds\n ")
+        message = (message + f"[{dt}] INFO [{function_name}] - "
+                             f"Check complete - total time {round(end_timer - start_timer, 2)} seconds\n ")
         logger.info(message)
 
 
@@ -1400,7 +1438,9 @@ def process_cameras(camera_list, engine_state_id, user_name):
         logs = LogImage.objects.filter(run_number=engine_state_id)
         number_of_pass = logs.filter(action="Pass").count()
         number_of_fail = logs.filter(action="Failed").count()
-        number_of_others = logs.count() - (number_of_pass + number_of_fail)
+        number_of_skipped = logs.filter(action="Skipped").count()
+        number_of_capture_errors = logs.filter(action="Capture Error").count()
+        number_of_others = number_of_capture_errors + number_of_skipped
         if logs:
             last_log_time = logs.last().creation_date
             engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
@@ -1421,12 +1461,13 @@ def process_cameras(camera_list, engine_state_id, user_name):
             # hard code localhost as I don't expect using webserver off the main host
             # hard code for 3 scenarios only 8000, 80 and 443.  
             web_server_type = check_web_server(CHECKIT_HOST, WEB_SERVER_PORT)
-            if web_server_type.get("http"):
-                web_server_type = "http"
-            elif web_server_type.get("https"):
-                web_server_type = "https"
-            else:
-                web_server_type = "Web server not running"
+            if web_server_type != "Web server not running":
+
+                if web_server_type.get("http"):
+                    web_server_type = "http"
+                elif web_server_type.get("https"):
+                    web_server_type = "https"
+
             if web_server_type in ["http", "https"]:
                 send_alarms(cameras_details, engine_state_id, web_server_type)
             else:
