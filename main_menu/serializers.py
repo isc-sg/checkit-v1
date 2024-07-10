@@ -35,7 +35,8 @@ class CameraSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'multicast_address', 'multicast_port', 'camera_username', 'camera_password',
                   'camera_number', 'camera_name', 'camera_location',
                   'matching_threshold', 'focus_value_threshold', 'light_level_threshold',
-                  'scheduled_hours', 'scheduled_days', 'snooze', 'trigger_new_reference_image']
+                  'scheduled_hours', 'scheduled_days', 'snooze', 'trigger_new_reference_image', 'psn_ip_address',
+                  'psn_recorded_port', 'psn_user_name', 'psn_password']
         # extra_kwargs = {
         #     'url': {'lookup_field': 'hoursinday'}
         # }
