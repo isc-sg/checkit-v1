@@ -23,6 +23,7 @@ from django.utils.decorators import method_decorator
 from django_celery_beat.apps import BeatConfig
 from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay
 from .resources import CameraResource, ReferenceImageResource
+from django import forms
 BeatConfig.verbose_name = "Checkit Clocks"
 
 # Register your models here.
@@ -32,6 +33,13 @@ BeatConfig.verbose_name = "Checkit Clocks"
 admin.site.site_title = "CheckIT"
 admin.site.site_header = "CheckIT"
 admin.site.index_title = "CheckIT Admin"
+
+
+class PasswordStarWidget(forms.PasswordInput):
+    def render(self, name, value, attrs=None, renderer=None):
+        if value:
+            value = '*' * 10  # Display 10 stars regardless of actual password length
+        return super().render(name, value, attrs, renderer)
 
 
 class DisableClientSideCachingMiddleware(object):
@@ -75,6 +83,11 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
     actions = [new_reference_image]
     exclude = ['trigger_new_version']
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields['psn_password'].widget = PasswordStarWidget()
+        return form
 
     def unique_camera_id(self, obj):
         return obj.id
