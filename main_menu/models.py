@@ -10,6 +10,8 @@ from django.utils.timezone import now
 from django.urls import reverse
 from django.template.defaultfilters import slugify
 from simple_history.models import HistoricalRecords
+from encrypted_model_fields.fields import EncryptedCharField
+
 import shutil
 from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
@@ -99,11 +101,17 @@ class Camera(models.Model):
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     scheduled_hours = models.ManyToManyField(HoursInDay, blank=True, help_text="List format 0-23")
     scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True, help_text="List format 1-7")
-    snooze = models.BooleanField(default=False,help_text="Set to true to pause checks for this camera")
+    snooze = models.BooleanField(default=
+                                 False,help_text="Set to true to pause checks for this camera")
     trigger_new_reference_image = models.BooleanField(default=False, help_text="Set to true to enable the initiation"
                                                                                " of a new reference image")
     trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
     reference_image_version = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(9999)])
+
+    psn_ip_address = models.GenericIPAddressField(blank=True, null=True, default=None)
+    psn_recorded_port = models.PositiveIntegerField(blank=True, null=True, default=None)
+    psn_user_name = models.CharField(blank=True, null=True, max_length=255)
+    psn_password = EncryptedCharField(max_length=255, null=True, blank=True, default=None)
 
     history = HistoricalRecords()
 
@@ -220,6 +228,10 @@ class EngineState(models.Model):
             return 0  # Handle division by zero or other cases
 
 
-class BestRegionResult(models.Model):
-    camera_id = models.CharField(max_length=100, unique=False)
-    regions = models.JSONField()
+class SuggestedValues(models.Model):
+    url = models.ForeignKey(Camera, on_delete=models.CASCADE, verbose_name="Camera Name and Number", default=None)
+    new_regions = models.JSONField(default=list)
+    new_matching_score = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    new_focus_value = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
+    new_light_level = models.DecimalField(max_digits=5, null=True, blank=True, decimal_places=2, default=0)
+    accepted = models.BooleanField(default=True)
