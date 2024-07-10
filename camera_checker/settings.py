@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'celery',
     'django_celery_beat',
+    'encrypted_model_fields',
 
 ]
 
@@ -255,3 +256,4 @@ CELERY_TIMEZONE = "Australia/Melbourne"
 DJANGO_CELERY_BEAT_TZ_AWARE = True
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o775
 FILE_UPLOAD_PERMISSIONS = 0o660
+FIELD_ENCRYPTION_KEY = b"SDFvHqmlRvzDEt8CJj4SySy9WxHNjrwZGOTGftIfH40="
