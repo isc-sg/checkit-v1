@@ -40,8 +40,8 @@ from django.contrib.auth.models import Permission, User, Group
 
 
 from .resources import CameraResource
-from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay, BestRegionResult
-from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable, BestRegionsTable
+from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay, SuggestedValues
+from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable, SuggestedValuesTable
 from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
@@ -1490,7 +1490,7 @@ def export_logs_to_csv(request):
                     if not os.path.exists(log_image):
                         logger.error(f"missing logfile {log_image}")
                         continue
-                    camera = Camera.objects.filter(id=log.url_id)
+                    # camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
                     # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
                     base_image = settings.MEDIA_ROOT + str(log.reference_image.image)
@@ -1595,14 +1595,14 @@ def input_camera_for_regions(request):
             if result.ready():
                 # print(result.get())  # Return task result if ready
                 try:
-                    BestRegionResult.objects.all().delete()
+                    SuggestedValues.objects.all().delete()
                 except:
                     pass
                 for data in result.get():
-                    instances = [BestRegionResult(camera_id=str(item[0]), regions=item[1]) for item in data]
+                    instances = [SuggestedValues(camera_id=str(item[0]), regions=item[1]) for item in data]
 
-                    BestRegionResult.objects.bulk_create(instances)
-                table = BestRegionsTable(BestRegionResult.objects.all())
+                    SuggestedValues.objects.bulk_create(instances)
+                table = SuggestedValuesTable(SuggestedValues.objects.all())
 
                 return render(request, "main_menu/best_regions_table.html", {
                     "table": table
