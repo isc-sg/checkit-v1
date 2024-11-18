@@ -23,6 +23,9 @@ from django.db.models.functions import TruncHour
 from django.db.models import Count
 from pathos.multiprocessing import cpu_count
 import configparser
+from collections import defaultdict
+from itertools import islice
+
 
 
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse, Http404, JsonResponse
@@ -174,6 +177,66 @@ def get_config():
 #     queryset = User.objects.all().order_by('-date_joined')
 #     serializer_class = UserSerializer
 #     permission_classes = [permissions.IsAuthenticated]
+
+
+def chunk_list(lst, chunk_size):
+    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
+def group_cameras_by_psn_ip():
+    # Fetch all Camera objects from the database
+    cameras = Camera.objects.all().filter(snooze=False)
+
+    # Initialize defaultdict to group cameras by psn_ip_address
+    grouped = defaultdict(list)
+
+    # Group cameras by psn_ip_address
+    for camera in cameras:
+        psn_ip = camera.psn_ip_address
+        grouped[psn_ip].append(camera.id)
+
+    if None in grouped:
+        original_list = grouped[None]
+        split_lists = chunk_list(original_list, 10)
+        app = celery.Celery('camera_checker', broker='redis://localhost:6379')
+        active_workers = app.control.inspect().ping()
+        inspect = app.control.inspect()
+        stats = inspect.stats()
+        total_concurrency = 0
+        if stats:
+            for worker, worker_stats in stats.items():
+                concurrency = worker_stats.get('pool', {}).get('max-concurrency', 'N/A')
+                total_concurrency += concurrency
+        # Now split the Non_psn cameras into sublists of total_concurrency
+        split_lists = chunk_list(original_list, chunk_size=total_concurrency)
+        grouped[None] = split_lists
+        flattened_lists = []
+
+        for value in grouped.values():
+            if isinstance(value[0], list):  # Check if the first element is a list
+                flattened_lists.extend(value)  # Extend the list with the lists inside the list
+            else:
+                flattened_lists.append(value)
+    else:
+        flattened_lists = list(grouped.values())
+    return flattened_lists
+
+
+def split_list(input_list, num_lists):
+    avg_size = len(input_list) // num_lists
+    remainder = len(input_list) % num_lists
+
+    result = []
+    start = 0
+
+    for i in range(num_lists):
+        end = start + avg_size + (1 if i < remainder else 0)
+        result.append(input_list[start:end])
+        start = end
+
+    return result
+
+
 def strtobool(val):
     """Convert a string representation of truth to true (1) or false (0).
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
@@ -222,7 +285,6 @@ class CameraViewSet(viewsets.ModelViewSet):
         instance.snooze = new_value
         instance.save()
         return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
-
 
     @action(detail=True, methods=['post'])
     def refresh_reference_image(self, request, camera_number=None):
@@ -635,7 +697,16 @@ def license_limits_are_ok():
     # return True if all good - False if fails
     try:
         license_obj = Licensing.objects.last()
-        if license_obj.transaction_count > license_obj.transaction_limit or datetime.date.today() > license_obj.end_date:
+        if license_obj is None:  # Check if no object was found
+            logger.error("Licensing Error - No License Found")
+            return False
+
+        # Proceed to check transaction count and date if object exists
+        if (license_obj.transaction_count > license_obj.transaction_limit or
+                datetime.date.today() > license_obj.end_date):
+            logger.error(f"Licensing Error Current Transaction Count {license_obj.transaction_count} "
+                         f"Transaction Limit {license_obj.transaction_limit} "
+                         f"Expiry Date {license_obj.end_date}")
             return False
         else:
             return True
@@ -798,6 +869,7 @@ def compare_images(request):
         camera_name = camera_object.camera_name
         camera_number = camera_object.camera_number
         actual_reference_image = obj.reference_image_id
+        freeze_status = obj.freeze_status
 
         # time_stamp = datetime.datetime.now()
         # hour = time_stamp.strftime('%H')
@@ -845,7 +917,8 @@ def compare_images(request):
         merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
         base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
         context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
-                   'camera_name': camera_name, 'camera_number': camera_number, 'merged_image': base_64_merged_image}
+                   'camera_name': camera_name, 'camera_number': camera_number,
+                   'merged_image': base_64_merged_image, 'freeze_status': freeze_status}
         # else:
         #     context = {'result': result, 'camera_name': camera_name, 'camera_number': camera_number}
         return HttpResponse(template.render(context, request))
@@ -915,7 +988,7 @@ def scheduler(request):
             engine_state_id = engine_state_record.id
 
             for group_of_cameras in sublists:
-                process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+                process_cameras.delay([group_of_cameras], engine_state_id, user_name)
             context = {"jobid": engine_state_id}
             return HttpResponse(template.render(context, request))
 
@@ -930,9 +1003,12 @@ def scheduler(request):
         camera_objects = Camera.objects.all().filter(snooze=False)
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
-        x = int(number_of_cpus/2)
-        num_sublists = (len(camera_ids) + x - 1) // x
-        sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+        # x = int(number_of_cpus/2)
+        # num_sublists = (len(camera_ids) + x - 1) // x
+        # number_of_entries_in_list = len(camera_ids)// (number_of_cpus * 2)
+        # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+        # sublists = split_list(camera_ids, number_of_cpus * 2)
+        sublists = group_cameras_by_psn_ip()
         # recommended configuration - set celery config file to have 2 x CPUs for concurrency and 2 workers
         # dual workers should provide some redundancy.
         # create STARTED record first then create FINISHED/ RUN COMPLETED and pass that record id to celery to have the
@@ -946,8 +1022,10 @@ def scheduler(request):
         engine_state_id = engine_state_record.id
         # process_cameras(camera_ids, engine_state_id, user_name)
 
-        for group_of_cameras in sublists:
-            process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+        # for group_of_cameras in sublists:
+            # process_cameras.delay(group_of_cameras, engine_state_id, user_name
+        logger.info(f"STARTING ENGINE for Run Number {engine_state_id}")
+        process_cameras.delay(sublists, engine_state_id, user_name)
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
 
@@ -978,6 +1056,7 @@ def scheduler(request):
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
+        camera_id = [camera_id]
         process_cameras.delay(camera_id, engine_state_id, user_name)
         # process_cameras(camera_id, engine_state_id, user_name)
 
@@ -1064,7 +1143,7 @@ def licensing(request):
                     adm_db = mysql.connector.connect(**adm_db_config)
                     admin_cursor = adm_db.cursor()
                     if mysql_password:
-                        sql_statement = f"ALTER USER 'root'@'localhost' IDENTIFIED BY '{mysql_password}';"
+                        sql_statement = f"ALTER USER 'root'@'%' IDENTIFIED BY '{mysql_password}';"
                         # TODO setup root@"%" and checkit@"%"
                         admin_cursor.execute(sql_statement)
                         sql_statement = "FLUSH PRIVILEGES;"
@@ -1278,9 +1357,11 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
             canvas_page.drawString(
                 *coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos) - 5,
                        page_height, mm), text="User: " + str(user_name))
+            local_timezone = timezone.get_current_timezone()
+            local_datetime = creation_time.astimezone(local_timezone)
             canvas_page.drawString(*coord(left_margin_pos, top_margin_text_pos + (count * top_margin_image_pos),
                                 page_height, mm),
-                         text="Capture: " + creation_time.strftime("%d-%b-%Y %H:%M %p"))
+                         text="Capture: " + local_datetime.strftime("%d-%b-%Y %H:%M %p"))
             if matching_score < current_matching_threshold:
                 canvas_page.setFillColor(HexColor("#CC0000"))
                 canvas_page.setStrokeColor(HexColor("#000000"))
@@ -1289,8 +1370,8 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
                 canvas_page.setStrokeColor(HexColor("#000000"))
             canvas_page.drawString(*coord(left_margin_pos + 87, top_margin_text_pos + (count * top_margin_image_pos),
                                 page_height, mm),
-                         text="Matching Score: " + str(matching_score) + "/" + str(current_matching_threshold))
-            if focus_value > current_focus_value:
+                                text="Matching Score: " + str(matching_score) + "/" + str(current_matching_threshold))
+            if focus_value < current_focus_value:
                 canvas_page.setFillColor(HexColor("#CC0000"))
                 canvas_page.setStrokeColor(HexColor("#000000"))
             else:
@@ -1306,14 +1387,17 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
                 canvas_page.setFillColor(HexColor("#000000"))
                 canvas_page.setStrokeColor(HexColor("#000000"))
             canvas_page.drawString(*coord(left_margin_pos + 177, top_margin_text_pos + (count * top_margin_image_pos),
-                                page_height, mm), text="Light Level: " + str(int(light_level)) +
-                                                       "/" + str(int(current_light_level)))
+                                page_height, mm), text="Light Level: " + str(light_level) +
+                                                       "/" + str(current_light_level))
             canvas_page.setFillColor(HexColor("#000000"))
             canvas_page.setStrokeColor(HexColor("#000000"))
 
             image_rl = canvas.ImageReader(base_image)
             image_width, image_height = image_rl.getSize()
             scaling_factor = (image_width / page_width) * 1.3
+            if 720 < image_width < 1920:
+                scaling_factor = (1920/image_width) * scaling_factor
+
             if image_height > 1920:
                 sf_multiplier = 2.311 / (image_width / image_height)
                 scaling_factor = (image_width / page_width) * sf_multiplier
@@ -1345,6 +1429,7 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
             log_image_edges = log_image_edges[:, :, :3]
             reference_image_cv2 = cv2.imread(base_image)
             merged_image = cv2.addWeighted(reference_image_cv2, 1, log_image_edges, 1, 0)
+            # TODO change this non file based.
             cv2.imwrite("/tmp/merged_image.jpg", merged_image)
             image_rl3 = canvas.ImageReader("/tmp/merged_image.jpg")
 
@@ -1398,15 +1483,18 @@ def export_logs_to_csv(request):
             )
 
             writer = csv.writer(response)
+
             writer.writerow(["camera_name", "camera_number", "camera_location",
-                             "pass_fail", "matching_score", "focus_value", "light_level", "creation_date",
+                             "pass_fail", "matching_score", "focus_value", "light_level", "Freeze Status" ,"creation_date",
                              "current_focus_value", "current_light_level", "user", "run_number"])
             # print(logs)
             for log in logs:
+                local_timezone = timezone.get_current_timezone()
+                local_datetime = log.creation_date.astimezone(local_timezone)
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
-                                 log.action, log.matching_score, log.focus_value,log.light_level,
-                                 datetime.datetime.strftime(log.creation_date, "%d-%b-%Y %H:%M:%S"),
-                                 log.current_focus_value,log.current_light_level, log.user, log.run_number])
+                                 log.action, log.matching_score, log.focus_value, log.light_level, log.freeze_status,
+                                 datetime.datetime.strftime(local_datetime, "%d-%b-%Y %H:%M:%S"),
+                                 log.current_focus_value, log.current_light_level, log.user, log.run_number])
 
             return response
 
@@ -1427,7 +1515,7 @@ def export_logs_to_csv(request):
                     # print(camera)
                     # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
                     # base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image)
-                    base_image = settings.MEDIA_ROOT + str(log.reference_image.image)
+                    base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image.image)
                     if not os.path.exists(base_image):
                         logger.error(f"missing baseimage for logs {base_image}")
                         continue
@@ -1486,14 +1574,14 @@ def export_logs_to_csv(request):
                     camera_number = log.url.camera_number
                     # hour = str(log.creation_date.hour).zfill(2)
                     # log_image = settings.MEDIA_ROOT + "/" + str(log.image)
-                    log_image = settings.MEDIA_ROOT + str(log.image)
+                    log_image = settings.MEDIA_ROOT + "/" + str(log.image)
                     if not os.path.exists(log_image):
                         logger.error(f"missing logfile {log_image}")
                         continue
                     # camera = Camera.objects.filter(id=log.url_id)
                     # print(camera)
                     # base_image = settings.MEDIA_ROOT + "/base_images/" + str(camera[0].id) + "/" + hour + ".jpg"
-                    base_image = settings.MEDIA_ROOT + str(log.reference_image.image)
+                    base_image = settings.MEDIA_ROOT + "/" + str(log.reference_image.image)
                     if not os.path.exists(base_image):
                         logger.error(f"missing baseimage for logs {base_image}")
                         continue
@@ -1807,10 +1895,11 @@ def check_all_cameras():
     user_name = "system_scheduler"
     camera_objects = Camera.objects.all()
     camera_ids = [item.id for item in camera_objects]
-    x = int(number_of_cpus/2)
-    num_sublists = (len(camera_ids) + x - 1) // x
-    sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+    # x = int(number_of_cpus/2)
+    # num_sublists = (len(camera_ids) + x - 1) // x
+    # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
     number_of_cameras_in_run = len(camera_ids)
+    sublists = group_cameras_by_psn_ip()
 
     # create STARTED record first then create FINISHED and pass that record id to celery to have the
     # workers update the timestamp and counts as the complete check
@@ -1821,6 +1910,41 @@ def check_all_cameras():
                                       number_of_cameras_in_run=number_of_cameras_in_run)
     engine_state_record.save()
     engine_state_id = engine_state_record.id
-    for group_of_cameras in sublists:
-        process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+    logger.info(f"SCHEDULER STARTED for Run Number {engine_state_id}")
+    # for group_of_cameras in sublists:
+    #     process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+    process_cameras.delay(sublists, engine_state_id, user_name)
 
+# @shared_task
+# def check_groups(groups, *args, **kwargs):
+#     # Your task logic here
+#     logger.info(f"Checking group: {groups}")
+#     camera_ids = []
+#     for grp in groups:
+#         logger.info(f"Processing Group {grp}")
+#         cameras = Camera.objects.filter(group_name=grp)
+#         for camera in cameras:
+#             camera_ids.append(camera.id)
+#             logger.info(f"Camera number{camera.camera_number} Camera Name {camera.camera_name} ")
+#     logger.info(f"Cameras to check {camera_ids}")
+#     user_name = "system_scheduler"
+#     # camera_objects = Camera.objects.all()
+#     # camera_ids = [item.id for item in camera_objects]
+#     # # x = int(number_of_cpus/2)
+#     # # num_sublists = (len(camera_ids) + x - 1) // x
+#     # # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+#     number_of_cameras_in_run = len(camera_ids)
+#     sublists = group_cameras_by_psn_ip()
+#
+#     # create STARTED record first then create FINISHED and pass that record id to celery to have the
+#     # workers update the timestamp and counts as the complete check
+#     engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
+#                                       number_of_cameras_in_run=number_of_cameras_in_run)
+#     engine_state_record.save()
+#     engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
+#                                       number_of_cameras_in_run=number_of_cameras_in_run)
+#     engine_state_record.save()
+#     engine_state_id = engine_state_record.id
+#     # for group_of_cameras in sublists:
+#     #     process_cameras.delay(group_of_cameras, engine_state_id, user_name)
+#     process_cameras.delay(sublists, engine_state_id, user_name)
