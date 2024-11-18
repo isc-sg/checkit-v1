@@ -1,8 +1,8 @@
-import datetime
-import os.path
+# import datetime
+# import os.path
 
 from django.db import models
-from django.core import validators
+# from django.core import validators
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.forms.fields import URLField as FormURLField
 from django.utils import timezone
@@ -10,10 +10,10 @@ from django.utils.timezone import now
 from django.urls import reverse
 from django.template.defaultfilters import slugify
 from simple_history.models import HistoricalRecords
-from encrypted_model_fields.fields import EncryptedCharField
+# from encrypted_model_fields.fields import EncryptedCharField
 
-import shutil
-from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
+# import shutil
+# from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
 LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Failed', 'Failed'), ('Capture Error', 'Capture Error'),
                       ('Image Size Error', 'Image Size Error'))
@@ -68,6 +68,13 @@ class HoursInDay(models.Model):
         return str(self.hour_in_the_day)
 
 
+class Group(models.Model):
+    group_name = models.CharField(max_length=50, blank=True, verbose_name="Group Name")
+
+    def __str__(self):
+        return f'{self.group_name}'
+
+
 class Camera(models.Model):
     url = models.CharField(max_length=255, unique=True, verbose_name="Camera URL")
     multicast_address = models.GenericIPAddressField(protocol='IPv4', blank=True, null=True, unique=True, default=None)
@@ -92,26 +99,35 @@ class Camera(models.Model):
                                                 default=0.5)
     # focus_value_threshold_range = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
-    light_level_threshold = models.DecimalField(max_digits=5, decimal_places=2,
-                                                validators=[MaxValueValidator(255), MinValueValidator(0)],
-                                                default=80)
+    light_level_threshold = models.DecimalField(max_digits=3, decimal_places=2,
+                                                validators=[MaxValueValidator(1), MinValueValidator(0)],
+                                                default=0.5)
     # light_level_threshold_range = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     creation_date = models.DateTimeField('date created', default=timezone.now)
     last_check_date = models.DateTimeField('date checked', default=timezone.now)
     scheduled_hours = models.ManyToManyField(HoursInDay, blank=True, help_text="List format 0-23")
     scheduled_days = models.ManyToManyField(DaysOfWeek, blank=True, help_text="List format 1-7")
-    snooze = models.BooleanField(default=
-                                 False,help_text="Set to true to pause checks for this camera")
+    snooze = models.BooleanField(default=False, help_text="Set to true to pause checks for this camera")
     trigger_new_reference_image = models.BooleanField(default=False, help_text="Set to true to enable the initiation"
                                                                                " of a new reference image")
+    freeze_check = models.BooleanField(default=False,
+                                       help_text="Set to true to check if previous log image is identical")
     trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
     reference_image_version = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(9999)])
 
-    psn_ip_address = models.GenericIPAddressField(blank=True, null=True, default=None)
-    psn_recorded_port = models.PositiveIntegerField(blank=True, null=True, default=None)
-    psn_user_name = models.CharField(blank=True, null=True, max_length=255)
-    psn_password = EncryptedCharField(max_length=255, null=True, blank=True, default=None)
+    psn_ip_address = models.GenericIPAddressField(blank=True, null=True, default=None,
+                                                  verbose_name="Video Storage IP Address")
+    psn_name = models.CharField(max_length=20, null=True, blank=True, default=None, verbose_name="Video Storage Name")
+    psn_recorded_port = models.PositiveIntegerField(blank=True, null=True, default=None,
+                                                    verbose_name="Video Storage Port Number")
+    psn_user_name = models.CharField(blank=True, null=True, max_length=255,
+                                     verbose_name="Video Storage User Name")
+    psn_password = models.CharField(max_length=255, null=True, blank=True, default=None,
+                                    verbose_name="Video Storage Password")
+
+    group_name = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Group Name", default=None)
+
 
     history = HistoricalRecords()
 
@@ -140,7 +156,7 @@ class ReferenceImage(models.Model):
                             verbose_name="Camera Name and Number", help_text="points to camera id")
     image = models.ImageField(max_length=300, upload_to=get_image_filename, verbose_name="Reference Image")
     hour = models.CharField(max_length=2, null=False, blank=False, default=get_hour)
-    light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
+    light_level = models.DecimalField(max_digits=3, null=False, blank=False, decimal_places=2, default=0)
     focus_value = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     # matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
     #                                          validators=[MaxValueValidator(1), MinValueValidator(0)],
@@ -167,14 +183,15 @@ class LogImage(models.Model):
     current_matching_threshold = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     focus_value = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     current_focus_value = models.DecimalField(max_digits=7, null=True, blank=True, decimal_places=2, default=0)
-    light_level = models.DecimalField(max_digits=5, null=True, blank=True, decimal_places=2, default=0)
-    current_light_level = models.DecimalField(max_digits=5, null=False, blank=False, decimal_places=2, default=0)
+    light_level = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
+    current_light_level = models.DecimalField(max_digits=3, null=False, blank=False, decimal_places=2, default=0)
     action = models.CharField(max_length=20, null=True)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)
     run_number = models.PositiveIntegerField(null=False, blank=False, default=0)
     reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.CASCADE,
                                         verbose_name="Reference Image", null=True, blank=True)
+    freeze_status = models.BooleanField(default=False)
 
     # history = HistoricalRecords()
 
@@ -233,5 +250,5 @@ class SuggestedValues(models.Model):
     new_regions = models.JSONField(default=list)
     new_matching_score = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     new_focus_value = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
-    new_light_level = models.DecimalField(max_digits=5, null=True, blank=True, decimal_places=2, default=0)
+    new_light_level = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
     accepted = models.BooleanField(default=True)
