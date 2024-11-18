@@ -29,7 +29,7 @@
 
     
     --primary : var(--accent);
-    --body-fg : var(--shade-of-white) ;
+    --body-fg : #ffffff ;
     --header-bg: var(--elevation);
     --breadcrumbs-bg: var(--accent);
   
