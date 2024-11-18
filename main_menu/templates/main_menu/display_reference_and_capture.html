@@ -59,6 +59,9 @@ tr:nth-child(even) {
         <div class="column">
             <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>
                 {{ camera_name }} / #{{ camera_number }} </u></h3>
+            {%  if freeze_status %}
+                <h3 class="h3 m-4" style="color: #FF1515">Images are similar - Check device for image freeze </h3>
+                {%  endif %}
             <img src="/media/{{ reference_image }}" alt="Base" style="width:30%">
             <img src="/media/{{ capture_image }}" alt="Capture" style="width:30%">
         </div>
