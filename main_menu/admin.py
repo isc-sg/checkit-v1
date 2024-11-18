@@ -21,18 +21,18 @@ from django_admin_listfilter_dropdown.filters import DropdownFilter, RelatedDrop
 from django.views.decorators.cache import cache_control, add_never_cache_headers
 from django.utils.decorators import method_decorator
 from django_celery_beat.apps import BeatConfig
-from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay
+from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay, Group
 from .resources import CameraResource, ReferenceImageResource
 from django import forms
-BeatConfig.verbose_name = "Checkit Clocks"
+BeatConfig.verbose_name = "Scene Check Clocks"
 
 # Register your models here.
 # from .models import Camera, ReferenceImage, LogImage
 
 
-admin.site.site_title = "CheckIT"
-admin.site.site_header = "CheckIT"
-admin.site.index_title = "CheckIT Admin"
+admin.site.site_title = "Scene Check"
+admin.site.site_header = "Scene Check"
+admin.site.index_title = "Scene Check Admin"
 
 
 class PasswordStarWidget(forms.PasswordInput):
@@ -79,15 +79,16 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
                        'reference_image_version']
     prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
-                   ('scheduled_days', RelatedDropdownFilter))
+                   ('scheduled_days', RelatedDropdownFilter), ('psn_ip_address', DropdownFilter),
+                   ('group_name', DropdownFilter))
     history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
     actions = [new_reference_image]
     exclude = ['trigger_new_version']
 
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        form.base_fields['psn_password'].widget = PasswordStarWidget()
-        return form
+    # def get_form(self, request, obj=None, **kwargs):
+    #     form = super().get_form(request, obj, **kwargs)
+    #     form.base_fields['psn_password'].widget = PasswordStarWidget()
+    #     return form
 
     def unique_camera_id(self, obj):
         return obj.id
@@ -287,6 +288,24 @@ class LogEntryAdmin(admin.ModelAdmin):
     object_link.short_description = "record"
 
 
+class GroupAdmin(admin.ModelAdmin):
+    resource_class = Group
+    list_display = ['group_id', 'group_name',]
+    fields = ['group_name']
+    list_per_page = 10
+
+    def group_id(self, obj):
+        return obj.id
+
+    group_id.short_description = "Group ID"
+
+    def get_queryset(self, request):
+        queryset = super(GroupAdmin, self).get_queryset(request)
+        return queryset.order_by('id')  # The '-' indicates descending order
+
+
 admin.site.register(Camera, CameraAdmin)
 admin.site.register(ReferenceImage, ReferenceAdmin)
 admin.site.register(LogImage, LogImageAdmin)
+admin.site.register(Group, GroupAdmin)
+
