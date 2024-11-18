@@ -5,7 +5,19 @@ from import_export.admin import ImportExportModelAdmin
 from django.conf import settings
 import logging
 
-from .models import Camera, ReferenceImage
+from .models import Camera, ReferenceImage, Group
+
+
+class GroupResource(resources.ModelResource):
+
+    class Meta:
+        model = Group
+        skip_unchanged = True
+        # exclude = ('id',)
+        fields = ('group_name')
+        import_id_fields = ('group_name')
+        report_skipped = True
+        raise_errors = True
 
 
 class CameraResource(resources.ModelResource):
@@ -17,14 +29,16 @@ class CameraResource(resources.ModelResource):
         fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
                   'camera_password', 'camera_number', 'camera_name',
                   'camera_location', 'image_regions', 'matching_threshold',
-                  'focus_value_threshold', 'light_level_threshold', 'reference_image_version')
+                  'focus_value_threshold', 'light_level_threshold', 'reference_image_version',
+                  'psn_ip_address', 'psn_name', 'psn_recorded_port', 'psn_user_name', 'psn_password', 'freeze_check')
         import_id_fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
                             'camera_password', 'camera_number', 'camera_name',
                             'camera_location', 'image_regions', 'matching_threshold',
-                            'focus_value_threshold', 'light_level_threshold')
+                            'focus_value_threshold', 'light_level_threshold',
+                            'psn_ip_address', 'psn_name', 'psn_recorded_port',
+                            'psn_user_name', 'psn_password', 'freeze_check')
         report_skipped = True
         raise_errors = True
-
 
     def import_row(self, row, instance_loader, **kwargs):
         try:
@@ -60,4 +74,5 @@ class ReferenceImageResource(resources.ModelResource):
 #
 # class CameraResult(ImportExportModelAdmin):
 #     resource_class = CameraResource
-#     import_id_fields = ('url', 'camera_number', 'camera_name', 'camera_location', 'image_regions', 'matching_threshold')
+#     import_id_fields = ('url', 'camera_number', 'camera_name', '
+#     camera_location', 'image_regions', 'matching_threshold')
