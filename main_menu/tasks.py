@@ -1,7 +1,8 @@
 import time
 
 from celery.utils.log import get_task_logger
-from celery import shared_task
+from celery import shared_task, chord, chain
+import celery
 import mysql.connector
 
 import cv2
@@ -29,6 +30,9 @@ from scipy.ndimage import convolve
 from scipy.stats import skew, kurtosis
 import inspect
 import requests
+import glob
+import ffmpeg
+import struct
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -37,15 +41,21 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 # from django.db import transaction
 from django.conf import settings
+import main_menu.dris
+from main_menu.dplin64py import DDProtCheck
+from collections import defaultdict
 
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
 
+__version__ = "1.2.3"
 
 logger = get_task_logger(__name__)
 
-MY_SDSN = 10101  # !!!! change this value to be the value of your SDSN (demo = 10101)
-MY_PRODCODE = "DEMO"  # !!!! change this value to be the value of the Product Code in the dongle
+
+MY_SDSN = 13343             # !!!! change this value to be the value of your SDSN (demo = 10101)
+MY_PRODCODE = "CHECKIT"		# !!!! change this value to be the value of the Product Code in the dongle
+
 
 socket_timeout = 1
 CHECKIT_HOST = ""
@@ -55,6 +65,153 @@ PORT = 0
 network_interface = ""
 log_alarms = False
 mysql_password = None
+
+
+def ProtCheck():
+    # create the DRIS and allocate the values we want to use
+    mydris = main_menu.dris.create()
+    main_menu.dris.set_function(mydris, main_menu.dris.PROTECTION_CHECK)  # standard protection check
+    main_menu.dris.set_flags(mydris,
+                   main_menu.dris.START_NET_USER)  # no extra flags, but you may want to specify some if you want to start a network user or decrement execs,...
+
+    ret_code = DDProtCheck(mydris)
+    if ret_code == 423:
+        time.sleep(5)
+        ret_code = DDProtCheck(mydris)
+    if (ret_code != 0):
+        dongle_error = main_menu.dris.DisplayError(ret_code, main_menu.dris.get_ext_err(mydris))
+        logger.error(f"Dongle Error {dongle_error} {ret_code}")
+        return ret_code
+
+    # later in your code you can check other values in the DRIS...
+    if (main_menu.dris.get_sdsn(mydris) != MY_SDSN):
+        logger.error("Incorrect SDSN! Please modify your source code so that MY_SDSN is set to be your SDSN.")
+        return ret_code
+
+    if (main_menu.dris.get_prodcode(mydris) != MY_PRODCODE):
+        logger.error(
+            "Incorrect Product Code! Please modify your source code so that MY_PRODCODE is set to be the Product Code in the dongle.")
+        return ret_code
+
+    # later on in your program you can check the return code again
+    if (main_menu.dris.get_ret_code(mydris) != 0):
+        logger.error("Dongle protection error")
+        return ret_code
+
+    # print("It worked!")
+    # print(dris.get_dongle_number(mydris))
+    main_menu.dris.set_function(mydris, main_menu.dris.PROTECTION_CHECK)
+    main_menu.dris.set_flags(mydris, main_menu.dris.STOP_NET_USER)
+    ret_code = DDProtCheck(mydris)
+    return ret_code
+
+@shared_task
+def setup_task():
+    # Perform some setup actions
+    logger.info("Setup task running")
+    # ret_code = ProtCheck()
+    # if ret_code != 0:
+    #     logger.error("LICENSE ERROR")
+    #     exit(0)
+    # else:
+    #     logger.info("LICENSE PASSED")
+    return
+
+
+@shared_task
+def all_done(dummy, engine_state_id, camera_list):
+    get_config()
+    # This will run after all tasks in the chord are finished
+    # logger.info(f"CAMERAS LIST {camera_list} {dummy} {engine_state_id}")
+    flattened_list = [item for sublist in camera_list for item in sublist]
+    cameras_details = Camera.objects.filter(id__in=flattened_list)
+    logs = LogImage.objects.filter(run_number=engine_state_id)
+    number_of_pass = logs.filter(action="Pass").count()
+    number_of_fail = logs.filter(action="Failed").count()
+    number_of_skipped = logs.filter(action="Skipped").count()
+    number_of_reference_capture = logs.filter(action="Reference Captured").count()
+    number_of_capture_errors = logs.filter(action="Capture Error").count()
+    number_of_others = number_of_capture_errors + number_of_skipped + number_of_reference_capture
+    engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
+    engine_object = EngineState.objects.get(id=engine_state_id)
+
+
+    if logs:
+        last_log_time = logs.last().creation_date
+        transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
+
+        try:
+
+            engine_object.transaction_rate = transaction_rate
+            engine_object.number_pass_images = number_of_pass
+            engine_object.number_failed_images = number_of_fail
+            engine_object.number_others = number_of_others
+            engine_object.state_timestamp = timezone.now()
+            engine_object.save()
+
+        except EngineState.DoesNotExist:
+            logger.error(f"Error updating transaction rate")
+    else:
+        logger.info(f"No logs in this run {engine_state_id} ")
+
+    if log_alarms:
+        # hard code localhost as I don't expect using webserver off the main host
+        # hard code for 3 scenarios only 8000, 80 and 443.
+        web_server_type = check_web_server(CHECKIT_HOST, WEB_SERVER_PORT)
+        if web_server_type != "Web server not running":
+
+            if web_server_type.get("http"):
+                web_server_type = "http"
+            elif web_server_type.get("https"):
+                web_server_type = "https"
+
+        # logger.info(f"web_server_type {web_server_type}")
+        if web_server_type in ["http", "https"]:
+            send_alarms(cameras_details, engine_state_id, web_server_type)
+        else:
+            logger.error("Unable to connect to local server while sending alarm")
+    if backup:
+        # replicate the media directory
+        command = ['rsync', '-aq --delete', 'camera_checker/media', f'checkit@{backup_server}:']
+        result = subprocess.run(command, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            logger.info("Media backup completed successfully")
+        else:
+            logger.error(f"Media backup failed with return code {result.returncode}")
+            logger.error(f"Error output: {result.stderr}")
+
+        # do mysqldump and transfer to back up server
+        db_user = "checkit"
+        db_password = "checkit"
+        db_name = "checkit"
+        backup_file = "backup.sql"
+
+        # Define your rsync command with options
+        with open(backup_file, 'w') as f:
+            result = subprocess.run(
+                ["mysqldump", "-u", db_user, f"-p{db_password}", db_name],
+                stdout=f,
+                stderr=subprocess.PIPE
+            )
+        if result.returncode == 0:
+
+            command = ['rsync', '-aq', 'backup.sql', f'checkit@{backup_server}:']
+            result = subprocess.run(command, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                command = ['rm', 'backup.sql']
+                result = subprocess.run(command, capture_output=True, text=True)
+                logger.info("Database backup completed successfully")
+            else:
+                logger.error(f"Database backup failed with return code {result.returncode}")
+                logger.error(f"Error output: {result.stderr}")
+        else:
+            logger.error(f"Database dump failed with return code {result.returncode}")
+            logger.error(f"Error output: {result.stderr}")
+
+    logger.info(f'All tasks are done! - TOTAL TIME {engine_object.state_timestamp - engine_start_time}')
+    # logger.info(f'Results:{results}')
 
 
 def check_web_server(site, port):
@@ -327,6 +484,10 @@ def get_config():
     global WEB_SERVER_PORT
     global network_interface
     global log_alarms
+    global transaction_delay
+    global freeze_threshold
+    global backup
+    global backup_server
 
     try:
         if config.has_option('DEFAULT', 'log_alarms'):
@@ -363,6 +524,29 @@ def get_config():
                 CHECKIT_HOST = config['DEFAULT']['checkit_host']
             except ValueError:
                 logger.error("Please check config file for checkit_host")
+        transaction_delay = 0
+
+        try:
+            transaction_delay = config.getint('DEFAULT', 'transaction_delay', fallback=0)
+        except ValueError:
+            logger.error("Please configure config file for transaction_delay")
+
+        try:
+            freeze_threshold = config.getfloat('DEFAULT', 'freeze_threshold', fallback=0.99)
+        except ValueError:
+            logger.error("Please configure config file for freeze_threshold")
+
+        try:
+            backup = config.getboolean('DEFAULT', 'backup', fallback=False)
+        except ValueError:
+            logger.error("Please configure config file for backup")
+
+        if backup:
+            try:
+                backup_server = config.get('DEFAULT', 'backup_server', fallback=False)
+            except ValueError:
+                logger.error("Please configure config file for backup_server")
+
     except configparser.NoOptionError:
         logger.error("Unable to read config file")
 
@@ -380,7 +564,9 @@ def get_camera_details(camera_list):
     # list(my_camera.scheduled_hours.values_list('hour_in_the_day', flat=True)) or
     # list(my_camera.scheduled_days.values_list('day_of_the_week', flat=True))
 
-    return Camera.objects.filter(id__in=camera_list)
+    flattened_list = [item for sublist in camera_list for item in sublist]
+
+    return Camera.objects.filter(id__in=flattened_list)
 
 
 def check_license_ok():
@@ -534,8 +720,8 @@ def send_alarms(cameras_details, run_number, web_server_type):
             logger.error(f"Error sending to alarm server - {e}")
 
 
-def increment_transaction_count():
-    password = mysql_password
+def increment_transaction_count(password):
+    # password = mysql_password
 
     adm_db_config = {
         "host": CHECKIT_HOST,
@@ -773,6 +959,8 @@ def open_capture_device(url, multicast_address, multicast_port, describe_data):
 
 
 def close_capture_device(cap, multicast_address):
+    if cap is None:
+        return
     if isinstance(cap, str):
         pass
     else:
@@ -787,10 +975,11 @@ def close_capture_device(cap, multicast_address):
             logger.error(f"Unable to leave multicast group - {error_output}")
 
 
-def log_capture_error(camera, user, engine_state_id):
+def log_capture_error(camera, user, engine_state_id, password):
     LogImage.objects.create(url_id=camera, region_scores=[], action="Capture Error",
                             creation_date=timezone.now(), user=user, run_number=engine_state_id)
-    increment_transaction_count()
+    
+    increment_transaction_count(password)
 
 
 def estimate_noise(image):
@@ -846,7 +1035,7 @@ def niqe(image):
 
 
 def compare_images(base, frame, regions):
-    time.sleep(1)
+    # time.sleep(1)
     h, w = frame.shape[:2]
     all_regions = []
     all_regions.extend(range(1, 65))
@@ -887,20 +1076,53 @@ def compare_images(base, frame, regions):
         matching_score = round(a_eye.movement(base_bilateral, frame_bilateral), 2)
 
     focus_value = skimage.measure.blur_effect(frame)
-    focus_value = round(focus_value, 2)
+    focus_value = round(1 - focus_value, 2)
 
-    blur = cv2.blur(frame, (5, 5))
-    light_level = cv2.mean(blur)[0]
+    # blur = cv2.blur(frame, (5, 5))
+    # light_level = cv2.mean(blur)[0]
 
     return {"matching score": matching_score, "focus value": focus_value,
-            "region scores": region_scores, "light level": light_level, "noise_level": noise_level}
+            "region scores": region_scores, "noise_level": noise_level}
 
 
-def create_base_image(camera_object, capture_device, version):
+def compare_previous_image(current_image, camera_object):
+    status = False
+    # set current time so that it remains constant and doesn't change as we
+    # call timezone.localtime().
+    current_time = timezone.localtime()
+    base_image_directory = (
+        f"{settings.MEDIA_ROOT}/logs/"
+        f"{current_time.strftime('%Y')}/"
+        f"{current_time.strftime('%m')}/"
+        f"{current_time.strftime('%d')}"
+    )
+    try:
+        files = glob.glob(f"{base_image_directory}/{camera_object.id}-*.jpg")
+    except OSError as e:
+        logger.error(f"Unable to get log images for camera id{camera_object.id} "
+                     f"camera number {camera_object.camera_number} - Error reported: "
+                     f"{e}")
+        return False
+    try:
+        last_file = sorted(files)[-1]
+        last_file_image = cv2.imread(last_file)
+        matching_score = a_eye.movement(current_image, last_file_image)
+        if matching_score > freeze_threshold:
+            status = True
+    except IndexError:
+        return status
+    return status
 
-    time.sleep(1)
 
-    able_to_read, frame = capture_device.read()
+def create_base_image(camera_object, capture_device, version, user, engine_state_id, password, image_frame=None):
+
+    # time.sleep(1)
+    if image_frame is None or image_frame.size == 0:
+        able_to_read, image_frame = capture_device.read()
+    else:
+        able_to_read = True
+
+    # able_to_read, frame = capture_device.read()
     if not able_to_read:
         message = (f"Unable to read from device for "
                    f"camera id {camera_object.id} / camera number {camera_object.camera_number}")
@@ -929,7 +1151,7 @@ def create_base_image(camera_object, capture_device, version):
             message = f"Unable to set permissions on {base_image_dir}/{camera_object.id} {e}"
             return message
 
-        able_to_write = cv2.imwrite(file_name, frame)
+        able_to_write = cv2.imwrite(file_name, image_frame)
 
         if not able_to_write:
             message = (f"Unable to save reference image for id {camera_object.id} / "
@@ -938,22 +1160,38 @@ def create_base_image(camera_object, capture_device, version):
 
         try:
 
-            img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            img_gray = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
             blur = cv2.blur(img_gray, (5, 5))
-            base_brightness = cv2.mean(blur)[0]
-
+            # base_brightness = cv2.mean(blur)[0]
+            base_brightness = get_luminosity(image_frame)
             noise_level = estimate_noise(img_gray)
             # logger.info(f"Noise Level {noise_level}")
             focus_value = skimage.measure.blur_effect(img_gray)
-            focus_value = round(focus_value, 2)
+            focus_value = round(1 - focus_value, 2)
 
             image_file_name = file_name.strip(f"{settings.MEDIA_ROOT}/")
 
             ReferenceImage.objects.create(url_id=camera_object.id, image=image_file_name,
                                           hour=timezone.localtime().strftime('%H'),
                                           light_level=base_brightness,
-                                          creation_date=timezone.now(), focus_value=focus_value, version=version)
+                                          creation_date=timezone.now(),
+                                          focus_value=focus_value,
+                                          version=version)
             # create log entry here with action as REFERENCE IMAGE
+            LogImage.objects.create(url_id=camera_object.id, image=None,
+                                    matching_score=0,
+                                    region_scores=json.dumps(None),
+                                    current_matching_threshold=camera_object.matching_threshold,
+                                    light_level=0,
+                                    focus_value=0,
+                                    action="Reference Captured",
+                                    creation_date=timezone.localtime(),
+                                    current_focus_value=camera_object.focus_value_threshold,
+                                    current_light_level=camera_object.light_level_threshold,
+                                    user=user,
+                                    run_number=engine_state_id,
+                                    reference_image_id=None)
+            increment_transaction_count(password)
         except Exception as e:
             message = f"Unable to save reference image {file_name} for camera id {camera_object.id} - error {e}"
             # remove file created earlier as transaction failed.
@@ -963,7 +1201,8 @@ def create_base_image(camera_object, capture_device, version):
     return "Capture succeeded"
 
 
-def read_and_compare(capture_device, user, engine_state_id, camera_object):
+
+def read_and_compare(capture_device, user, engine_state_id, camera_object, image_frame=None, password=None):
     multicast_address = camera_object.multicast_address
     camera = camera_object.id
     regions = camera_object.image_regions
@@ -971,11 +1210,17 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     task_timer = time.time()
     # message = (f"{camera} Start read at {round(time.time(), 2)}\n")
     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'timeout;5000'
-    able_to_read, image_frame = capture_device.read()
+    if isinstance(image_frame,str):
+        logger.info(f"IMAGE FRAME {image_frame}")
+    if image_frame is None or image_frame.size == 0:
+        able_to_read, image_frame = capture_device.read()
+
+    else:
+        able_to_read = True
     end_time = time.time()
     # logger.info(f"{camera} End read at {round(time.time(), 2)}")
-    frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
-    function_name = frame.function
+    # frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
+    function_name = read_and_compare.__name__
     dt = format_datetime_with_milliseconds(datetime.datetime.now())
     message = (f"[{dt}] INFO [{function_name}] -"
                f" Completed low level read in {round(end_time - task_timer, 2)}\n")
@@ -986,8 +1231,9 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
         dt = format_datetime_with_milliseconds(datetime.datetime.now())
         message = (message + f"[{dt}] ERROR [{function_name}] -" 
                    f" Error reading video frame for camera id {camera} camera number {camera_object.camera_number}\n")
-        log_capture_error(camera, user, engine_state_id)
-        increment_transaction_count()
+        log_capture_error(camera, user, engine_state_id, password)
+
+        increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
@@ -1002,7 +1248,6 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     # referenceimage_set is created by Django automatically.
 
     reference_image_objects = ReferenceImage.objects.filter(url_id=camera)
-
     # now lets make sure we get the last version of the reference image.
     # we do this by getting the last of reference_image_objects.
     # from there get the version number.
@@ -1017,7 +1262,8 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
         if elapsed_time < timezone.timedelta(hours=24):
             message = (message + f"[{dt}] INFO [{function_name}] -"
                                  f" Attempting capture of reference image\n")
-            response = create_base_image(camera_object, capture_device, last_version)
+            response = create_base_image(camera_object, capture_device, last_version,
+                                         user, engine_state_id, password, image_frame)
             message = (message + f"[{dt}] INFO [{function_name}] -"
                                  f" {response}\n")
             close_capture_device(capture_device, multicast_address)
@@ -1030,7 +1276,8 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
         message = (message + f"[{dt}] INFO [{function_name}] -"
                              f" Attempting capture of reference image\n")
-        response = create_base_image(camera_object, capture_device, last_version)
+        response = create_base_image(camera_object, capture_device, last_version,
+                                     user, engine_state_id, password, image_frame)
         message = (message + f"[{dt}] INFO [{function_name}] -"
                              f" {response}\n")
         close_capture_device(capture_device, multicast_address)
@@ -1049,8 +1296,10 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
         message = (message + f"[{dt}] INFO [{function_name}] -" 
                              f" Error reading reference image for "
                              f"camera id {camera} camera number {camera_object.camera_number}\n")
-        log_capture_error(camera, user, engine_state_id)
-        increment_transaction_count()
+        log_capture_error(camera, user, engine_state_id, password)
+        
+
+        increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
@@ -1080,7 +1329,9 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
         dt = format_datetime_with_milliseconds(datetime.datetime.now())
         message = message + (f"[{dt}] ERROR [{function_name}] -"
                              f" Error in converting image {err}\n")
-        increment_transaction_count()
+        
+
+        increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
@@ -1092,24 +1343,36 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
                                 action="Image Size Error",
                                 creation_date=timezone.now(), user=user,
                                 run_number=engine_state_id)
-        increment_transaction_count()
+        
+
+        increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
-    # Do the check here
     results_dict = compare_images(image_base_grey, image_frame_grey, regions)
+    # Do the check here
+    freeze_status = False
+    if camera_object.freeze_check:
+        freeze_status = compare_previous_image(image_frame, camera_object)
+
     matching_score = results_dict['matching score']
     focus_value = results_dict['focus value']
     region_scores = results_dict['region scores']
-    light_level = results_dict['light level']
+    # light_level = results_dict['light level']
     # use the function below to provide an alternative method for light level.
-    # luminosity = get_luminosity(image_frame)
-
-    base_image_directory = (f"{settings.MEDIA_ROOT}/logs/{timezone.now().year}"
-                            f"/{timezone.now().month}/{timezone.now().day}")
+    light_level = get_luminosity(image_frame)
+    current_time = timezone.localtime()
+    base_image_directory = (
+        f"{settings.MEDIA_ROOT}/logs/"
+        f"{current_time.strftime('%Y')}/"
+        f"{current_time.strftime('%m')}/"
+        f"{current_time.strftime('%d')}"
+    )
     log_image_file_name = (f"{base_image_directory}/"
                            f"{camera}-"
-                           f"{timezone.now().hour}:{timezone.now().minute}:{timezone.now().second}.jpg")
+                           f"{timezone.localtime().strftime('%H')}:"
+                           f"{timezone.localtime().strftime('%M')}:"
+                           f"{timezone.localtime().strftime('%S')}.jpg")
 
     try:
         pathlib.Path(f"{base_image_directory}").mkdir(parents=True, exist_ok=True)
@@ -1125,20 +1388,21 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
         dt = format_datetime_with_milliseconds(datetime.datetime.now())
         message = (message + f"[{dt}] ERROR [{function_name}] -"
                              f"Unable to write log file {log_image_file_name}")
-        increment_transaction_count()
+
+        increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
-    sql_file_name = log_image_file_name.strip(settings.MEDIA_ROOT)
-
     if matching_score < camera_object.matching_threshold:
         action = "Failed"
-    elif focus_value > camera_object.focus_value_threshold:
+    elif focus_value < camera_object.focus_value_threshold:
         action = "Failed"
     elif light_level < camera_object.light_level_threshold:
         action = "Failed"
     else:
         action = "Pass"
+    if freeze_status:
+        action = "Failed"
 
     # code below allows for upper and lower range % on thresholds.
     # threshold_ranges = {
@@ -1177,21 +1441,23 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     # else:
     #     action = "Pass"
 
-    LogImage.objects.create(url_id=camera, image=sql_file_name,
+    LogImage.objects.create(url_id=camera,
+                            image=log_image_file_name.strip(settings.MEDIA_ROOT),
                             matching_score=matching_score,
                             region_scores=json.dumps(region_scores),
                             current_matching_threshold=camera_object.matching_threshold,
                             light_level=light_level,
                             focus_value=focus_value,
+                            freeze_status=freeze_status,
                             action=action,
-                            creation_date=timezone.now(),
+                            creation_date=timezone.localtime(),
                             current_focus_value=camera_object.focus_value_threshold,
                             current_light_level=camera_object.light_level_threshold,
                             user=user,
                             run_number=engine_state_id,
                             reference_image_id=reference_image_objects.get(hour=current_hour, version=last_version).id)
 
-    increment_transaction_count()
+    increment_transaction_count(password)
 
     camera_object = Camera.objects.get(id=camera)
     camera_object.last_check_date = timezone.now()
@@ -1200,13 +1466,43 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object):
     return message
 
 
-def check_the_camera(camera_list, cameras_details, engine_state_id, user):
+@shared_task(name='main_menu.tasks.check_the_camera', time_limit=333333, soft_time_limit=333333)
+def check_the_camera(extra_param, camera_list, engine_state_id, user, password):
+    get_config()
 
-    logger.info(f"Starting check {camera_list}")
-
+    # logger.info(f"Starting check {len(camera_list)} cameras [{camera_list[0]}..{camera_list[-1]}]")
+    # logger.info(f"CAMERA LIST {camera_list}")
+    cameras_details = Camera.objects.filter(id__in=camera_list)
+    if not cameras_details:
+        logger.error(f'"Error - camera list does not contain any cameras" - {camera_list}')
+        return
+    psn_check = False
     for camera in camera_list:
+
+        if transaction_delay > 0:
+            logger.info(f"Sleeping {transaction_delay} seconds between transactions")
+            time.sleep(transaction_delay)
+
+        camera_object = Camera.objects.get(id=camera)
+        psn_check = False
+
+        if camera_object.psn_ip_address:
+            # mount the fs
+            os.makedirs(name=f"/tmp/mount_points/{camera_object.psn_ip_address}", exist_ok=True)
+
+            if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
+                psn_check = True
+            else:
+                os.system(f'sudo mount -t cifs -o username={camera_object.psn_user_name},'
+                          f'password={camera_object.psn_password} //{camera_object.psn_ip_address}/F$ /tmp/mount_points/{camera_object.psn_ip_address}/')
+                if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
+                    psn_check = True
+                else:
+                    logger.error(f"Unable to mount video storage for camera number {camera_object.camera_number}")
+                    log_capture_error(camera, user, engine_state_id, password)
+                    continue
         start_timer = time.time()
-        camera_object = cameras_details.get(id=camera)
+        # camera_object = cameras_details.get(id=camera)
         url = camera_object.url
         camera_number = camera_object.camera_number
         multicast_address = camera_object.multicast_address
@@ -1215,9 +1511,9 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
         camera_password = camera_object.camera_password
         hoursinday = list(camera_object.scheduled_hours.values_list('hour_in_the_day', flat=True))
         daysofweek = list(camera_object.scheduled_days.values_list('id', flat=True))
-
-        frame = inspect.stack()[0]
-        function_name = frame.function
+        psn_ipaddress = camera_object.psn_ip_address
+        psn_recorded_port = camera_object.psn_recorded_port
+        function_name = "check_the_camera"
         message = f"Starting check for camera id {camera} camera number {camera_object.camera_number}\n"
 
         if int(timezone.localtime().hour) not in hoursinday:
@@ -1227,11 +1523,11 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
             LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=None,
+                                    matching_score=0,
                                     region_scores=json.dumps(None),
                                     current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=None,
-                                    focus_value=None,
+                                    light_level=0,
+                                    focus_value=0,
                                     action="Skipped",
                                     creation_date=timezone.now(),
                                     current_focus_value=camera_object.focus_value_threshold,
@@ -1241,6 +1537,7 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                     reference_image_id=None)
             continue
 
+
         if (timezone.localtime().weekday() + 1) not in daysofweek:
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
             message = (message + f"[{dt}] INFO [{function_name}] - "
@@ -1248,11 +1545,11 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
             LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=None,
+                                    matching_score=0,
                                     region_scores=json.dumps(None),
                                     current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=None,
-                                    focus_value=None,
+                                    light_level=0,
+                                    focus_value=0,
                                     action="Skipped",
                                     creation_date=timezone.now(),
                                     current_focus_value=camera_object.focus_value_threshold,
@@ -1269,11 +1566,11 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                  f"for camera id {camera} camera number {camera_object.camera_number}\n")
             logger.info(message)
             LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=None,
+                                    matching_score=0,
                                     region_scores=json.dumps(None),
                                     current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=None,
-                                    focus_value=None,
+                                    light_level=0,
+                                    focus_value=0,
                                     action="Skipped",
                                     creation_date=timezone.now(),
                                     current_focus_value=camera_object.focus_value_threshold,
@@ -1282,6 +1579,36 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                                     run_number=engine_state_id,
                                     reference_image_id=None)
             continue
+
+        if psn_check:
+            # PSN's run on UTC time
+            dt = format_datetime_with_milliseconds(timezone.localtime())
+            path = f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data/{psn_recorded_port}"
+            date_time_path = datetime.datetime.utcnow().strftime("%Y-%m-%d/%H/")
+
+            curr_path = f"{path}/{date_time_path}"
+
+            pattern = os.path.join(curr_path, '*_1.synav')
+            dir_files = glob.glob(pattern)
+            # logger.info(f"dir_files {dir_files[-1]}")
+            if not dir_files:
+                # logger.info(f"ERROR NOT ABLE TO FIND PSN FILE")
+                message = (message + f"[{dt}] ERROR [{function_name}] -"
+                                     f" Error reading video frame for camera id {camera} "
+                                     f"camera number {camera_object.camera_number}\n")
+                log_capture_error(camera, user, engine_state_id, password)
+                logger.info(message)
+                continue
+            # logger.info(psn_recorded_port)
+            # logger.info(dir_files)
+            # need to do check for current hour and get that file.
+            image_frame = read_from_file(path=path, file=dir_files[-1])
+            capture_device = None
+            message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object, image_frame, password))
+            logger.info(message)
+
+            continue
+
 
         # if user has entered a username and password set in the database then ensure that we use these
         # when we connect via the url. Add username and password to URL.
@@ -1297,8 +1624,10 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
             message = (f"[{dt}] ERROR [{function_name}] - "
                        f"Error in IP address for camera "
                        f"{camera_object.camera_name} {camera_number} {camera_object.id}\n")
-            log_capture_error(camera, user, engine_state_id)
-            increment_transaction_count()
+            log_capture_error(camera, user, engine_state_id, password)
+            
+
+            increment_transaction_count(password)
             logger.error(message)
             continue
 
@@ -1321,12 +1650,14 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                          f"for camera id {camera} camera number {camera_object.camera_number}\n")
             continue
 
+
+
         if scheme in ["rtsp", "rtsps"]:
             task_timer = time.time()
             options_response, has_error = options(url, ip_address, url_port, camera_username, camera_password)
             end_timer = time.time()
-            frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
-            function_name = frame.function
+            # frame = inspect.stack()[0]  # Get the frame record of the caller (1 level up)
+            # function_name = frame.function
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
             message = message + (f"[{dt}] INFO [{function_name}] -"
                                  f" Completed OPTIONS in {round(end_timer - task_timer, 2)} seconds\n")
@@ -1335,8 +1666,10 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                 message = (f"[{dt}] ERROR [{function_name}] - "
                            f"Error in OPTIONS for {url} {options_response} "
                            f"total time {round(end_timer - start_timer, 2)} seconds\n")
-                log_capture_error(camera, user, engine_state_id)
-                increment_transaction_count()
+                log_capture_error(camera, user, engine_state_id, password)
+                
+
+                increment_transaction_count(password)
                 logger.error(message)
                 continue
             task_timer = time.time()
@@ -1351,8 +1684,10 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                 message = (f"[{dt}] ERROR [{function_name}] - "
                            f"Error in DESCRIBE for url {url} {describe_response} "
                            f"total time {round(end_timer - start_timer, 2)} seconds\n")
-                log_capture_error(camera, user, engine_state_id)
-                increment_transaction_count()
+                log_capture_error(camera, user, engine_state_id, password)
+                
+
+                increment_transaction_count(password)
                 logger.error(message)
                 continue
 
@@ -1361,14 +1696,17 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
             if status == "Fail" or not capture_device.isOpened():
                 # code below is ugly - capture_device holds the error message in case it does not open
                 message = f"{capture_device}"
-                log_capture_error(camera, user, engine_state_id)
-                increment_transaction_count()
+                log_capture_error(camera, user, engine_state_id, password)
+                
+
+                increment_transaction_count(password)
                 close_capture_device(capture_device, multicast_address)
                 logger.error(message)
                 continue
 
             task_timer = time.time()
-            message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
+            message = message + (read_and_compare(capture_device, user, engine_state_id,
+                                                  camera_object, None, password))
             end_timer = time.time()
             dt = format_datetime_with_milliseconds(datetime.datetime.now())
             message = message + (f"[{dt}] INFO [{function_name}] - "
@@ -1391,7 +1729,7 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                     count += 1
             if capture_device.isOpened():
                 task_timer = time.time()
-                message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object))
+                message = message + (read_and_compare(capture_device, user, engine_state_id, camera_object, password))
                 end_timer = time.time()
                 dt = format_datetime_with_milliseconds(datetime.datetime.now())
                 message = message + (f"[{dt}] INFO [{function_name}] - "
@@ -1403,8 +1741,10 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                 message = (f"[{dt}] ERROR [{function_name}] - "
                            f"Unable to open capture device {url} "
                            f"total time {round(end_timer - start_timer,2)} seconds\n")
-                log_capture_error(camera, user, engine_state_id)
-                increment_transaction_count()
+                log_capture_error(camera, user, engine_state_id, password)
+                
+
+                increment_transaction_count(password)
                 close_capture_device(capture_device, multicast_address)
                 logger.error(message)
                 continue
@@ -1415,8 +1755,12 @@ def check_the_camera(camera_list, cameras_details, engine_state_id, user):
                              f"Check complete - total time {round(end_timer - start_timer, 2)} seconds\n ")
         logger.info(message)
 
+    # unmount here
+    if psn_check:
+        os.system(f"umount -l /tmp/mount_points/{camera_object.psn_ip_address}/")
 
-@shared_task()
+
+@shared_task(name='main_menu.tasks.process_cameras')
 def process_cameras(camera_list, engine_state_id, user_name):
     get_config()
 
@@ -1426,55 +1770,58 @@ def process_cameras(camera_list, engine_state_id, user_name):
         # if ret_code != 0:
         #     return f"Licensing Error {ret_code}"
         # logger.info(f"{cameras}{engine_state_id}{user_name}")
+        # initial_setup = setup_task.s()
+        # logger.info(f"initial setup {type(initial_setup)}")
+        # psn_check = False
         worker_id = process_cameras.request.hostname
         logger.info(f"Worker ID: {worker_id} Cameras {camera_list}")
-        cameras_details = get_camera_details(camera_list)
-        if not cameras_details:
-            logger.error(f'"Error - camera list does not contain any cameras" - {camera_list}')
-            sys.exit(1)
 
-        check_the_camera(camera_list, cameras_details, engine_state_id, user_name)
+        # cameras_details = get_camera_details(camera_list)
+        # if not cameras_details:
+        #     logger.error(f'"Error - camera list does not contain any cameras" - {camera_list}')
+        #     sys.exit(1)
+        # camera_object = Camera.objects.get(id=camera_list[0])
+        # if camera_object.psn_ip_address:
+        #     # mount the fs
+        #     os.makedirs(name=f"/tmp/mount_points/{camera_object.psn_ip_address}", exist_ok=True )
+        #     # os.system(f'sudo mount -t cifs -o username={camera_object.psn_user_name},'
+        #     #           f'password={camera_object.psn_password} //{camera_object.psn_ip_address}/F$ /mnt/share')
+        #     if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
+        #         psn_check = True
+        # check_the_camera(camera_list, cameras_details, engine_state_id, user_name, psn_check)
 
-        logs = LogImage.objects.filter(run_number=engine_state_id)
-        number_of_pass = logs.filter(action="Pass").count()
-        number_of_fail = logs.filter(action="Failed").count()
-        number_of_skipped = logs.filter(action="Skipped").count()
-        number_of_capture_errors = logs.filter(action="Capture Error").count()
-        number_of_others = number_of_capture_errors + number_of_skipped
-        if logs:
-            last_log_time = logs.last().creation_date
-            engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
-            transaction_rate = math.floor(len(logs) / (last_log_time.timestamp() - engine_start_time.timestamp()))
+        header = [check_the_camera.s(data, engine_state_id, user_name, mysql_password) for data in camera_list]
+        # logger.info(f"HEADER {type(header)} {header}")
+        callback = all_done.s(engine_state_id, camera_list)
+        # logger.info(f"CALLBACK {type(callback)} {callback}")
 
-            try:
-                engine_object = EngineState.objects.get(id=engine_state_id)
-                engine_object.transaction_rate = transaction_rate
-                engine_object.number_pass_images = number_of_pass
-                engine_object.number_failed_images = number_of_fail
-                engine_object.number_others = number_of_others
-                engine_object.state_timestamp = timezone.now()
-                engine_object.save()
-            except EngineState.DoesNotExist:
-                logger.error(f"Error updating transaction rate")
+        main_tasks_chord = chord(header, callback)
+        # logger.info(f"main task chord {type(main_tasks_chord)}")
 
-        if log_alarms:
-            # hard code localhost as I don't expect using webserver off the main host
-            # hard code for 3 scenarios only 8000, 80 and 443.  
-            web_server_type = check_web_server(CHECKIT_HOST, WEB_SERVER_PORT)
-            if web_server_type != "Web server not running":
+        # Create a chain to run the setup task first and then the chord of main tasks
+        # logger.info(f"setup {type(setup_task.s())}, main {type(main_tasks_chord)}")
+        workflow = chain(setup_task.s(), main_tasks_chord)
 
-                if web_server_type.get("http"):
-                    web_server_type = "http"
-                elif web_server_type.get("https"):
-                    web_server_type = "https"
-
-            if web_server_type in ["http", "https"]:
-                send_alarms(cameras_details, engine_state_id, web_server_type)
-            else:
-                logger.error("Unable to connect to local server while sending alarm")
-
+        # Execute the workflow
+        workflow.apply_async()
     else:
         logger.error(f"Licensing error - please contact your software vendor for assistance")
+
+
+# @shared_task
+# def run_workflow(data_list):
+#     # Create a chain that first runs the setup_task
+#     initial_setup = setup_task.s()
+#
+#     # Create the main tasks as a chord
+#     main_tasks = [process_cameras.s(data) for data in data_list]
+#     main_tasks_chord = chord(main_tasks)(all_done.s())
+#
+#     # Create a chain to run the setup task first and then the chord of main tasks
+#     workflow = chain(initial_setup, main_tasks_chord)
+#
+#     # Execute the workflow
+#     workflow()
 
 
 @shared_task()
@@ -1534,3 +1881,246 @@ def find_best_regions(camera_list):
         return_list.append((camera, top_quartile_cells))
 
     return return_list
+
+
+def decode_frame(frame_data):
+    process = (
+        ffmpeg
+        .input('pipe:0', format='h264')
+        .output('pipe:1', format='image2', frames='1')
+        .run_async(pipe_stdin=True, pipe_stdout=True, pipe_stderr=True)
+    )
+    out, _ = process.communicate(input=frame_data)
+    # print(_)
+    if len(out) == 0:
+        logger.info(f"Decode failed - {_}")
+    return out
+
+
+class RawSynAV2ComponentHeader:
+    def __init__(self, data):
+        self.FileID = data.decode('utf-8')
+
+
+class RawSynAV2ComponentHeader2:
+    def __init__(self, data):
+        # Define the format string for struct.unpack
+        fmt = '<10I'
+        unpacked_data = struct.unpack(fmt, data)
+
+        self.version_format_2ndID = unpacked_data[0]
+        self.file_offset_supplementary_data = unpacked_data[1]
+        self.file_offset_primary_index = unpacked_data[2]
+        self.file_offset_configuration_data_index = unpacked_data[3]
+        self.file_offset_authentication_data = unpacked_data[4]
+        self.file_offset_configuration_data_entries = unpacked_data[5]
+        self.number_of_entries_in_primary_index = unpacked_data[6]
+        self.number_of_entries_in_configuration_index = unpacked_data[7]
+        self.bytes_of_configuration_data_stored = unpacked_data[8]
+        self.bits_of_presentation_timestamp = unpacked_data[9]
+
+
+class ContentFrameHeader:
+    def __init__(self, data):
+        # Define the format string for struct.unpack
+        fmt = '<IIIIHQ'
+        unpacked_data = struct.unpack(fmt, data)
+
+        self.file_offset_to_frame_entry = unpacked_data[0]
+        self.frame_size = unpacked_data[1]
+        self.frame_type_and_gop = unpacked_data[2]
+        self.date_time = unpacked_data[3]
+        self.seconds_and_frame_index = unpacked_data[4]
+        self.bits_of_presentation_timestamp = unpacked_data[5]
+
+
+class ContentFrameInPlaceHeader:
+    def __init__(self, data):
+        # Define the format string for struct.unpack
+        fmt = '<I'
+        unpacked_data = struct.unpack(fmt, data)
+
+        self.S = unpacked_data[0] >> 1 & 0b1
+        self.decoder_configuration_data_index = unpacked_data[0] >> 17 & 0b1111111111111111
+        self.frame_time_stamp_millisecond = unpacked_data[0] >> 18 & 0b1111111111
+
+
+class ConfigurationDataHeader:
+    def __init__(self, data):
+        fmt = '<II'
+        unpacked_data = struct.unpack(fmt, data)
+
+        self.offset = unpacked_data[0]
+        self.size = unpacked_data[1]
+
+
+def read_from_file(path, file):
+    count = 0
+    # logger.info(datetime.datetime.now())
+    # logger.info(f"FILES {files}")
+    # for file in files:
+    # time.sleep(1)
+    # logger.info(f"Reading file {file}")
+    with open(file, 'rb') as f:
+        data = f.read(8)
+        if len(data) < 8:
+            raise ValueError("File too short to contain a valid header")
+
+        header = RawSynAV2ComponentHeader(data)
+        # print(header.FileID)
+        # print(count)
+        if header.FileID != 'SYN-AV-2':
+            logger.info("File ID is not SYN-AV-2")
+            return None
+        data = f.read(40)
+        header2 = RawSynAV2ComponentHeader2(data)
+
+        major_version = header2.version_format_2ndID & 0b1111  # bits 0-3
+        minor_version = (header2.version_format_2ndID >> 4) & 0b1111  # bits 4-7
+        stream_format = (header2.version_format_2ndID >> 8) & 0b11111111
+        secondary_ID_tag_1st = (header2.version_format_2ndID >> 16) & 0b11111111
+        secondary_ID_tag_2nd = (header2.version_format_2ndID >> 24) & 0b11111111
+        # file_offset_supplementary_data = header2.file_offset_supplementary_data
+        file_offset_primary_index = header2.file_offset_primary_index
+        file_offset_configuration_data_index = header2.file_offset_configuration_data_index
+        # file_offset_authentication_data = header2.file_offset_authentication_data
+        file_offset_configuration_data_entries = header2.file_offset_configuration_data_entries
+        number_of_entries_in_primary_index = header2.number_of_entries_in_primary_index
+        number_of_entries_in_configuration_index = header2.number_of_entries_in_configuration_index
+        bytes_of_configuration_data_stored = header2.bytes_of_configuration_data_stored
+        # bits_of_presentation_timestamp = header2.bits_of_presentation_timestamp
+
+        # print("Major Version:", major_version)
+        # print("Minor Version:", minor_version)
+        # print("Stream Format:", stream_format)
+        # print("2nd ID Tag:", chr(secondary_ID_tag_1st) + chr(secondary_ID_tag_2nd))
+        f.seek(file_offset_configuration_data_index)
+        config_header_data = f.read(8)
+        config_header = ConfigurationDataHeader(config_header_data)
+        offset_within_configuration_data_entries = config_header.offset
+        length_of_configuration_data = config_header.size
+        f.seek(file_offset_configuration_data_entries)
+        configuration_data = f.read(length_of_configuration_data)
+        frame = bytearray(configuration_data)
+        integer_value = int.from_bytes(configuration_data[0:4], byteorder='big')
+        frame[0:4] = b'\x00\x00\x00\x01'
+        start = integer_value + 4
+        end = integer_value + 4 + 4
+        frame[start:end] = b'\x00\x00\x00\x01'
+        configuration_data = bytes(frame)
+        f.seek(file_offset_primary_index)
+        frames = []
+        for frame_primary_index in range(number_of_entries_in_primary_index):
+            data = f.read(26)
+            frame_data_header = ContentFrameHeader(data)
+            file_offset_to_frame_entry = frame_data_header.file_offset_to_frame_entry
+            frame_size = frame_data_header.frame_size & 0b11111111111111111111111
+            size_of_data = frame_data_header.frame_size >> 23
+            frame_type = frame_data_header.frame_type_and_gop & 0b111
+            frames.append((file_offset_to_frame_entry, frame_size, frame_type, size_of_data))
+        frames_processed = 0
+        # logger.info(f"frames {frames}")
+        for frame_count, frame in enumerate(frames):
+            # f.seek(frames[0][0])
+            # inplace_header = ContentFrameInPlaceHeader(f.read(4))
+            # can delete this loop later as we only want 1 frame anyway.
+            # logger.info(f"frames_processed {frames_processed}")
+            if frames_processed == 1:
+                break
+            offset = frame[0]
+            size = frame[1]
+            # size_of_nal = 4
+
+            f.seek(offset + 4)  # Add 4 bytes for Frame in place header.
+            # now read the frame
+            in_bytes = f.read(size)
+            # logger.info(f"in_bytes length {len(in_bytes)}")
+            # move the bytes into a bytearray, so we can manipulate the NAL's
+            # frame = bytearray(in_bytes)
+
+
+            nal_offset = 0
+            nal_count = 0
+            nal_positions = []
+            frame = bytearray(in_bytes)
+
+            while nal_offset < len(in_bytes):
+                if nal_offset + 4 > len(in_bytes):
+                    break
+                nal_size = int.from_bytes(in_bytes[nal_offset: nal_offset + 4], byteorder='big')
+                if nal_offset + nal_size > len(in_bytes):
+                    break
+                nal_count += 1
+                nal_offset += nal_size + 4
+
+                nal_positions.append(nal_offset)
+                pass
+            nal_positions.insert(0, 0)
+            for position in nal_positions:
+                frame[position:position + 4] = b'\x00\x00\x00\x01'
+
+            in_bytes = bytes(frame)
+            in_bytes = configuration_data + in_bytes
+            # with open("/tmp/image.h264", "wb") as wf:
+            #     wf.write(in_bytes)
+            #     wf.close()
+            image_bytes = decode_frame(in_bytes)
+            # logger.info(f"image_bytes {len(image_bytes)} {image_bytes}")
+            if not image_bytes:
+                logger.info("Error decoding:", file)
+                break
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            # Decode image from the NumPy array
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            h, w, _ = img.shape
+            logger.info(count, "Decoded image", file, h, w)
+            frames_processed += 1
+        return img
+
+            # img = cv2.resize(img, (int(w/2), int(h/2)), interpolation=cv2.INTER_AREA)
+            # cv2.imshow('frame', img)
+            # cv2.waitKey(1)
+            # count += 1
+            # frames_processed += 1
+            # logger.info(count, "Decoded image", file, h, w)
+    # print("Total successful reads", count)
+    # logger.info(f"Total successful reads {count}")
+
+
+@shared_task()
+def test_psn():
+    start_time = time.time()
+    path = '/mnt/share/recorded_video_data'
+    stream_directories = os.listdir(path)
+    pattern = os.path.join(path, '**', '*_1.synav')
+    # files = glob.glob(pattern, recursive=True)
+    files = []
+    current_hour = datetime.datetime.now().strftime("%I")
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    current_min = datetime.datetime.now().strftime("%M")
+    if current_min == "00":
+        time.sleep(2)
+    for stream_id in stream_directories:
+        # print(stream_id)
+        if current_hour == "12":
+            current_hour = "00"
+        curr_path = f"{path}/{stream_id}/{current_date}/{current_hour}/"
+        pattern = os.path.join(curr_path, '**', '*_1.synav')
+        dir_files = glob.glob(pattern, recursive=True)
+        file = (f"{path}/{stream_id}/{current_date}/{str(current_hour)}/{stream_id.zfill(5)}-{current_date}-"
+                f"{current_hour}-00_1.synav")
+        if dir_files:
+            file = dir_files[-1]
+            # logger.info(f"FILE USED FROM PSN {file}")
+            if os.path.isfile(file):
+                # print(file)
+                files.append(file)
+            # print(file)
+
+    # files = glob.glob("*_1.synav", root_dir=path)
+    # print(f"Processing {len(files)} files")
+
+    file_path = '/mnt/share/recorded_video_data/Incident109468/Cam9354/40800/2023-09-09/00/40800-2023-09-09-00-00-30_1.synav'
+    image_frame = read_from_file(path, files)
+    # print(f'Total Processing Time: {round((time.time() - start_time) * 1000, 2)}ms')
+    logger.info(f'Total Processing Time: {round((time.time() - start_time) * 1000, 2)}ms')
