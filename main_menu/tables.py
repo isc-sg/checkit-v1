@@ -126,7 +126,7 @@ class LogTable(tables.Table):
     def render_focus_value(self, value, record):
         # camera_object = Camera.objects.get(pk=record.url_id)
         # default_focus_level = camera_object.focus_value_threshold
-        if value < record.current_focus_value:
+        if value > record.current_focus_value:
             return value
         else:
             return mark_safe(f'<span style="color: red;">{value}</span>')
@@ -237,7 +237,6 @@ class EngineStateTable(tables.Table):
                 return mark_safe(f'<span style="color: red;">{value}</span>')
             else:
                 return value
-
 
     class Meta:
         model = EngineState
