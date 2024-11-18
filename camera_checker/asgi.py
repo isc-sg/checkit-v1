@@ -11,6 +11,7 @@ import os
 
 from django.core.asgi import get_asgi_application
 
+os.umask(0o002)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camera_checker.settings')
 
 application = get_asgi_application()

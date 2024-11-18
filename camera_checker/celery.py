@@ -6,7 +6,7 @@ from celery import Celery
 from celery.signals import setup_logging
 import sys
 
-
+os.umask(0o002)
 sys.path.append(os.path.dirname(os.path.abspath("camera_checker")))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "camera_checker.settings")
