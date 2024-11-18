@@ -6,6 +6,7 @@ from django.forms import widgets
 
 
 LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Failed', 'Failed'), ('Capture Error', 'Capture Error'),
+                      ('Skipped', 'Skipped'), ('Reference Captured', 'Reference Captured'),
                       ('Image Size Error', 'Image Size Error'))
 
 STATE_CHOICES = (('RUN COMPLETED', 'Finished'), ('STARTED', 'Started'), ('ERROR', 'Error'))
@@ -48,6 +49,7 @@ class CameraSelectFilter(FilterSet):
         model = Camera
         fields = ['camera_name', 'camera_number', 'url', 'camera_location', 'matching_threshold', 'last_check_date']
 
+
 class LogFilter(FilterSet):
     matching_score = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Match")
     focus_value = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Focus")
@@ -61,11 +63,14 @@ class LogFilter(FilterSet):
     camera_location = CharFilter(field_name='url__camera_location', lookup_expr='icontains',
                                  label="Location contains",
                                  widget=TextInput(attrs={'size': '18'}))
+    run_number = CharFilter(field_name='run_number', lookup_expr='icontains', label="Run # contains",
+                               widget=TextInput(attrs={'size': '18'}))
+
 
     class Meta:
         model = LogImage
         fields = ["camera_number", "camera_name", "camera_location", "matching_score", "focus_value", "light_level",
-                  "action", "creation_date"]
+                  "run_number", "action", "creation_date"]
 
 
 class EngineStateFilter(FilterSet):
