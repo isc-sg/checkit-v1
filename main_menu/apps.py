@@ -10,10 +10,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lin
 class MainMenuConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'main_menu'
-    verbose_name = "Checkit"
+    verbose_name = "Scene Check"
 
     def ready(self):
         pass  # startup code here
-        logging.info("Starting Checkit")
+        logging.info("Starting Scene Check")
         # insert license check code here.
         # for now lets check adm but later lets check dongle.
