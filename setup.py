@@ -16,11 +16,11 @@ fileSet.add("main_menu/tasks.py")
 fileSet.add("main_menu/tables.py")
 fileSet.add("main_menu/urls.py")
 fileSet.add("main_menu/views.py")
+#fileSet.add("main_menu/setup_mysql.py")
 
 setup(description='Checkit Application',
       author='Sam Corbo',
       author_email='sam.corbo@isc.sg',
-      ext_modules=cythonize(fileSet, language_level=3),
-      define_macros=[("VERSION", '"1.3.4"')]
+      ext_modules=cythonize(fileSet, language_level=3)
 )
 
