@@ -1,4 +1,6 @@
 import os
+from tokenize import group
+
 from import_export import resources
 from django.db import IntegrityError
 from import_export.admin import ImportExportModelAdmin
@@ -6,6 +8,9 @@ from django.conf import settings
 import logging
 
 from .models import Camera, ReferenceImage, Group
+from django.core.validators import ValidationError
+
+__version__ = 2.1
 
 
 class GroupResource(resources.ModelResource):
@@ -30,15 +35,12 @@ class CameraResource(resources.ModelResource):
                   'camera_password', 'camera_number', 'camera_name',
                   'camera_location', 'image_regions', 'matching_threshold',
                   'focus_value_threshold', 'light_level_threshold', 'reference_image_version',
-                  'psn_ip_address', 'psn_name', 'psn_recorded_port', 'psn_user_name', 'psn_password', 'freeze_check')
-        import_id_fields = ('url', 'multicast_address', 'multicast_port', 'camera_username',
-                            'camera_password', 'camera_number', 'camera_name',
-                            'camera_location', 'image_regions', 'matching_threshold',
-                            'focus_value_threshold', 'light_level_threshold',
-                            'psn_ip_address', 'psn_name', 'psn_recorded_port',
-                            'psn_user_name', 'psn_password', 'freeze_check')
+                  'psn_ip_address', 'psn_name', 'psn_recorded_port', 'psn_user_name', 'psn_password', 'freeze_check',
+                  'group_name')
+        import_id_fields = ('url', 'multicast_address', 'multicast_port')
         report_skipped = True
         raise_errors = True
+        update_existing = True
 
     def import_row(self, row, instance_loader, **kwargs):
         try:
@@ -49,12 +51,17 @@ class CameraResource(resources.ModelResource):
             error_message = str(e)
             problematic_row = row  # The problematic data
             logging.error(f"Error with row {problematic_row} - {error_message}")
+            raise ValidationError(error_message)
 
-    def save_instance(self, instance, is_created=True, using_transactions=True, dry_run=False):
+    def save_instance(self, instance, is_validcreated=True, using_transactions=True, dry_run=False):
         try:
             super(CameraResource, self).save_instance(instance, using_transactions, dry_run)
-        except IntegrityError:
-            logging.error(f"Error saving import for {instance}")
+        except IntegrityError as e:
+            error_message = str(e)
+            logging.error(f"Error saving import for {instance} error is {e}")
+            raise ValidationError(error_message)
+
+
 
     def after_save_instance(self, instance, using_transactions, dry_run):
         # the model instance will have been saved at this point, and will have a pk
