@@ -1,8 +1,15 @@
+import cv2
 import django_tables2 as tables
 from django_tables2 import TemplateColumn
 from .models import Camera, LogImage, EngineState, SuggestedValues, ReferenceImage
 from django.utils.safestring import mark_safe
 from urllib.parse import urlparse
+import main_menu.select_region
+import io
+import base64
+
+
+__version__ = 2.1
 
 
 class CameraTable(tables.Table):
@@ -179,7 +186,7 @@ class EngineStateTable(tables.Table):
         }})
     state_timestamp = tables.DateTimeColumn(attrs={'td': {"width": 580, "align": "center"}},format='d M Y, h:i A')
     number_failed_images = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
-                                         verbose_name="Number of failed images")
+                                         verbose_name="Number of images that triggered")
     number_pass_images = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
                                        verbose_name="Number of pass images")
     number_others = tables.Column(attrs={'td': {"width": 200, "align": "center"}},
@@ -292,7 +299,7 @@ class SuggestedValuesTable(tables.Table):
                                       attrs={"td": {
                                           "width": 50, "align": "center"
                                       }, "th__input": {"onclick": "toggle(this)"}})
-    regions = tables.Column()
+    # new_regions = tables.Column()
     camera_number = tables.Column(empty_values=(),  attrs={
         "td": {
             "width": 100, "align": "left"
@@ -301,22 +308,33 @@ class SuggestedValuesTable(tables.Table):
         "td": {
             "width": 250, "align": "left"
         }})
-    # image = tables.Column(empty_values=())
+    modified_image = tables.Column(empty_values=())
 
     def render_camera_name(self, value, record):
-        camera = Camera.objects.get(pk=record.camera_id)
+        camera = Camera.objects.get(pk=record.url_id)
         return camera.camera_name
 
     def render_camera_number(self, value, record):
-        camera = Camera.objects.get(pk=record.camera_id)
+        camera = Camera.objects.get(pk=record.url_id)
         return camera.camera_number
 
-    # def render_image(self, value, record):
-    #     camera = ReferenceImage.objects.filter(url_id=record.camera_id).last()
-    #     return camera.image
+    def render_modified_image(self, record):
+        camera = ReferenceImage.objects.filter(url_id=record.url_id).last()
+        ref_image = cv2.imread(f"/home/checkit/camera_checker/media/{camera.image}")
+        h, w, _ = ref_image.shape
+        c_list = main_menu.select_region.get_coordinates(record.new_regions, h, w)
+        grid_image = main_menu.select_region.draw_grid(c_list, ref_image, h, w )
+        grid_image = cv2.resize(grid_image, (int(w/2), int(h/2)))
+        _, buffer = cv2.imencode('.jpg', grid_image)
+        img_str = base64.b64encode(buffer).decode('utf-8')
+
+        # Encode the image to base64
+        return mark_safe(f'<img src="data:image/jpeg;base64,{img_str}"/>')
+
     class Meta:
         model = SuggestedValues
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('selection', 'camera_number', 'camera_name', 'regions')
+        fields = ('selection', 'camera_number', 'camera_name', 'new_matching_score',
+                  'new_focus_value', 'new_light_level','modified_image')
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
-        order_by = 'camera_id'
+        order_by = 'url_id'
