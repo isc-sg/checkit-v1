@@ -5,6 +5,8 @@ from django.utils import timezone
 from datetime import timedelta
 
 
+__version__ = 2.1
+
 #
 # class UserSerializer(serializers.HyperlinkedModelSerializer):
 #     class Meta:
@@ -36,7 +38,7 @@ class CameraSerializer(serializers.ModelSerializer):
                   'camera_number', 'camera_name', 'camera_location',
                   'matching_threshold', 'focus_value_threshold', 'light_level_threshold',
                   'scheduled_hours', 'scheduled_days', 'snooze', 'trigger_new_reference_image', 'psn_ip_address',
-                  'psn_name', 'psn_recorded_port', 'psn_user_name', 'psn_password', 'freeze_check']
+                  'psn_name', 'psn_recorded_port', 'psn_user_name', 'psn_password', 'freeze_check', 'group_name']
         # extra_kwargs = {
         #     'url': {'lookup_field': 'hoursinday'}
         # }
