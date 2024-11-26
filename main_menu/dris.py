@@ -2,6 +2,8 @@ import random
 import sys
 #define constants
 
+__version__ = 2.1
+
 #these constants depend on the bitness of the OS - the DRIS is 4 bytes bigger for 64-bit code
 if sys.maxsize > 2**32:
 	DRIS_SIZE = 564         # DRIS size is bigger for 64-bit (it has an 8-byte pointer)
