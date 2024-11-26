@@ -8,14 +8,17 @@ from django.forms.fields import URLField as FormURLField
 from django.utils import timezone
 from django.utils.timezone import now
 from django.urls import reverse
-from django.template.defaultfilters import slugify
+# from django.template.defaultfilters import slugify
 from simple_history.models import HistoricalRecords
 # from encrypted_model_fields.fields import EncryptedCharField
 
 # import shutil
 # from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
-LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Failed', 'Failed'), ('Capture Error', 'Capture Error'),
+__version__ = 2.1
+
+
+LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Triggered', 'Triggered'), ('Capture Error', 'Capture Error'),
                       ('Image Size Error', 'Image Size Error'))
 STATE_CHOICES = (('RUN COMPLETED', 'Finished'), ('STARTED', 'Started'), ('ERROR', 'Error'))
 
@@ -83,10 +86,10 @@ class Camera(models.Model):
     camera_username = models.CharField(max_length=32, blank=True, verbose_name="Username")
     camera_password = models.CharField(max_length=64, blank=True, verbose_name="Password")
     # image = models.ImageField(upload_to='base_images/')
-    camera_number = models.IntegerField(null=False, blank=False, unique=True,
+    camera_number = models.IntegerField(null=False, blank=False, unique=False,
                                         validators=[MaxValueValidator(9999999999), MinValueValidator(1)])
-    camera_name = models.CharField(max_length=100, null=False, blank=False, unique=True)
-    slug = models.SlugField(max_length=100, null=True, blank=False, unique=True, verbose_name="URL friendly name")
+    camera_name = models.CharField(max_length=100, null=False, blank=False, unique=False)
+    # slug = models.SlugField(max_length=100, null=True, blank=False, unique=False, verbose_name="URL friendly name")
     camera_location = models.CharField(max_length=100)
     image_regions = models.CharField(max_length=300, default="[]")
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
@@ -134,12 +137,12 @@ class Camera(models.Model):
     def __str__(self):
         return f'{self.camera_name} / #{self.camera_number}'
 
-    def get_slug_camera_name(self):
-        return reverse('images', kwargs={'slug': self.slug})
+    # def get_slug_camera_name(self):
+    #     return reverse('images', kwargs={'slug': self.slug})
 
-    def save(self, *args, **kwargs):
-        self.slug = slugify(self.camera_name)
-        return super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.slug = slugify(self.camera_name)
+    #     return super().save(*args, **kwargs)
 
 
 class ReferenceImage(models.Model):
