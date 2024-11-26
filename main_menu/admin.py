@@ -5,7 +5,7 @@ import shutil
 from django.contrib import admin
 from django.conf import settings
 from django.utils.safestring import mark_safe
-from django.template.defaultfilters import slugify
+# from django.template.defaultfilters import slugify
 from import_export.admin import ImportExportModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
 
@@ -28,6 +28,7 @@ BeatConfig.verbose_name = "Scene Check Clocks"
 
 # Register your models here.
 # from .models import Camera, ReferenceImage, LogImage
+__version__ = 2.1
 
 
 admin.site.site_title = "Scene Check"
@@ -68,8 +69,8 @@ new_reference_image.short_description = "Trigger New Reference Image"
 
 class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
 
-    massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address', 'creation_date', "last_check_date",
-                         'slug']
+    massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address',
+                         'creation_date', "last_check_date"]
     filter_horizontal = ('scheduled_hours', 'scheduled_days')
     resource_class = CameraResource
     search_fields = ['url', 'camera_number', 'camera_name', 'camera_location', 'id']
@@ -77,7 +78,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
                     'camera_location', 'matching_threshold', 'unique_camera_id', 'check_reference_image')
     readonly_fields = ["unique_camera_id", "creation_date", "last_check_date", 'image_regions',
                        'reference_image_version']
-    prepopulated_fields = {'slug': ('camera_name',)}
+    # prepopulated_fields = {'slug': ('camera_name',)}
     list_filter = (('camera_location', DropdownFilter), ('scheduled_hours', RelatedDropdownFilter),
                    ('scheduled_days', RelatedDropdownFilter), ('psn_ip_address', DropdownFilter),
                    ('group_name', DropdownFilter))
