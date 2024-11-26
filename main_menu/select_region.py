@@ -2,6 +2,8 @@ import cv2
 import math
 import numpy as np
 
+__version__ = 2.1
+
 
 def get_coordinates(r, h, w):
     var_list = []

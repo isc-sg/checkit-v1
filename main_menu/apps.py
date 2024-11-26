@@ -2,6 +2,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from django.apps import AppConfig
 
+__version__ = 2.1
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(lineno)d] \t - '
                                                '%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
                     handlers=[RotatingFileHandler('/home/checkit/camera_checker/logs/checkit.log',

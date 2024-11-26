@@ -3,6 +3,9 @@ from django import forms
 from bootstrap_datepicker_plus.widgets import DatePickerInput
 from .models import Camera, EngineState
 
+__version__ = 2.1
+
+
 REGIONS = []
 for i in range(1, 65):
     REGIONS.append((str(i),str(i)))

@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import cv2
 
+__version__ = 2.1
 
 def movement(img1, img2):
     c1 = (0.01 * 255) ** 2

@@ -13,6 +13,10 @@ from rest_framework.schemas.openapi import AutoSchema
 from main_menu import views
 from .views import SnoozeCamera
 
+
+__version__ = 2.1
+
+
 router = routers.DefaultRouter()
 # router.register(r'users', views.UserViewSet)
 # router.register(r'groups', views.GroupViewSet)
