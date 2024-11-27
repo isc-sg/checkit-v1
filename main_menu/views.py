@@ -18,6 +18,7 @@ import numpy as np
 import uuid
 import mysql.connector
 import psutil
+from django.contrib.admin.templatetags.admin_list import pagination
 from django.utils import timezone
 from django.db.models.functions import TruncHour
 from django.db.models import Count
@@ -40,6 +41,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.views.decorators.cache import cache_control
 from django.contrib.auth.models import Permission, User, Group
+from django.core.paginator import Paginator
 
 
 from .resources import CameraResource
@@ -49,6 +51,8 @@ from .forms import DateForm, RegionsForm
 from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
 import main_menu.select_region as select_region
 from django.contrib.admin.models import LogEntry
+from django.contrib.auth.decorators import user_passes_test
+
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
@@ -81,6 +85,8 @@ import celery
 from celery import shared_task, group
 from celery.result import AsyncResult, GroupResult
 from celery.exceptions import *
+
+__version__ = 2.1
 
 # import main_menu.compare_images_v4
 
@@ -178,15 +184,36 @@ def get_config():
 #     serializer_class = UserSerializer
 #     permission_classes = [permissions.IsAuthenticated]
 
+def group_required(group_name):
+    def in_group(user):
+        return user.is_authenticated and user.groups.filter(name=group_name).exists()
 
-def chunk_list(lst, chunk_size):
-    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+    return user_passes_test(in_group)
 
 
-def group_cameras_by_psn_ip():
+def chunk_list(lst, number_of_groups):
+    # Calculate the size of each chunk
+    chunk_length = len(lst) // number_of_groups
+    remainder = len(lst) % number_of_groups
+
+    # Create the groups
+    chunks = []
+    start = 0
+    for i in range(number_of_groups):
+        # Distribute the remainder evenly across the first groups
+        end = start + chunk_length + (1 if i < remainder else 0)
+        chunks.append(lst[start:end])
+        start = end
+
+    return chunks
+
+
+def group_cameras_by_psn_ip(camera_list=None):
     # Fetch all Camera objects from the database
-    cameras = Camera.objects.all().filter(snooze=False)
-
+    if isinstance(camera_list, list):
+        cameras = Camera.objects.filter(id__in=camera_list)
+    else:
+        cameras = Camera.objects.all().filter(snooze=False)
     # Initialize defaultdict to group cameras by psn_ip_address
     grouped = defaultdict(list)
 
@@ -197,9 +224,8 @@ def group_cameras_by_psn_ip():
 
     if None in grouped:
         original_list = grouped[None]
-        split_lists = chunk_list(original_list, 10)
         app = celery.Celery('camera_checker', broker='redis://localhost:6379')
-        active_workers = app.control.inspect().ping()
+        # active_workers = app.control.inspect().ping()
         inspect = app.control.inspect()
         stats = inspect.stats()
         total_concurrency = 0
@@ -208,7 +234,7 @@ def group_cameras_by_psn_ip():
                 concurrency = worker_stats.get('pool', {}).get('max-concurrency', 'N/A')
                 total_concurrency += concurrency
         # Now split the Non_psn cameras into sublists of total_concurrency
-        split_lists = chunk_list(original_list, chunk_size=total_concurrency)
+        split_lists = chunk_list(original_list, number_of_groups=total_concurrency)
         grouped[None] = split_lists
         flattened_lists = []
 
@@ -271,7 +297,7 @@ class CameraViewSet(viewsets.ModelViewSet):
 
         camera_id = [instance.id]
         snooze: str = request.data.get('snooze')
-        print('camera_id', camera_id, snooze, camera_number)
+        # print('camera_id', camera_id, snooze, camera_number)
         if not snooze:
             return JsonResponse({"status": "fail", "error": "requires snooze field"},
                                 status=status.HTTP_400_BAD_REQUEST)
@@ -846,7 +872,7 @@ def simple_upload(request):
         new_cameras = request.FILES['my_file']
 
         imported_data = dataset.load(new_cameras.read(), format='csv', headers=True)
-        print(imported_data)
+        # print(imported_data)
         result = camera_resource.import_data(dataset, dry_run=True)  # Test the data import
 
         if not result.has_errors():
@@ -887,6 +913,7 @@ def compare_images(request):
             # closest_hour = str(closest_hour).zfill(2)
         try:
             reference_image = ReferenceImage.objects.get(pk=actual_reference_image)
+            reference_image_date = reference_image.creation_date
         except ObjectDoesNotExist:
             context = {'result': "Capture Error", 'camera_name': camera_name,
                        'message': " - Unable to read Reference image"}
@@ -897,6 +924,11 @@ def compare_images(request):
             context = {'result': "Capture Error", 'camera_name': camera_name,
                        'message': " - Unable to read Reference image"}
             return HttpResponse(template.render(context, request))
+        else:
+            local_time = timezone.localtime(reference_image_date).strftime("%Y-%m-%d %H:%M:%S")
+            # base_image = cv2.putText(base_image, "Reference Image: " + local_time,
+            #                          (50,50), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2,
+            #                          color=(0,255,0), thickness=2, lineType=cv2.LINE_AA)
 
         captured_image = cv2.imread(settings.MEDIA_ROOT + "/" + str(obj.image))
         if captured_image is None:
@@ -914,11 +946,16 @@ def compare_images(request):
             return HttpResponse(template.render(context, request))
 
         merged_image = cv2.addWeighted(captured_image_transparent, 1, base_image, 1, 0)
+        capture_time_date = timezone.localtime(obj.creation_date).strftime("%Y-%m-%d %H:%M:%S")
+        # merged_image = cv2.putText(merged_image, "Captured Image: " + local_time,
+        #                              (50,50), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2,
+        #                              color=(0,255,0), thickness=2, lineType=cv2.LINE_AA)
         merged_image_converted_to_binary = cv2.imencode('.png', merged_image)[1]
         base_64_merged_image = base64.b64encode(merged_image_converted_to_binary).decode('utf-8')
         context = {'capture_image': obj.image, 'reference_image': image, 'result': result,
                    'camera_name': camera_name, 'camera_number': camera_number,
-                   'merged_image': base_64_merged_image, 'freeze_status': freeze_status}
+                   'merged_image': base_64_merged_image, 'freeze_status': freeze_status,
+                   'reference_image_date': reference_image_date, 'capture_time_date': obj.creation_date}
         # else:
         #     context = {'result': result, 'camera_name': camera_name, 'camera_number': camera_number}
         return HttpResponse(template.render(context, request))
@@ -926,7 +963,8 @@ def compare_images(request):
         return redirect('logs')
 
 
-# @permission_required('camera_checker.main_menu')
+# @permission_required('main_menu.add_enginestate')
+@group_required('Scheduler')
 def scheduler(request):
     user_name = request.user.username
 
@@ -972,11 +1010,11 @@ def scheduler(request):
                 if not camera_object.snooze:
                     camera_ids.append(camera_object.id)
             number_of_cameras_in_run = len(camera_ids)
-            x = int(number_of_cpus/2)
-            num_sublists = (len(camera_ids) + x - 1) // x
-            sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
+            # x = int(number_of_cpus/2)
+            # num_sublists = (len(camera_ids) + x - 1) // x
+            # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
             # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
-
+            sublists = group_cameras_by_psn_ip(camera_ids)
             # create STARTED record first then create FINISHED and pass that record id to celery to have the
             # workers update the timestamp and counts as the complete check
             engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
@@ -987,8 +1025,7 @@ def scheduler(request):
             engine_state_record.save()
             engine_state_id = engine_state_record.id
 
-            for group_of_cameras in sublists:
-                process_cameras.delay([group_of_cameras], engine_state_id, user_name)
+            process_cameras.delay(sublists, engine_state_id, user_name)
             context = {"jobid": engine_state_id}
             return HttpResponse(template.render(context, request))
 
@@ -1064,7 +1101,8 @@ def scheduler(request):
         return HttpResponse(template.render(context, request))
     return HttpResponse(template.render(context, request))
 
-@login_required
+# @login_required
+@group_required('Licensing')
 def licensing(request):
     # user_name = request.user.usename
     # logging.info("User {u} access to Licensing".format(u=user_name))
@@ -1222,6 +1260,7 @@ class CameraSelectView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = CameraSelectFilter
     ordering = 'camera_number'
 
+
 class LogView(LoginRequiredMixin, SingleTableMixin, FilterView):
     model = LogImage
     table_class = LogTable
@@ -1232,6 +1271,13 @@ class LogView(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = LogFilter
     ordering = '-id'
 
+
+    def get_queryset(self):
+        # Get the base queryset
+        qs = super().get_queryset()
+        # Apply the filter to the queryset
+        self.filterset = self.filterset_class(self.request.GET, queryset=qs)
+        return self.filterset.qs  # Return the filtered queryset
 
 # def get_date(request):
 #     # if this is a POST request we need to process the form data
@@ -1284,6 +1330,7 @@ def download_system_logs(request):
         headers={'Content-Disposition': 'attachment; filename="result_export.csv"'},
     )
 
+
 def mass_update(request):
     selection = request.POST.getlist("selection")
     selection.sort()
@@ -1319,6 +1366,7 @@ def mass_update(request):
 
     return HttpResponse(values)
 
+
 def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fail):
     while len(image_list) > 0:
         left_margin_pos = 20
@@ -1335,8 +1383,8 @@ def write_pdf_pages(image_list, page_width, page_height, canvas_page, pass_or_fa
         canvas_page.setStrokeColor(HexColor("#000000"))
 
         canvas_page.setFont("Helvetica-BoldOblique", 18, )
-        if pass_or_fail == "Failed":
-            canvas_page.drawString(*coord(110, 10, page_height, mm), text="Failed Images Report")
+        if pass_or_fail == "Triggered":
+            canvas_page.drawString(*coord(110, 10, page_height, mm), text="Triggered Images Report")
         else:
             canvas_page.drawString(*coord(110, 10, page_height, mm), text="Pass Images Report")
 
@@ -1498,12 +1546,12 @@ def export_logs_to_csv(request):
 
             return response
 
-        elif request.POST.get('action') == "Export Failed PDF":
+        elif request.POST.get('action') == "Export Triggered PDF":
             image_list_for_failed = []
             log = []
             base_image = ""
             for log in logs:
-                if log.action == "Failed":
+                if log.action == "Triggered":
                     camera_name = log.url.camera_name
                     camera_number = log.url.camera_number
                     # hour = str(log.creation_date.hour).zfill(2)
@@ -1539,10 +1587,10 @@ def export_logs_to_csv(request):
             page_width, page_height = landscape(A4)
             if image_list_for_failed:
                 canvas_for_failed = write_pdf_pages(image_list_for_failed, page_width,
-                                                    page_height, canvas_for_failed, "Failed")
+                                                    page_height, canvas_for_failed, "Triggered")
                 canvas_for_failed.save()
                 buffer_for_failed.seek(0)
-                return FileResponse(buffer_for_failed, as_attachment=True, filename='failed_results.pdf')
+                return FileResponse(buffer_for_failed, as_attachment=True, filename='triggered_results.pdf')
             else:
                 canvas_for_failed.setFillColor(HexColor("#a2a391"))
                 canvas_for_failed.setStrokeColor(HexColor("#a2a391"))
@@ -1557,11 +1605,11 @@ def export_logs_to_csv(request):
                 canvas_for_failed.setStrokeColor(HexColor("#000000"))
                 canvas_for_failed.setFont("Helvetica-BoldOblique", 18, )
                 canvas_for_failed.drawString(*coord(25, 10, page_height, mm),
-                             text="There are no failed images for the selected records")
+                             text="There are no triggered images for the selected records")
                 canvas_for_failed.showPage()
                 canvas_for_failed.save()
                 buffer_for_failed.seek(0)
-                return FileResponse(buffer_for_failed, as_attachment=True, filename='failed_results.pdf')
+                return FileResponse(buffer_for_failed, as_attachment=True, filename='triggered_results.pdf')
         elif request.POST.get('action') == "Export Pass PDF":
             buffer_for_pass = io.BytesIO()
             canvas_for_pass = canvas.Canvas(buffer_for_pass, pagesize=landscape(A4))
@@ -1628,7 +1676,8 @@ def export_logs_to_csv(request):
         return HttpResponseRedirect("/state/")
 
 
-@permission_required('camera_checker.main_menu')
+# @permission_required('main_menu.change_referenceimage')
+@group_required('Regions')
 def input_camera_for_regions(request):
     user_name = request.user.username
     logger.info("User {u} access to Regions".format(u=user_name))
@@ -1639,7 +1688,7 @@ def input_camera_for_regions(request):
         camera_objects = Camera.objects.all()
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
-        x = int(number_of_cpus * 4)
+        x = int(number_of_cpus)
         num_sublists = (len(camera_ids) + x - 1) // x
         sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
         task_signatures = [find_best_regions.s(numbers) for numbers in sublists]
@@ -1660,49 +1709,77 @@ def input_camera_for_regions(request):
         # print(message, result.backend)
         request.session['task_id'] = result.id
         request.session.save()  # Save session data
+        # print('message', message)
         message = ""
-        return render(request, 'main_menu/regions.html', {'message': message})
+        superuser = True
+        return render(request, 'main_menu/regions.html',
+                      {'message': message, 'superuser': superuser})
 
     if request.method == 'POST' and 'status' in request.POST:
         task_id = request.session.get('task_id')
-        # print(task_id)
 
-        if task_id:
+        # if task_id:
             # Retrieve AsyncResult object using task ID
             # result = AsyncResult(task_id)
-            try:
-                result = GroupResult.restore(task_id)
-            except AttributeError:
-                message = "No Result"
-                return render(request, 'main_menu/regions.html', {'message': message})
+            # try:
+            #     result = GroupResult.restore(task_id)
+            # except AttributeError:
+            #     message = "No Result"
+            #     return render(request, 'main_menu/regions.html', {'message': message})
+            #
+            # if not result:
+            #     message = "Not Ready"
+            #     return render(request, 'main_menu/regions.html', {'message': message})
 
-            if not result:
-                message = "Not Ready"
-                return render(request, 'main_menu/regions.html', {'message': message})
-
-            if result.ready():
-                # print(result.get())  # Return task result if ready
-                try:
-                    SuggestedValues.objects.all().delete()
-                except:
-                    pass
-                for data in result.get():
-                    instances = [SuggestedValues(camera_id=str(item[0]), regions=item[1]) for item in data]
-
-                    SuggestedValues.objects.bulk_create(instances)
-                table = SuggestedValuesTable(SuggestedValues.objects.all())
-
-                return render(request, "main_menu/best_regions_table.html", {
-                    "table": table
-                })
+            # if result.ready():
+            #     print(result.get())  # Return task result if ready
+            #     # try:
+            #     #     SuggestedValues.objects.all().delete()
+            #     # except:
+            #     #     pass
+            #     # for data in result.get():
+            #     #     instances = [SuggestedValues(camera_id=str(item[0]), regions=item[1]) for item in data]
+            #     #
+            #     #     SuggestedValues.objects.bulk_create(instances)
+        table = SuggestedValuesTable(SuggestedValues.objects.all())
+        table.paginate(page=request.GET.get("page", 1), per_page=5)
+        return render(request, "main_menu/best_regions_table.html", {
+            "table": table})
                 # message = ""
                 # return render(request, 'main_menu/regions.html', {'message': message})
-            else:
-                message = ""
-                return render(request, 'main_menu/regions.html', {'message': message})
-        else:
-            message = ""
-            return render(request, 'main_menu/regions.html', {'message': message})
+        #     else:
+        #         message = ""
+        #         superuser = True
+        #         return render(request, 'main_menu/regions.html',
+        #                       {'message': message, 'superuser': superuser})
+        # else:
+        #     message = ""
+        #     superuser = True
+        #     return render(request, 'main_menu/regions.html',
+        #                   {'message': message, 'superuser': superuser })
+    if request.method == 'POST' and 'reset_auto_regions' in request.POST:
+        SuggestedValues.objects.all().delete()
+        message = ""
+        superuser = True
+        return render(request, 'main_menu/regions.html',
+                      {'message': message, 'superuser': superuser})
+
+    if request.method == 'POST' and 'commit' in request.POST:
+        suggested_values = SuggestedValues.objects.all()
+        for suggested_value in suggested_values:
+            camera_object = Camera.objects.get(id=suggested_value.url_id)
+            camera_object.matching_threshold = suggested_value.new_matching_score
+            camera_object.focus_value_threshold = suggested_value.new_focus_value
+            camera_object.light_level_threshold = suggested_value.new_light_level
+            camera_object.image_regions = suggested_value.new_regions
+            camera_object.save()
+        SuggestedValues.objects.all().delete()
+        selected_ids = request.POST.getlist('selection')
+        # print(selected_ids)
+        message = ""
+        superuser = True
+        return render(request, 'main_menu/regions.html',
+                      {'message': message, 'superuser': superuser})
 
     if request.method == 'POST':
 
@@ -1726,7 +1803,7 @@ def input_camera_for_regions(request):
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions, camera_object.reference_image_version)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
+                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Triggered"]).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:
@@ -1765,10 +1842,24 @@ def input_camera_for_regions(request):
             return render(request, 'main_menu/regions.html', {'message': message})
     else:
         message = ""
-        return render(request, 'main_menu/regions.html', {'message': message})
+
+        if request.user.is_superuser:
+            superuser = True
+        else:
+            superuser = False
+        page = request.GET.get('page')
+        if page:
+            table = SuggestedValuesTable(SuggestedValues.objects.all())
+            table.paginate(page=request.GET.get("page", page), per_page=5)
+            return render(request, "main_menu/best_regions_table.html", {
+                "table": table})
+        else:
+            return render(request, 'main_menu/regions.html',
+                          {'message': message, 'superuser': superuser})
 
 
-@permission_required('camera_checker.main_menu')
+# @permission_required('main_menu.change_referenceimage')
+@group_required('Regions')
 def display_regions(request):
     if request.method == "POST":
         form = RegionsForm(request.POST)
@@ -1792,7 +1883,7 @@ def display_regions(request):
         if reference_images:
             base64_image = get_base_image(reference_images, url_id, regions, camera_object.reference_image_version)
             try:
-                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Failed"]).last()
+                log_obj = LogImage.objects.filter(url_id=url_id, action__in=["Pass", "Triggered"]).last()
                 if not log_obj:
                     raise ObjectDoesNotExist
                 else:
@@ -1831,20 +1922,23 @@ def display_regions(request):
         message = ""
         return render(request, 'main_menu/regions.html', {'message': message})
 
+
 def get_engine_status(request):
     app = celery.Celery('camera_checker', broker='redis://localhost:6379')
-    status = app.control.inspect().active()
+    app_status = app.control.inspect().active()
     running = False
-    if status:
-        for value in status.values():
+    if app_status:
+        for value in app_status.values():
             if value != []:
                 running = True
     data = {'progress': running}
     response = JsonResponse(data)
     return response
 
+
 def progress_meter(request):
     return render(request, "main_menu/progress_meter.html")
+
 
 def cameras_with_missing_reference_images(request):
     table = CameraTable(Camera.objects.exclude(referenceimage__isnull=False))
