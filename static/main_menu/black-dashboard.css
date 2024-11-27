@@ -20659,3 +20659,33 @@ form[action="/accounts/login/"] td {
     vertical-align: middle;
     padding: 1ex;
 }
+.image-row, .grid-container {
+    display: flex; /* Or display: grid if using grid layout */
+    justify-content: center;
+    gap: 20px; /* Increase spacing between images */
+}
+
+.image-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px; /* Increase max width for larger images */
+}
+
+.image {
+    display: block;
+    width: 100%; /* Ensure image fills the container */
+    height: auto;
+}
+
+.text-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 5px 10px;
+    border-radius: 5px;
+}
