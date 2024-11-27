@@ -9,8 +9,9 @@ https://docs.djangoproject.com/en/3.2/howto/deployment/wsgi/
 
 import os
 
-os.umask(0o002)
 from django.core.wsgi import get_wsgi_application
+
+os.umask(0o002)
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camera_checker.settings')
 
