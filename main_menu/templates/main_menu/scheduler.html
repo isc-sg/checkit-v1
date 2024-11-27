@@ -1,6 +1,6 @@
 <!doctype html>
 {% load bootstrap4 %}
-<html lang="en" xmlns="http://www.w3.org/1999/html">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
     {% load static %}
@@ -10,7 +10,7 @@
     <!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
 
     <title>
-        Check IT
+        Scene Check
     </title>
     <!--     Fonts and icons     -->
 
@@ -293,8 +293,10 @@ input::file-selector-button {
                                 <input type="number" style="::placeholder {color: red;};"
                                        placeholder="Camera does not exist" class="form-control"
                                        name="camera_check"/>
+                                <button class="btn btn-round" type="submit">Single Camera Check</button>
                                 {% else %}
-                                <input type="number" class="form-control" min=1 required name="camera_check"/>
+                                <input type="number" class="form-control" min=1 required name="camera_check">
+                                <button class="btn btn-round" type="submit">Single Camera Check</button>
                                 {% endif %}
                             <br>
                             </form>
@@ -322,9 +324,7 @@ input::file-selector-button {
 
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
-                integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
-                crossorigin="anonymous"></script>
+        <script src="{% static 'main_menu/bootstrap.bundle.min.js' %}"></script>
     </div>
 </div>
 </div>
