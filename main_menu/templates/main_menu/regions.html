@@ -10,7 +10,7 @@
     <!--    <link rel="apple-touch-icon" sizes="76x76" href="assets/img/apple-icon.png">-->
 
     <title>
-        Check IT
+        Scene Check
     </title>
     <!--     Fonts and icons     -->
 
@@ -176,6 +176,7 @@
                                 </form>
                             </div>
                         </div>
+                        {% if superuser %}
                         <br>
                         <br>
                         <div class="col-md-6 border-round">
@@ -200,7 +201,16 @@
                                 <br>
 
                             </form>
+                            <form method="post">
+                                {% csrf_token %}
+                                <button class="btn btn-round" type="submit" name="reset_auto_regions">Clear Region Suggestions</button>
+
+                                <br>
+                                <br>
+
+                            </form>
                         </div>
+                        {% endif %}
 
                     </div>
                 </div>
