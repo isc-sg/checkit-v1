@@ -44,54 +44,64 @@ tr:nth-child(even) {
 
 
     </style>
-    <title>Images</title>
+<title>Images</title>
 </head>
 <body>
 
 {% if result == "Capture Error" %}
 <h3 class="h3 m-4" style="color: #FFFFFF">Capture Error on <u>{{ camera_name }}</u> - No image to display {{ message }}</h3>
 {% elif result == "Image Size Error" %}
-<h3 class="h3 m-4" style="color: #FFFFFF">Image Size Error on <u>{{ camera_name }}</u> - Unable to compare images {{ message }}
-</h3>
+<h3 class="h3 m-4" style="color: #FFFFFF">Image Size Error on <u>{{ camera_name }}</u> - Unable to compare images {{ message }}</h3>
 {% else %}
 <div class="container-fluid">
     <div class="row pl-2">
         <div class="column">
-            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>
-                {{ camera_name }} / #{{ camera_number }} </u></h3>
-            {%  if freeze_status %}
-                <h3 class="h3 m-4" style="color: #FF1515">Images are similar - Check device for image freeze </h3>
-                {%  endif %}
-            <img src="/media/{{ reference_image }}" alt="Base" style="width:30%">
-            <img src="/media/{{ capture_image }}" alt="Capture" style="width:30%">
+            <h3 class="h3 m-4" style="color: #FFFFFF">Reference Image for <u>{{ camera_name }} / #{{ camera_number }}</u></h3>
+
+            <div class="image-row">
+                <div class="image-container">
+                    <a style="color: #FFFFFF"> Reference Image Date/Time: {{ reference_image_date }}</a>
+                    <img src="/media/{{ reference_image }}" alt="Base" class="image" title="Reference Image">
+                    <div class="image-overlay" style="color: #FFFFFF">Reference Image</div>
+                </div>
+                <div class="image-container">
+                    <a style="color: #FFFFFF"> Captured Image Date/Time: &nbsp;&nbsp;{{ capture_time_date }}</a>
+                    <img src="/media/{{ capture_image }}" alt="Capture" class="image">
+                    <div class="image-overlay" style="color: #FFFFFF">Captured Image</div>
+                </div>
+            </div>
         </div>
     </div>
-    <p></p>
-    <p></p>
-    <p></p>
+
+
+    <div class="container-fluid">
     <div class="row pl-2">
+        <div class="column">
         <h3 class="h3 m-4" style="color: #FFFFFF"> Difference </h3>
-        <div style="text-align: center;">
-            <a href="#" onclick="open_new_window (this)">
-                <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:60%">
+        <div class="image-row">
+<!--        <div style="text-align: center;">-->
+            <div class="container-fluid">
+            <a href="#" onclick="open_new_window(this)">
+                <img src="data:image/png;base64,{{ merged_image }}" alt="Movement" style="width:50%">
             </a>
             <script>
-
             function open_new_window(element) {
-            var newTab = window.open();
-            setTimeout(function(){newTab.document.body.innerHTML = element.innerHTML;
-            },500);
-
-              return false;
-
+                var newTab = window.open();
+                setTimeout(function() {
+                    newTab.document.body.innerHTML = element.innerHTML;
+                }, 500);
+                return false;
             }
-
-
             </script>
+            </div>
+        </div>
+        </div>
         </div>
     </div>
-
+    </div>
+    </div>
 </div>
+
 {% endif %}
 </div>
 </div>
