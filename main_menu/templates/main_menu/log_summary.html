@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 {% load render_table from django_tables2 %}
 {% load bootstrap4 %}
+{% load bootstrap_datepicker_plus %}
+<link rel="stylesheet" href="{% static 'css/bootstrap-datepicker.min.css' %}">
+<script src="{% static 'js/bootstrap-datepicker.min.js' %}"></script>
+
 <html>
 
 <head>
@@ -16,7 +20,7 @@
         <meta name="theme-color" content="#ffffff">
         <link rel="stylesheet" type="text/css" href="{% static 'main_menu/black-dashboard.css' %}"/>
     <link rel="stylesheet" type="text/css" href="{% static 'fontawesomefree/css/all.css' %}"/>
-
+ {{ filter.form.media }}
 
     <title>Camera Check Results per Hour Report</title>
 </head>
@@ -24,6 +28,7 @@
     <h1>Action per Hour Report</h1>
 <div class="container-fluid">
             </div>
+    {{ filter.form.as_p }}
 
             {% render_table table 'django_tables2/bootstrap.html' %}
         </div>
