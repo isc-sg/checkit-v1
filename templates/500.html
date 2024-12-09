@@ -66,7 +66,7 @@
                         {% if user.is_authenticated %}
                         <li class="active">
                             <a href="/status/">
-                                <i class="fas fa-person-running" style="color:#5603ad"></i>
+                                <i class="fas fa-person-running" style="color:#4890fe"></i>
                                 <p style="color:#4890fe"> System Status</p>
                             </a>
                         </li>
@@ -148,6 +148,10 @@
                         <h1>You have encountered a system error
                             <br>
                             Please download logs and email support for assistance</h1>
+                            {% if error_message %}
+                            <br>
+                            <h1>{{ error_message }}</h1>
+                            {% endif %}
                         </div>
                     </div>
 

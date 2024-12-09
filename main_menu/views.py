@@ -967,7 +967,15 @@ def compare_images(request):
 @group_required('Scheduler')
 def scheduler(request):
     user_name = request.user.username
-
+    app = celery.Celery('camera_checker', broker='redis://localhost:6379')
+    inspect = app.control.inspect()
+    stats = inspect.stats()
+    total_concurrency = 0
+    if not stats:
+        template = loader.get_template("500.html")
+        context = {"error_message": "Unable to communicate with the Scheduler, please check if it is running"}
+        logger.error("Unable to communicate with the Scheduler, please check if it is running")
+        return HttpResponse(template.render(context, request))
     logger.info("User {u} access to Scheduler".format(u=user_name))
 
     template = loader.get_template('main_menu/scheduler.html')
