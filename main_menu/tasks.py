@@ -52,7 +52,7 @@ from math import isnan
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
 
-__version__ = 2.1
+__version__ = 2.101
 
 logger = get_task_logger(__name__)
 
@@ -667,7 +667,7 @@ def send_alarms(cameras_details, run_number, web_server_type):
         logger.error(f"Alarm Server Socket creation error: {e}")
         return
 
-    alarm_logs = LogImage.objects.filter(run_number=run_number).exclude(action='Pass')
+    alarm_logs = LogImage.objects.filter(run_number=run_number).exclude(action='Pass').exclude(action="Skipped").exclude(action="Reference Captured")
     for alarm in alarm_logs:
         url_id = alarm.url_id
         log_image = alarm.image
