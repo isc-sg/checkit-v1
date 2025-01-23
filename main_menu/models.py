@@ -90,7 +90,7 @@ class Camera(models.Model):
                                         validators=[MaxValueValidator(9999999999), MinValueValidator(1)])
     camera_name = models.CharField(max_length=100, null=False, blank=False, unique=False)
     # slug = models.SlugField(max_length=100, null=True, blank=False, unique=False, verbose_name="URL friendly name")
-    camera_location = models.CharField(max_length=100)
+    camera_location = models.CharField(max_length=100, blank=True)
     image_regions = models.CharField(max_length=300, default="[]")
     matching_threshold = models.DecimalField(max_digits=3, decimal_places=2,
                                              validators=[MaxValueValidator(1), MinValueValidator(0)],
@@ -130,9 +130,10 @@ class Camera(models.Model):
                                     verbose_name="Video Storage Password")
 
     group_name = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Group Name", default=None)
+    psn_api_method = models.BooleanField(default=False, help_text="Set to true to use API method for"
+                                                                  " reading from Video Storage")
 
-
-    history = HistoricalRecords()
+    history = HistoricalRecords(cascade_delete_history=True)
 
     def __str__(self):
         return f'{self.camera_name} / #{self.camera_number}'
