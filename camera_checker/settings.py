@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'celery',
     'django_celery_beat',
     'encrypted_model_fields',
+    'drf_yasg',
 
 ]
 
