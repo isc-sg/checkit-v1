@@ -19,6 +19,7 @@ import uuid
 import mysql.connector
 import psutil
 from django.contrib.admin.templatetags.admin_list import pagination
+from django.core.serializers import serialize
 from django.utils import timezone
 from django.db.models.functions import TruncHour
 from django.db.models import Count
@@ -42,7 +43,7 @@ from django.conf import settings
 from django.views.decorators.cache import cache_control
 from django.contrib.auth.models import Permission, User, Group
 from django.core.paginator import Paginator
-
+from rest_framework.renderers import JSONRenderer
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay, SuggestedValues
@@ -71,20 +72,31 @@ from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView, ListAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
+import importlib
 
 from main_menu.tasks import process_cameras, find_best_regions
 
 from main_menu.serializers import (CameraSerializer, LogImageSerializer,
-                                   ReferenceImageSerializer, SnoozeCameraSerializer)
+                                   ReferenceImageSerializer)
 
 from celery import Celery, current_app
 import celery
 from celery import shared_task, group
 from celery.result import AsyncResult, GroupResult
 from celery.exceptions import *
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .scheduler_task_manager import CeleryTaskManager
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+
+
 
 __version__ = 2.1
 
@@ -277,6 +289,211 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+class CheckSoftwareVersionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+
+    def get(self, request):
+        directory = "/home/checkit/camera_checker/main_menu/"
+        software_files = files = os.listdir(directory)
+        try:
+            # List all files in the directory
+            version_dict = {}
+            files = os.listdir(directory)
+            version_ascii_array = [95, 95, 118, 101, 114, 115, 105, 111, 110, 95, 95]
+            for file in files:
+                # Check if the file is a .so or .py file
+                file_path = os.path.join(directory, file)
+                if file.endswith('.so'):
+                    module_name = file.split(".")[0]
+                    module = importlib.import_module("main_menu." + module_name)
+                    version = getattr(module, array_to_string(version_ascii_array), "Version not found")
+                    version_dict[file] = str(version)
+                elif file.endswith('.py'):
+
+                    result = subprocess.run(['grep', array_to_string(version_ascii_array), f"{directory}{file}"], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        # Extract version from the output
+                        for line in result.stdout.splitlines():
+                            parts = line.split('=')
+                            if len(parts) > 1:
+                                version = parts[1].strip().strip('"').strip("'")
+                                version_dict[file] = str(version)
+                else:
+                    continue  # Skip files that are neither .so nor .py
+            sorted_version_dict = dict(sorted(version_dict.items()))
+            return Response(sorted_version_dict)
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+class ActiveTasksView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_id="listActiveSchedulerTasks",
+        description="Retrieve all currently active tasks in the scheduler.",
+        tags=["scheduler"],
+        responses={
+            200: openapi.Response(
+                description="List of active tasks in the scheduler.",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "tasks": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Unique task ID."
+                                    ),
+                                    "name": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Name of the method called."
+                                    ),
+                                    "args": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_STRING),
+                                        description="Arguments passed to the task."
+                                    ),
+                                    "kwargs": openapi.Schema(
+                                        type=openapi.TYPE_OBJECT,
+                                        additional_properties=openapi.Schema(
+                                            type=openapi.TYPE_STRING
+                                        ),
+                                        description="Keyword arguments passed to the task."
+                                    ),
+                                    "worker": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Name of the worker executing the task."
+                                    ),
+                                },
+                            ),
+                            description="List of active tasks.",
+                        )
+                    },
+                    example={
+                        "tasks": [
+                            {
+                                "id": "unique_id",
+                                "name": "called_from_method",
+                                "args": ["status_of_submission", "list_of_cameras", "run_number", "user"],
+                                "kwargs": {"key": "value"},
+                                "worker": "worker_name",
+                            }
+                        ]
+                    }
+                )
+            )
+        }
+    )
+    def get(self, request):
+        task_manager = CeleryTaskManager()
+        tasks = task_manager.get_active_tasks()
+        return Response({'tasks': tasks})
+
+
+class CheckCamerasView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_id="CheckCameras",
+        operation_description="Execute a check on a given list of cameras",
+        tags=["check_camera"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'camera_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,  # Specify it as an array
+                    items=openapi.Items(type=openapi.TYPE_INTEGER),  # Array items are integers
+                    description="List of camera IDs to check",
+                ),
+                'force_check': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,  # Specify it as a boolean
+                    description="Force the check to execute regardless of conditions",
+                )
+            },
+            required=['camera_ids']
+        ),
+        responses={  # Place this outside the `request_body` definition
+            200: openapi.Response(description="Cameras check initiated"),
+            400: openapi.Response(description="Invalid input"),
+        }
+    )
+    def post(self, request):
+
+        camera_ids = request.data.get('camera_ids')
+
+        if not camera_ids:
+            return Response(
+                {"error": "camera_ids is required and must be a list of integers."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if isinstance(camera_ids, list):
+            try:
+                if not all(isinstance(part,int) for part in camera_ids):
+                    raise ValueError("Non-integer value found")
+            except ValueError:
+                return Response(
+                    {"error": "camera_ids must contain only integers"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif isinstance(camera_ids, str):
+            try:
+                # Split the string by commas
+                parts = camera_ids.split(",")
+
+                # Ensure all parts are digits before converting
+                if not all(part.strip().isdigit() for part in parts):
+                    raise ValueError("Non-integer value found")
+
+                # Convert all parts to integers
+                camera_ids = [int(part.strip()) for part in parts]
+            except ValueError:
+                return Response(
+                    {"error": "camera_ids must contain only integers separated by commas."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            return Response(
+                {"error": "camera_ids must be a string of integers separated by commas."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+        existing_ids = set(Camera.objects.filter(id__in=camera_ids).values_list('id', flat=True))
+        input_ids = set(camera_ids)
+        missing_ids = input_ids - existing_ids
+
+        if missing_ids:
+            return Response(
+                {"error": f"The list contains invalid camera ids {missing_ids}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user_name = request.user.username
+        if request.data.get('force_check'):
+            force_check = request.data.get('force_check')
+        else:
+            force_check = False
+        number_of_cameras_in_run = len(camera_ids)
+        engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_record = EngineState(state="RUN COMPLETED", state_timestamp=timezone.now(), user=user_name,
+                                          number_of_cameras_in_run=number_of_cameras_in_run)
+        engine_state_record.save()
+        engine_state_id = engine_state_record.id
+        process_cameras.delay([camera_ids], engine_state_id, user_name, force_check=force_check)
+
+        return Response(
+            {"message": "Camera check tasks have been initiated.", "camera_ids": camera_ids, "engine_state_id": engine_state_id},
+            status=status.HTTP_200_OK
+        )
+
 
 class CameraViewSet(viewsets.ModelViewSet):
     """
@@ -287,9 +504,74 @@ class CameraViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'camera_number'
 
+    @extend_schema(
+        summary="Update the snooze status of a camera",
+        description=(
+            "Updates the snooze status of a camera. This method accepts a POST request with a form-body containing "
+            "the 'snooze' field. The value for 'snooze' can be 'true', 'false', 'Yes', or 'No'. It updates the `snooze` "
+            "attribute of the specified camera and returns a success response."
+        ),
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "snooze": {"type": "string", "description": "Snooze status ('true', 'false', 'Yes', or 'No')"}
+                },
+                "required": ["snooze"]
+            }
+        },
+        responses={
+            201: OpenApiResponse(
+                description="Success",
+                response={"type": "object", "properties": {"status": {"type": "string"}}},
+                examples=[
+                    OpenApiExample(
+                        name="Success Example",
+                        value={"status": "success"}
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                description="Bad request",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "error": {"type": "string"}
+                    }
+                },
+                examples=[
+                    OpenApiExample(
+                        name="Missing Snooze Field Example",
+                        value={"status": "fail", "error": "requires snooze field"}
+                    ),
+                    OpenApiExample(
+                        name="Invalid Snooze Value Example",
+                        value={"status": "fail", "error": "invalid value for snooze"}
+                    )
+                ]
+            )
+        },
+    )
+
     @action(detail=True, methods=['post'])
     def snooze(self, request, camera_number=None):
         """
+        
+        Updates the snooze status of a camera.
+
+        This method accepts a POST request with a form-body containing the 'snooze' field.
+        The value for 'snooze' can be 'true', 'false', 'Yes', or 'No'.
+        It updates the `snooze` attribute of the specified camera and returns a success response.
+
+        Parameters:
+        - request: The HTTP request object.
+        - camera_number: The identifier of the camera to update.
+
+        Returns:
+        - JsonResponse with status "success" if the operation is successful.
+        - JsonResponse with status "fail" and an error message if the 'snooze' field is missing or invalid.
+        
         Must contain snooze in form-body and be true or false type.
         Values such as Yes or No also accepted
         """
@@ -314,9 +596,20 @@ class CameraViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def refresh_reference_image(self, request, camera_number=None):
-        """
-        Will initiate a check on camera.  If reference image previously deleted then a new one will be created.
-        Checks are governed by schedule and only occur at current hour according to the schedule.
+        """       
+        Initiates a reference image refresh for a specified camera.
+
+        This method accepts a POST request and starts the process to check the camera.
+        If the reference image was previously deleted, it will create a new one.
+        The checks are governed by schedule and only occur at the current hour according to the schedule.
+
+        Parameters:
+        - request: The HTTP request object.
+        - camera_number: The identifier of the camera to refresh.
+
+        Returns:
+        - Response with a success message indicating that the refresh has been submitted.
+        
         """
         instance = self.get_object()
 
@@ -332,21 +625,50 @@ class CameraViewSet(viewsets.ModelViewSet):
                                           number_of_cameras_in_run=number_of_cameras_in_run)
         engine_state_record.save()
         engine_state_id = engine_state_record.id
-        process_cameras(camera_id, engine_state_id, user_name)
+        process_cameras(camera_id, engine_state_id, user_name, force_check=False)
         logger.info(f"API request completed refresh for camera {instance.camera_number}")
         return Response({'message': 'Camera refresh submitted.'})
 
 
-class LogImageViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows logs to be viewed or deleted only.
-    """
-    queryset = LogImage.objects.all().order_by('creation_date')
-    serializer_class = LogImageSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'id'
-    http_method_names = ['get', 'delete']
 
+class LogImageViewSet(APIView):
+    """
+    API endpoint that allows logs to be viewed. Use Run Number or Action to filter results.
+    """
+    # queryset = LogImage.objects.all().order_by('creation_date')
+    # serializer_class = LogImageSerializer
+    permission_classes = [IsAuthenticated]
+    # lookup_field = 'id'
+    # http_method_names = ['GET', 'delete']
+    renderer_classes = [JSONRenderer]
+    
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('run_number', openapi.IN_QUERY, description="Run Number", type=openapi.TYPE_STRING),
+            openapi.Parameter('action', openapi.IN_QUERY, description="Action", type=openapi.TYPE_STRING),
+        ],
+        responses={
+            200: LogImageSerializer(many=True),
+        }
+    )
+
+    def get(self, request, *args, **kwargs):
+
+        run_number = request.data.get('run_number')
+        log_item_status = request.data.get('action')
+
+        if run_number is not None and log_item_status is not None:
+            logs = LogImage.objects.filter(run_number=run_number).filter(action=log_item_status)
+        elif run_number is not None:
+            logs = LogImage.objects.filter(run_number=run_number)
+        elif log_item_status is not None:
+            logs = LogImage.objects.filter(action=log_item_status)
+        else:
+            logs = LogImage.objects.all()
+
+        serializer = LogImageSerializer(logs, many=True)
+        return Response(serializer.data)
+    
 
 class ReferenceImageListCreateAPIView(ListAPIView):
     """
@@ -448,7 +770,7 @@ def reference_image_api(request):
                                               number_of_cameras_in_run=number_of_cameras_in_run)
             engine_state_record.save()
             engine_state_id = engine_state_record.id
-            process_cameras(camera_id, engine_state_id, user_name)
+            process_cameras(camera_id, engine_state_id, user_name, force_check=False)
             logger.info(f"API request completed camera check for camera {camera_number}")
             return HttpResponse("Run Completed - No errors reported")
 
@@ -476,60 +798,60 @@ def reference_image_api(request):
         return HttpResponse("Error: Only POST method allowed")
 
 
-class SnoozeCamera(GenericAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = SnoozeCameraSerializer
-
-    def get(self, request):
-        """
-        API endpoint to get snooze value - must contain snooze in form-data.
-        """
-        if 'camera_number' in request.data:
-            camera_number = request.data['camera_number']
-        else:
-            return JsonResponse({"status": "fail", "error": "camera_number required for GET"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        try:
-            camera_object = Camera.objects.get(camera_number=camera_number)
-        except ObjectDoesNotExist:
-            return JsonResponse({"status": "fail", "error": "camera does not exist", 'data': request})
-        return JsonResponse({"snooze": camera_object.snooze}, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        # schema = SnoozeCamera.schema
-        """
-        API endpoint to set snooze value - must contain snooze and camera_number in form-data
-        """
-
-        # Check if "snooze" key is present in the request data
-        if 'snooze' not in request.POST:
-            return JsonResponse({"status": "fail", "error": "requires snooze field"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        snooze: str = request.POST['snooze']
-        try:
-            new_value = strtobool(snooze)
-        except ValueError:
-            return JsonResponse({"status": "fail", "error": "invalid value for snooze"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        if 'camera_number' in request.POST:
-            camera_number = request.POST['camera_number']
-        else:
-            camera_number = None
-        try:
-            camera_object = Camera.objects.get(camera_number=camera_number)
-        except ObjectDoesNotExist:
-            return JsonResponse({"status": "fail", "error": "camera does not exist"}, status=status.HTTP_404_NOT_FOUND)
-        camera_object.snooze = new_value
-        camera_object.save()
-        return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
-    # def options(self, request, *args, **kwargs):
-    #     """
-    #     Don't include the view description in OPTIONS responses.
-    #     """
-    #     meta = self.metadata_class()
-    #     data = meta.determine_metadata(request, self)
-    #     data.pop('description')
-    #     return Response(data=data, status=status.HTTP_200_OK)
+# class SnoozeCamera(GenericAPIView):
+#     permission_classes = [AllowAny]
+#     serializer_class = SnoozeCameraSerializer
+#
+#     def get(self, request):
+#         """
+#         API endpoint to get snooze value - must contain snooze in form-data.
+#         """
+#         if 'camera_number' in request.data:
+#             camera_number = request.data['camera_number']
+#         else:
+#             return JsonResponse({"status": "fail", "error": "camera_number required for GET"},
+#                                 status=status.HTTP_400_BAD_REQUEST)
+#         try:
+#             camera_object = Camera.objects.get(camera_number=camera_number)
+#         except ObjectDoesNotExist:
+#             return JsonResponse({"status": "fail", "error": "camera does not exist", 'data': request})
+#         return JsonResponse({"snooze": camera_object.snooze}, status=status.HTTP_200_OK)
+#
+#     def post(self, request):
+#         # schema = SnoozeCamera.schema
+#         """
+#         API endpoint to set snooze value - must contain snooze and camera_number in form-data
+#         """
+#
+#         # Check if "snooze" key is present in the request data
+#         if 'snooze' not in request.POST:
+#             return JsonResponse({"status": "fail", "error": "requires snooze field"},
+#                                 status=status.HTTP_400_BAD_REQUEST)
+#         snooze: str = request.POST['snooze']
+#         try:
+#             new_value = strtobool(snooze)
+#         except ValueError:
+#             return JsonResponse({"status": "fail", "error": "invalid value for snooze"},
+#                                 status=status.HTTP_400_BAD_REQUEST)
+#         if 'camera_number' in request.POST:
+#             camera_number = request.POST['camera_number']
+#         else:
+#             camera_number = None
+#         try:
+#             camera_object = Camera.objects.get(camera_number=camera_number)
+#         except ObjectDoesNotExist:
+#             return JsonResponse({"status": "fail", "error": "camera does not exist"}, status=status.HTTP_404_NOT_FOUND)
+#         camera_object.snooze = new_value
+#         camera_object.save()
+#         return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
+#     # def options(self, request, *args, **kwargs):
+#     #     """
+#     #     Don't include the view description in OPTIONS responses.
+#     #     """
+#     #     meta = self.metadata_class()
+#     #     data = meta.determine_metadata(request, self)
+#     #     data.pop('description')
+#     #     return Response(data=data, status=status.HTTP_200_OK)
 # def snooze_api(request):
 #     permission_classes = [AllowAny]
 #
@@ -1033,7 +1355,7 @@ def scheduler(request):
             engine_state_record.save()
             engine_state_id = engine_state_record.id
 
-            process_cameras.delay(sublists, engine_state_id, user_name)
+            process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
             context = {"jobid": engine_state_id}
             return HttpResponse(template.render(context, request))
 
@@ -1070,7 +1392,7 @@ def scheduler(request):
         # for group_of_cameras in sublists:
             # process_cameras.delay(group_of_cameras, engine_state_id, user_name
         logger.info(f"STARTING ENGINE for Run Number {engine_state_id}")
-        process_cameras.delay(sublists, engine_state_id, user_name)
+        process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
 
@@ -1102,17 +1424,20 @@ def scheduler(request):
         engine_state_record.save()
         engine_state_id = engine_state_record.id
         camera_id = [camera_id]
-        process_cameras.delay(camera_id, engine_state_id, user_name)
+        process_cameras.delay(camera_id, engine_state_id, user_name, force_check=False)
         # process_cameras(camera_id, engine_state_id, user_name)
 
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
     return HttpResponse(template.render(context, request))
 
+
 # @login_required
 @group_required('Licensing')
 def licensing(request):
-    # user_name = request.user.usename
+    user_name = request.user.username
+    u = User.objects.get(username=user_name)
+    # logger.info(f"group is {request.user.groups} {u.groups} {user_name}")
     # logging.info("User {u} access to Licensing".format(u=user_name))
     template = loader.get_template('main_menu/license.html')
     # get the actual state from the engine here and pass it to context
@@ -1152,7 +1477,11 @@ def licensing(request):
         except InvalidToken:
             context['status'] = "ERROR: Invalid file"
             return HttpResponse(template.render(context, request))
-        license_details = ast.literal_eval(decrypted_file)
+        try:
+            license_details = ast.literal_eval(decrypted_file)
+        except (SyntaxError, TypeError, ValueError, RecursionError) as e:
+            context['status'] = f"ERROR: Invalid file {e}"
+            return HttpResponse(template.render(context, request))
         uploaded_end_date = license_details['end_date']
         uploaded_purchased_cameras = license_details['purchased_cameras']
         uploaded_purchased_transactions = license_details['purchased_transactions']
@@ -2015,7 +2344,7 @@ def check_all_cameras():
     logger.info(f"SCHEDULER STARTED for Run Number {engine_state_id}")
     # for group_of_cameras in sublists:
     #     process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-    process_cameras.delay(sublists, engine_state_id, user_name)
+    process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
 
 # @shared_task
 # def check_groups(groups, *args, **kwargs):
