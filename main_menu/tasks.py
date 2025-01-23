@@ -11,6 +11,7 @@ import os
 import sys
 import configparser
 import datetime
+from datetime import timedelta
 import math
 import socket
 from cryptography.fernet import Fernet
@@ -21,6 +22,7 @@ from urllib.parse import urlparse
 import base64
 from wurlitzer import pipes
 import skimage
+from skimage import color
 from main_menu import select_region
 from main_menu import a_eye
 import json
@@ -35,6 +37,7 @@ import glob
 import ffmpeg
 import struct
 import urllib3
+import io
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -48,6 +51,8 @@ from main_menu.dplin64py import DDProtCheck
 from collections import defaultdict
 import decimal
 from math import isnan
+from requests_toolbelt.multipart import decoder
+import requests.auth
 
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
@@ -675,6 +680,9 @@ def send_alarms(cameras_details, run_number, web_server_type):
         focus_value = alarm.focus_value
         light_level = alarm.light_level
         reference_image_id = alarm.reference_image_id
+        current_matching_threshold = alarm.current_matching_threshold
+        current_focus_threshold = alarm.current_focus_value
+        current_light_level = alarm.current_light_level
 
         last_good_check = LogImage.objects.filter(url_id=url_id, action="Pass").last()
 
@@ -700,7 +708,11 @@ def send_alarms(cameras_details, run_number, web_server_type):
             reference_image_creation_date = ""
 
         additional_data = ("lastGoodCheckDatetime=" + last_good_check_date_time +
-                           "&amp;referenceImageDatetime=" + reference_image_creation_date)
+                           "&amp;referenceImageDatetime=" + reference_image_creation_date +
+                           "&amp;matchingThreshold=" + str(current_matching_threshold) +
+                           "&amp;lightLevelThreshold=" + str(current_light_level) +
+                           "&amp;focusLevelThreshold=" + str(current_focus_threshold) +
+                           "&amp;run_number=" + str(run_number) )
 
         image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + log_image.name
         reference_image = f"{web_server_type}://" + CHECKIT_HOST + "/media/" + str(reference_image)
@@ -1097,13 +1109,14 @@ def compare_images(base, frame, regions):
         matching_score = round(a_eye.movement(base_bilateral, frame_bilateral), 2)
 
     try:
+        # bw_image = color.rgb2gray(frame)
         focus_value = skimage.measure.blur_effect(frame)
         focus_value = round(1 - focus_value, 2)
-    except:
-        logger.error(f'Error calculating focus value')
+    except Exception as e:
+        logger.error(f'Error calculating focus value {e}')
         focus_value = 0
     if isnan(focus_value):
-        logger.error(f'Error calculating focus value')
+        logger.error(f'Error calculating focus value - returned NaN')
         focus_value = 0
     # blur = cv2.blur(frame, (5, 5))
     # light_level = cv2.mean(blur)[0]
@@ -1212,7 +1225,8 @@ def create_base_image(camera_object, capture_device, version, user, engine_state
             # noise_level = estimate_noise(image_frame)
             # logger.info(f"Noise Level {noise_level}")
             try:
-                focus_value = skimage.measure.blur_effect(image_frame)
+                bw_image = color.rgb2gray(image_frame)
+                focus_value = skimage.measure.blur_effect(bw_image)
                 focus_value = round(1 - focus_value, 2)
             except:
                 logger.error(f'Error calculating focus value during reference image creation')
@@ -1251,8 +1265,8 @@ def create_base_image(camera_object, capture_device, version, user, engine_state
                 logger.error(f"Error in creating LogImage for camera number {camera_object.camera_number}")
             try:
                 increment_transaction_count(password)
-            except:
-                logger.error(f"Error in incrementing transaction count")
+            except Exception as e:
+                logger.error(f"Error in incrementing transaction count {e}")
         except Exception as e:
             message = f"Unable to save reference image {file_name} for camera id {camera_object.id} - error {e}"
             log_capture_error(camera_object.id, user, engine_state_id, password)
@@ -1560,7 +1574,7 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
 
 
 @shared_task(name='main_menu.tasks.check_the_camera', time_limit=333333, soft_time_limit=333333)
-def check_the_camera(previous_task_return_value, camera_list, engine_state_id, user, password):
+def check_the_camera(previous_task_return_value, camera_list, engine_state_id, user, password, force_check):
     get_config()
 
     # logger.info(f"Starting check {len(camera_list)} cameras [{camera_list[0]}..{camera_list[-1]}]")
@@ -1581,7 +1595,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
         camera_object = Camera.objects.get(id=camera)
         psn_check = False
 
-        if camera_object.psn_ip_address:
+        if camera_object.psn_ip_address and not camera_object.psn_api_method:
             # mount the fs
             os.makedirs(name=f"/tmp/mount_points/{camera_object.psn_ip_address}", exist_ok=True)
 
@@ -1596,6 +1610,8 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                     logger.error(f"Unable to mount video storage for camera number {camera_object.camera_number}")
                     log_capture_error(camera, user, engine_state_id, password)
                     continue
+        if camera_object.psn_api_method and camera_object.psn_ip_address:
+            psn_check = True
 
         start_timer = time.time()
         # camera_object = cameras_details.get(id=camera)
@@ -1612,74 +1628,76 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
         function_name = "check_the_camera"
         message = f"Starting check for camera id {camera} camera number {camera_object.camera_number}\n"
 
-        if int(timezone.localtime().hour) not in hoursinday:
-            dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (message + f"[{dt}] INFO [check_the_camera] - "
-                                 f"Not in scheduled hours "
-                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
-            logger.info(message)
-            LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=0,
-                                    region_scores=json.dumps(None),
-                                    current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=0,
-                                    focus_value=0,
-                                    action="Skipped",
-                                    creation_date=timezone.now(),
-                                    current_focus_value=camera_object.focus_value_threshold,
-                                    current_light_level=camera_object.light_level_threshold,
-                                    user=user,
-                                    run_number=engine_state_id,
-                                    reference_image_id=None)
-            continue
+        if not force_check:
 
-        if (timezone.localtime().weekday() + 1) not in daysofweek:
-            dt = format_datetime_with_milliseconds(datetime.datetime.now()) 
-            message = (message + f"[{dt}] INFO [check_the_camera] - "
-                                 f"Not in scheduled days "
-                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
-            logger.info(message)
-            LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=0,
-                                    region_scores=json.dumps(None),
-                                    current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=0,
-                                    focus_value=0,
-                                    action="Skipped",
-                                    creation_date=timezone.now(),
-                                    current_focus_value=camera_object.focus_value_threshold,
-                                    current_light_level=camera_object.light_level_threshold,
-                                    user=user,
-                                    run_number=engine_state_id,
-                                    reference_image_id=None)
-            continue
+            if int(timezone.localtime().hour) not in hoursinday:
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = (message + f"[{dt}] INFO [check_the_camera] - "
+                                     f"Not in scheduled hours "
+                                     f"for camera id {camera} camera number {camera_object.camera_number}\n")
+                logger.info(message)
+                LogImage.objects.create(url_id=camera, image=None,
+                                        matching_score=0,
+                                        region_scores=json.dumps(None),
+                                        current_matching_threshold=camera_object.matching_threshold,
+                                        light_level=0,
+                                        focus_value=0,
+                                        action="Skipped",
+                                        creation_date=timezone.now(),
+                                        current_focus_value=camera_object.focus_value_threshold,
+                                        current_light_level=camera_object.light_level_threshold,
+                                        user=user,
+                                        run_number=engine_state_id,
+                                        reference_image_id=None)
+                continue
 
-        if camera_object.snooze:
-            dt = format_datetime_with_milliseconds(datetime.datetime.now())
-            message = (message + f"[{dt}] INFO [check_the_camera] - "
-                                 f"Camera set to snooze "
-                                 f"for camera id {camera} camera number {camera_object.camera_number}\n")
-            logger.info(message)
-            LogImage.objects.create(url_id=camera, image=None,
-                                    matching_score=0,
-                                    region_scores=json.dumps(None),
-                                    current_matching_threshold=camera_object.matching_threshold,
-                                    light_level=0,
-                                    focus_value=0,
-                                    action="Skipped",
-                                    creation_date=timezone.now(),
-                                    current_focus_value=camera_object.focus_value_threshold,
-                                    current_light_level=camera_object.light_level_threshold,
-                                    user=user,
-                                    run_number=engine_state_id,
-                                    reference_image_id=None)
-            continue
+            if timezone.localtime().weekday() + 1 not in daysofweek:
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = (message + f"[{dt}] INFO [check_the_camera] - "
+                                     f"Not in scheduled days "
+                                     f"for camera id {camera} camera number {camera_object.camera_number}\n")
+                logger.info(message)
+                LogImage.objects.create(url_id=camera, image=None,
+                                        matching_score=0,
+                                        region_scores=json.dumps(None),
+                                        current_matching_threshold=camera_object.matching_threshold,
+                                        light_level=0,
+                                        focus_value=0,
+                                        action="Skipped",
+                                        creation_date=timezone.now(),
+                                        current_focus_value=camera_object.focus_value_threshold,
+                                        current_light_level=camera_object.light_level_threshold,
+                                        user=user,
+                                        run_number=engine_state_id,
+                                        reference_image_id=None)
+                continue
 
-        if psn_check:
+            if camera_object.snooze:
+                dt = format_datetime_with_milliseconds(datetime.datetime.now())
+                message = (message + f"[{dt}] INFO [check_the_camera] - "
+                                     f"Camera set to snooze "
+                                     f"for camera id {camera} camera number {camera_object.camera_number}\n")
+                logger.info(message)
+                LogImage.objects.create(url_id=camera, image=None,
+                                        matching_score=0,
+                                        region_scores=json.dumps(None),
+                                        current_matching_threshold=camera_object.matching_threshold,
+                                        light_level=0,
+                                        focus_value=0,
+                                        action="Skipped",
+                                        creation_date=timezone.now(),
+                                        current_focus_value=camera_object.focus_value_threshold,
+                                        current_light_level=camera_object.light_level_threshold,
+                                        user=user,
+                                        run_number=engine_state_id,
+                                        reference_image_id=None)
+                continue
+
+        if psn_check and not camera_object.psn_api_method:
             # PSN's run on UTC time
             dt = format_datetime_with_milliseconds(timezone.localtime())
             path = f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data/{psn_recorded_port}"
-            date_time_path = datetime.datetime.utcnow().strftime("%Y-%m-%d/%H/")
+            date_time_path = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d/%H/")
             if not os.path.isdir(path):
                 logger.error(f"Video storage path does not exist {path}")
                 log_capture_error(camera, user, engine_state_id, password)
@@ -1700,7 +1718,10 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
             # logger.info(psn_recorded_port)
             # logger.info(dir_files)
             # need to do check for current hour and get that file.
-            image_frame, status = read_from_file(path=path, file=dir_files[-1])
+            last_file_in_list = dir_files[-1]
+            with open(last_file_in_list, "rb") as f:
+                file_data = f.read()
+            image_frame, status = read_from_file(file_data)
             if status != "Success":
                 log_capture_error(camera, user, engine_state_id, password)
                 continue
@@ -1710,6 +1731,52 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
 
             continue
 
+        if psn_check and camera_object.psn_api_method:
+            # currently hard coded but will change in future
+            basic = requests.auth.HTTPBasicAuth('user', 'pass')
+            # Get the current time in UTC
+            current_time = datetime.datetime.now(datetime.timezone.utc)
+
+            # Subtract one minute
+            one_minute_prior = current_time - timedelta(minutes=1)
+
+            # Format the time in the desired ISO 8601 format with 'Z'
+            formatted_time = one_minute_prior.strftime("%Y-%m-%dT%H:%M:%SZ")
+            # read only the "I" frame hence frameTypes=I as we don't need P frames
+
+            psn_api_url = (f"https://{camera_object.psn_ip_address}:2242/services/v1/synav?streamID=" +
+                           f"{camera_object.psn_recorded_port}&frameTypes=I&time={formatted_time}")
+
+            response = requests.get(psn_api_url, auth=basic, verify=False)
+            if response.status_code != 200:
+                log_capture_error(camera, user, engine_state_id, password)
+                increment_transaction_count(password)
+                message = message + (f"Request to read from Video Server failed with status code: "
+                                     f"{response.status_code} - {response.content}")
+                logger.error(message)
+
+                continue
+            status = None
+            try:
+                first_part = decoder.MultipartDecoder(response.content, response.headers['Content-Type']).parts[0]
+                file_data = first_part.content
+                image_frame, status = read_from_file(file_data)
+            except ValueError as e:
+                logger.error(f"ValueError during video request decode: {e}")
+            except TypeError as e:
+                logger.error(f"TypeError during video request decode: {e}")
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during video request decode: {e}")
+
+            if status != "Success":
+                log_capture_error(camera, user, engine_state_id, password)
+                continue
+            capture_device = None
+            message = str(message) + str(
+                read_and_compare(capture_device, user, engine_state_id, camera_object, image_frame, password))
+            logger.info(message)
+
+            continue
 
         # if user has entered a username and password set in the database then ensure that we use these
         # when we connect via the url. Add username and password to URL.
@@ -1726,8 +1793,6 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                        f"Error in IP address for camera "
                        f"{camera_object.camera_name} {camera_number} {camera_object.id}\n")
             log_capture_error(camera, user, engine_state_id, password)
-            
-
             increment_transaction_count(password)
             logger.error(message)
             continue
@@ -1750,7 +1815,6 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
             logger.error(f"Unsupported URL scheme {scheme} "
                          f"for camera id {camera} camera number {camera_object.camera_number}\n")
             continue
-
 
 
         if scheme in ["rtsp", "rtsps"]:
@@ -1857,14 +1921,14 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
         logger.info(message)
 
     # unmount here
-    if psn_check:
+    if psn_check and not camera_object.psn_api_method:
         os.system(f"umount -l /tmp/mount_points/{camera_object.psn_ip_address}/")
 
     return "Success"
 
 
 @shared_task(name='main_menu.tasks.process_cameras')
-def process_cameras(camera_list, engine_state_id, user_name):
+def process_cameras(camera_list, engine_state_id, user_name, force_check=False):
     get_config()
 
     if check_license_ok():
@@ -1877,7 +1941,7 @@ def process_cameras(camera_list, engine_state_id, user_name):
         # logger.info(f"initial setup {type(initial_setup)}")
         # psn_check = False
         worker_id = process_cameras.request.hostname
-        logger.info(f"Worker ID: {worker_id} Cameras {camera_list}")
+        logger.info(f"Worker ID: {worker_id} Cameras: {camera_list} Force Check: {force_check}")
 
         # cameras_details = get_camera_details(camera_list)
         # if not cameras_details:
@@ -1893,7 +1957,8 @@ def process_cameras(camera_list, engine_state_id, user_name):
         #         psn_check = True
         # check_the_camera(camera_list, cameras_details, engine_state_id, user_name, psn_check)
 
-        header = [check_the_camera.s(data, engine_state_id, user_name, mysql_password) for data in camera_list]
+        header = [check_the_camera.s(data, engine_state_id,
+                                     user_name, mysql_password, force_check) for data in camera_list]
         # logger.info(f"HEADER {type(header)} {header}")
         callback = all_done.s(engine_state_id, camera_list)
         # logger.info(f"CALLBACK {type(callback)} {callback}")
@@ -2163,140 +2228,129 @@ class ConfigurationDataHeader:
         self.size = unpacked_data[1]
 
 
-def read_from_file(path, file):
+def read_from_file(file_data):
     count = 0
     # logger.info(datetime.datetime.now())
     # logger.info(f"FILES {files}")
     # for file in files:
     # time.sleep(1)
     # logger.info(f"Reading file {file}")
-    with open(file, 'rb') as f:
-        data = f.read(8)
-        if len(data) < 8:
-            # raise ValueError("File too short to contain a valid header")
-            return None, "Error - File too short to contain a valid header"
+    # with open(file, 'rb') as f:
+    buffer = io.BytesIO(file_data)
+    data = buffer.read(8)
+    if len(data) < 8:
+        # raise ValueError("File too short to contain a valid header")
+        return None, "Error - File too short to contain a valid header"
 
-        header = RawSynAV2ComponentHeader(data)
-        # print(header.FileID)
-        # print(count)
-        if header.FileID != 'SYN-AV-2':
-            logger.info("File ID is not SYN-AV-2")
-            return None , "Error in Header"
-        data = f.read(40)
-        header2 = RawSynAV2ComponentHeader2(data)
+    header = RawSynAV2ComponentHeader(data)
+    # print(header.FileID)
+    # print(count)
+    if header.FileID != 'SYN-AV-2':
+        logger.info("File ID is not SYN-AV-2")
+        return None , "Error in Header"
+    data = buffer.read(40)
+    header2 = RawSynAV2ComponentHeader2(data)
 
-        major_version = header2.version_format_2ndID & 0b1111  # bits 0-3
-        minor_version = (header2.version_format_2ndID >> 4) & 0b1111  # bits 4-7
-        stream_format = (header2.version_format_2ndID >> 8) & 0b11111111
-        secondary_ID_tag_1st = (header2.version_format_2ndID >> 16) & 0b11111111
-        secondary_ID_tag_2nd = (header2.version_format_2ndID >> 24) & 0b11111111
-        # file_offset_supplementary_data = header2.file_offset_supplementary_data
-        file_offset_primary_index = header2.file_offset_primary_index
-        file_offset_configuration_data_index = header2.file_offset_configuration_data_index
-        # file_offset_authentication_data = header2.file_offset_authentication_data
-        file_offset_configuration_data_entries = header2.file_offset_configuration_data_entries
-        number_of_entries_in_primary_index = header2.number_of_entries_in_primary_index
-        number_of_entries_in_configuration_index = header2.number_of_entries_in_configuration_index
-        bytes_of_configuration_data_stored = header2.bytes_of_configuration_data_stored
-        # bits_of_presentation_timestamp = header2.bits_of_presentation_timestamp
+    major_version = header2.version_format_2ndID & 0b1111  # bits 0-3
+    minor_version = (header2.version_format_2ndID >> 4) & 0b1111  # bits 4-7
+    stream_format = (header2.version_format_2ndID >> 8) & 0b11111111
+    secondary_ID_tag_1st = (header2.version_format_2ndID >> 16) & 0b11111111
+    secondary_ID_tag_2nd = (header2.version_format_2ndID >> 24) & 0b11111111
+    # file_offset_supplementary_data = header2.file_offset_supplementary_data
+    file_offset_primary_index = header2.file_offset_primary_index
+    file_offset_configuration_data_index = header2.file_offset_configuration_data_index
+    # file_offset_authentication_data = header2.file_offset_authentication_data
+    file_offset_configuration_data_entries = header2.file_offset_configuration_data_entries
+    number_of_entries_in_primary_index = header2.number_of_entries_in_primary_index
+    number_of_entries_in_configuration_index = header2.number_of_entries_in_configuration_index
+    bytes_of_configuration_data_stored = header2.bytes_of_configuration_data_stored
+    # bits_of_presentation_timestamp = header2.bits_of_presentation_timestamp
 
-        # print("Major Version:", major_version)
-        # print("Minor Version:", minor_version)
-        # print("Stream Format:", stream_format)
-        # print("2nd ID Tag:", chr(secondary_ID_tag_1st) + chr(secondary_ID_tag_2nd))
-        f.seek(file_offset_configuration_data_index)
-        config_header_data = f.read(8)
-        config_header = ConfigurationDataHeader(config_header_data)
-        offset_within_configuration_data_entries = config_header.offset
-        length_of_configuration_data = config_header.size
-        f.seek(file_offset_configuration_data_entries)
-        configuration_data = f.read(length_of_configuration_data)
-        frame = bytearray(configuration_data)
-        integer_value = int.from_bytes(configuration_data[0:4], byteorder='big')
-        frame[0:4] = b'\x00\x00\x00\x01'
-        start = integer_value + 4
-        end = integer_value + 4 + 4
-        frame[start:end] = b'\x00\x00\x00\x01'
-        configuration_data = bytes(frame)
-        f.seek(file_offset_primary_index)
-        frames = []
-        for frame_primary_index in range(number_of_entries_in_primary_index):
-            data = f.read(26)
-            frame_data_header = ContentFrameHeader(data)
-            file_offset_to_frame_entry = frame_data_header.file_offset_to_frame_entry
-            frame_size = frame_data_header.frame_size & 0b11111111111111111111111
-            size_of_data = frame_data_header.frame_size >> 23
-            frame_type = frame_data_header.frame_type_and_gop & 0b111
-            frames.append((file_offset_to_frame_entry, frame_size, frame_type, size_of_data))
-        frames_processed = 0
-        # logger.info(f"frames {frames}")
-        for frame_count, frame in enumerate(frames):
-            # f.seek(frames[0][0])
-            # inplace_header = ContentFrameInPlaceHeader(f.read(4))
-            # can delete this loop later as we only want 1 frame anyway.
-            # logger.info(f"frames_processed {frames_processed}")
+    # print("Major Version:", major_version)
+    # print("Minor Version:", minor_version)
+    # print("Stream Format:", stream_format)
+    # print("2nd ID Tag:", chr(secondary_ID_tag_1st) + chr(secondary_ID_tag_2nd))
+    buffer.seek(file_offset_configuration_data_index)
+    config_header_data = buffer.read(8)
+    config_header = ConfigurationDataHeader(config_header_data)
+    offset_within_configuration_data_entries = config_header.offset
+    length_of_configuration_data = config_header.size
+    buffer.seek(file_offset_configuration_data_entries)
+    configuration_data = buffer.read(length_of_configuration_data)
+    frame = bytearray(configuration_data)
+    integer_value = int.from_bytes(configuration_data[0:4], byteorder='big')
+    frame[0:4] = b'\x00\x00\x00\x01'
+    start = integer_value + 4
+    end = integer_value + 4 + 4
+    frame[start:end] = b'\x00\x00\x00\x01'
+    configuration_data = bytes(frame)
+    buffer.seek(file_offset_primary_index)
+    frames = []
+    for frame_primary_index in range(number_of_entries_in_primary_index):
+        data = buffer.read(26)
+        frame_data_header = ContentFrameHeader(data)
+        file_offset_to_frame_entry = frame_data_header.file_offset_to_frame_entry
+        frame_size = frame_data_header.frame_size & 0b11111111111111111111111
+        size_of_data = frame_data_header.frame_size >> 23
+        frame_type = frame_data_header.frame_type_and_gop & 0b111
+        frames.append((file_offset_to_frame_entry, frame_size, frame_type, size_of_data))
+    frames_processed = 0
+    # logger.info(f"frames {frames}")
+    for frame_count, frame in enumerate(frames):
+        # buffer.seek(frames[0][0])
+        # inplace_header = ContentFrameInPlaceHeader(buffer.read(4))
+        # can delete this loop later as we only want 1 frame anyway.
+        # logger.info(f"frames_processed {frames_processed}")
 
-            offset = frame[0]
-            size = frame[1]
-            # size_of_nal = 4
+        offset = frame[0]
+        size = frame[1]
+        # size_of_nal = 4
 
-            f.seek(offset + 4)  # Add 4 bytes for Frame in place header.
-            # now read the frame
-            in_bytes = f.read(size)
-            # logger.info(f"in_bytes length {len(in_bytes)}")
-            # move the bytes into a bytearray, so we can manipulate the NAL's
-            # frame = bytearray(in_bytes)
+        buffer.seek(offset + 4)  # Add 4 bytes for Frame in place header.
+        # now read the frame
+        in_bytes = buffer.read(size)
+        # logger.info(f"in_bytes length {len(in_bytes)}")
+        # move the bytes into a bytearray, so we can manipulate the NAL's
+        # frame = bytearray(in_bytes)
 
+        nal_offset = 0
+        nal_count = 0
+        nal_positions = []
+        frame = bytearray(in_bytes)
 
-            nal_offset = 0
-            nal_count = 0
-            nal_positions = []
-            frame = bytearray(in_bytes)
+        while nal_offset < len(in_bytes):
+            if nal_offset + 4 > len(in_bytes):
+                return None, "Error in NAL offset"
+            nal_size = int.from_bytes(in_bytes[nal_offset: nal_offset + 4], byteorder='big')
+            if nal_offset + nal_size > len(in_bytes):
+                return None, "Error in NAL offset"
+            nal_count += 1
+            nal_offset += nal_size + 4
 
-            while nal_offset < len(in_bytes):
-                if nal_offset + 4 > len(in_bytes):
-                    return None, "Error in NAL offset"
-                nal_size = int.from_bytes(in_bytes[nal_offset: nal_offset + 4], byteorder='big')
-                if nal_offset + nal_size > len(in_bytes):
-                    return None, "Error in NAL offset"
-                nal_count += 1
-                nal_offset += nal_size + 4
+            nal_positions.append(nal_offset)
+            pass
+        nal_positions.insert(0, 0)
+        for position in nal_positions:
+            frame[position:position + 4] = b'\x00\x00\x00\x01'
 
-                nal_positions.append(nal_offset)
-                pass
-            nal_positions.insert(0, 0)
-            for position in nal_positions:
-                frame[position:position + 4] = b'\x00\x00\x00\x01'
+        in_bytes = bytes(frame)
+        in_bytes = configuration_data + in_bytes
 
-            in_bytes = bytes(frame)
-            in_bytes = configuration_data + in_bytes
-            # with open("/tmp/image.h264", "wb") as wf:
-            #     wf.write(in_bytes)
-            #     wf.close()
-            image_bytes, status = decode_frame(in_bytes)
+        image_bytes, status = decode_frame(in_bytes)
 
-            # logger.info(f"image_bytes {len(image_bytes)} {image_bytes}")
-            if not image_bytes:
-                logger.info("Error decoding:", file)
-                return None, "Error Decoding"
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            # Decode image from the NumPy array
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            h, w, _ = img.shape
-            logger.info(count, "Decoded image", file, h, w)
-            frames_processed += 1
-            if frames_processed == 1:
-                return img, "Success"
-        return img, "Success"
+        if not image_bytes:
+            logger.info("Error decoding video file",)
+            return None, "Error Decoding"
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        # Decode image from the NumPy array
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        h, w, _ = img.shape
+        logger.info(count, "Decoded image", h, w)
+        frames_processed += 1
+        if frames_processed == 1:
+            return img, "Success"
+    return img, "Success"
 
-            # img = cv2.resize(img, (int(w/2), int(h/2)), interpolation=cv2.INTER_AREA)
-            # cv2.imshow('frame', img)
-            # cv2.waitKey(1)
-            # count += 1
-            # frames_processed += 1
-            # logger.info(count, "Decoded image", file, h, w)
-    # print("Total successful reads", count)
-    # logger.info(f"Total successful reads {count}")
 
 
 @shared_task()
