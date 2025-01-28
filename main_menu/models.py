@@ -255,4 +255,8 @@ class SuggestedValues(models.Model):
     new_matching_score = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     new_focus_value = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
     new_light_level = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
+    current_regions = models.JSONField(default=list)
+    current_matching_score = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    current_focus_value = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
+    current_light_level = models.DecimalField(max_digits=3, null=True, blank=True, decimal_places=2, default=0)
     accepted = models.BooleanField(default=True)
