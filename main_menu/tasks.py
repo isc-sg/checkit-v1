@@ -2147,6 +2147,9 @@ def find_best_regions(camera_list):
         suggested_value.new_regions = new_top_cells
         suggested_value.new_matching_score = new_matching_threshold
         suggested_value.accepted = False
+        suggested_value.current_focus_value = camera.focus_value_threshold
+        suggested_value.current_light_level = camera.light_level_threshold
+        suggested_value.current_regions = camera.image_regions
         suggested_value.save()
         logger.info("Best Regions Saved")
         count += 1
