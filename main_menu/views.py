@@ -319,6 +319,8 @@ class CheckSoftwareVersionsView(APIView):
                             if len(parts) > 1:
                                 version = parts[1].strip().strip('"').strip("'")
                                 version_dict[file] = str(version)
+                    else:
+                        version_dict[file] = "Version not found"
                 else:
                     continue  # Skip files that are neither .so nor .py
             sorted_version_dict = dict(sorted(version_dict.items()))
@@ -394,6 +396,10 @@ class ActiveTasksView(APIView):
         tasks = task_manager.get_active_tasks()
         return Response({'tasks': tasks})
 
+class Test500ErrorView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        raise Exception()
 
 class CheckCamerasView(APIView):
     permission_classes = [IsAuthenticated]
