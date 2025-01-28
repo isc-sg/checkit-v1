@@ -14,7 +14,7 @@ from drf_yasg import openapi
 
 
 from main_menu import views
-from .views import ActiveTasksView, CheckCamerasView, CheckSoftwareVersionsView
+from .views import ActiveTasksView, CheckCamerasView, CheckSoftwareVersionsView, Test500ErrorView
 
 
 __version__ = 2.1
@@ -56,6 +56,7 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('api/scheduler/active-tasks/', ActiveTasksView.as_view(), name='active_tasks'),
     path('api/software_versions/', CheckSoftwareVersionsView.as_view(), name='software_versions'),
+    path('test500/', Test500ErrorView.as_view(), name='test_500'),
 
 
     # path('api/schema', get_schema_view(
