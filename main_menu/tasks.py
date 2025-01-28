@@ -57,7 +57,7 @@ import requests.auth
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
 
-__version__ = 2.101
+__version__ = 2.1
 
 logger = get_task_logger(__name__)
 
