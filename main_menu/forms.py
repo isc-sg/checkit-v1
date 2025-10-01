@@ -25,5 +25,16 @@ class FilterForm(forms.Form):
     # status = forms.ChoiceField(choices=[('active', 'Active'), ('inactive', 'Inactive')], required=False)
     # category = forms.ChoiceField(choices=[('category1', 'Category 1'), ('category2', 'Category 2')], required=False)
     camera_number = forms.IntegerField(widget=forms.NumberInput)
-    reference_image_version = forms.IntegerField(widget=forms.NumberInput)
+    version = forms.ChoiceField(
+        required=False,
+        choices=[],  # set at runtime
+        widget=forms.Select(attrs={'disabled': 'disabled'})
+    )
+
+    def __init__(self, *args, version_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if version_choices:
+            self.fields['version'].choices = version_choices
+            # enable when actually have versions
+            self.fields['version'].widget.attrs.pop('disabled', None)
 

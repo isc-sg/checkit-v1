@@ -617,6 +617,136 @@ class CameraViewSet(viewsets.ModelViewSet):
         instance.save()
         return JsonResponse({"status": "success"}, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+    summary="Enable/disable a camera",
+    description=(
+            "Toggles the disabled state of a camera. Accepts a POST body with 'disable' as a boolean-like string "
+            "('true'|'false'|'yes'|'no'). When disabling (true), 'reason' is required. "
+            "When enabling (false), any provided reason is ignored and cleared. "
+            "The model auto-stamps/clears the disabled date."
+        ),
+    request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "disable": {"type": "string", "description": "Disable flag ('true'|'false'|'yes'|'no')"},
+                    "disable_reason": {"type": "string", "description": "Required when disable is true"}
+                },
+                "required": ["disable"]
+            }
+        },
+    responses={
+            201: OpenApiResponse(
+                description="Success",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "disabled": {"type": "boolean"},
+                        "disable_reason": {"type": "string", "nullable": True},
+                        "camera_disabled_date": {"type": "string", "format": "date-time", "nullable": True}
+                    }
+                },
+                examples=[
+                    OpenApiExample(
+                        name="Disabled",
+                        value={
+                            "status": "success",
+                            "disabled": True,
+                            "disable_reason": "Lens damaged",
+                        }
+                    ),
+                    OpenApiExample(
+                        name="Enabled (re-enabled)",
+                        value={
+                            "status": "success",
+                            "disabled": False,
+                            "disable_reason": None,
+                            "camera_disabled_date": None
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                description="Bad request",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "error": {"type": "string"}
+                    }
+                },
+                examples=[
+                    OpenApiExample(
+                        name="Missing Disable Field",
+                        value={"status": "fail", "error": "requires disable field"}
+                    ),
+                    OpenApiExample(
+                        name="Invalid Disable Value",
+                        value={"status": "fail", "error": "invalid value for disable"}
+                    ),
+                    OpenApiExample(
+                        name="Missing disable reason When Disabling",
+                        value={"status": "fail", "error": "reason is required when disabling"}
+                    )
+                ]
+            )
+        },
+    )
+    @action(detail=True, methods=['post'])
+    def disable(self, request, camera_number=None):
+        """
+        Toggle the camera's disabled state.
+
+        Body:
+            {
+              "disable": "true" | "false" | "yes" | "no",
+              "reason": "text (required when disabling)"
+            }
+        """
+        instance = self.get_object()
+
+        disable_raw = request.data.get('disable')
+        if disable_raw is None:
+            return JsonResponse({"status": "fail", "error": "requires disable field"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            disable_flag = bool(strtobool(str(disable_raw)))
+        except ValueError:
+            return JsonResponse({"status": "fail", "error": "invalid value for disable"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('disable_reason')
+
+        if disable_flag:
+            if not (reason and str(reason).strip()):
+                return JsonResponse({"status": "fail", "error": "reason is required when disabling"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            instance.disable = True
+            instance.disable_reason = reason.strip()
+            # The model/serializer stamps date; stamp here too if empty for direct updates
+            if instance.camera_disabled_date is None:
+                instance.camera_disabled_date = timezone.now()
+        else:
+            # Re-enable: clear reason and date
+            instance.disable = False
+            instance.disable_reason = None
+            instance.camera_disabled_date = None
+
+        instance.save()
+
+        return JsonResponse({
+            "status": "success",
+            "disabled": instance.disable,
+            "disable_reason": instance.disable_reason,
+            "camera_disabled_date": (
+                instance.camera_disabled_date.isoformat() if instance.camera_disabled_date else None
+            )
+        }, status=status.HTTP_201_CREATED)
+
+
+    
     @action(detail=True, methods=['post'])
     def refresh_reference_image(self, request, camera_number=None):
         """       
@@ -2556,9 +2686,57 @@ def check_all_cameras():
 
 def copy_reference_images(request):
     filter_form = FilterForm(request.GET or None)
+
+    # --- Build version choices BEFORE instantiating/validating the form ---
+    versions_list = []
+    version_choices = None  # we'll pass into the form
+
+    camera_number_raw = request.GET.get('camera_number')  # raw string is fine
+    if camera_number_raw:
+        try:
+            cam_num = int(camera_number_raw)
+            camera = Camera.objects.get(camera_number=cam_num)
+            url_id = camera.id
+            versions_list = (ReferenceImage.objects
+                             .filter(url_id=url_id)
+                             .values_list('version', flat=True)
+                             .distinct()
+                             .order_by('version'))
+            if versions_list:
+                version_choices = [('', '— pick a version —')] + [(str(v), str(v)) for v in versions_list]
+            else:
+                version_choices = [('', 'No versions for this camera')]
+        except (ValueError, Camera.DoesNotExist):
+            version_choices = [('', 'No versions for this camera')]
+
+    # Now instantiating the form with the choices pre-populated
+    filter_form = FilterForm(request.GET or None, version_choices=version_choices)
+
+    # Default queryset
     queryset = ReferenceImage.objects.all()
-    table = ReferenceImageTable(queryset)
-    table.paginate(page=request.GET.get("page", 1), per_page=24)
+
+    if filter_form.is_valid():
+        camera_number = filter_form.cleaned_data.get('camera_number')
+        version_raw = filter_form.cleaned_data.get('version')  # string from ChoiceField
+
+        if camera_number is not None:
+            try:
+                camera = Camera.objects.get(camera_number=camera_number)
+                url_id = camera.id
+
+                if version_raw:  # only filter by version if user picked one
+                    queryset = ReferenceImage.objects.filter(url_id=url_id, version=int(version_raw))
+                else:
+                    queryset = ReferenceImage.objects.filter(url_id=url_id)
+            except Camera.DoesNotExist:
+                # fall back and show error
+                table = ReferenceImageTable(queryset)
+                table.paginate(page=request.GET.get("page", 1), per_page=24)
+                return render(request, "main_menu/select_regions_table.html", {
+                    'filter_form': filter_form,
+                    'error_message': "Camera number does not exist",
+                    'table': table,
+                })
 
     if request.method == 'POST':
         selection = request.POST.getlist("selection")
@@ -2650,37 +2828,6 @@ def copy_reference_images(request):
                           {'filter_form': filter_form,
                            "error_message": "Successfully copied",
                            "table": table})
-
-
-    if filter_form.is_valid():
-        camera_number = filter_form.cleaned_data.get('camera_number')
-        version = filter_form.cleaned_data.get('reference_image_version')
- 
-        try:
-            camera = Camera.objects.get(camera_number=camera_number)
-            url_id = camera.id
-            # version = camera.reference_image_version
-            queryset = ReferenceImage.objects.filter(url_id=url_id, version=version)
-        except ObjectDoesNotExist:
-            queryset = ReferenceImage.objects.all()
-            table = ReferenceImageTable(queryset)
-            table.paginate(page=request.GET.get("page", 1), per_page=24)
-            return render(request, "main_menu/select_regions_table.html",
-                          {'filter_form': filter_form,
-                           "error_message": "Camera number does not exist",
-                           "table": table})
-        # if camera_number:
-        #     camera = Camera.objects.filter(camera_number=camera_number).first()
-        #     url_id = camera.id if camera else None
-        #     queryset = ReferenceImage.objects.filter(url_id=url_id)
-        # else:
-        #     queryset = ReferenceImage.objects.all()
-
-        # for key, value in filter_form.cleaned_data.items():
-        #     if key != 'camera_number':
-        #         queryset = queryset.filter(**{key: value})
-    else:
-        queryset = ReferenceImage.objects.all()
 
     table = ReferenceImageTable(queryset)
     table.paginate(page=request.GET.get("page", 1), per_page=24)

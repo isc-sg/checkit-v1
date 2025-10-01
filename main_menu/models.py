@@ -10,6 +10,8 @@ from django.utils.timezone import now
 from django.urls import reverse
 # from django.template.defaultfilters import slugify
 from simple_history.models import HistoricalRecords
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 # from encrypted_model_fields.fields import EncryptedCharField
 
 # import shutil
@@ -114,6 +116,11 @@ class Camera(models.Model):
     snooze = models.BooleanField(default=False, help_text="Set to true to pause checks for this camera")
     trigger_new_reference_image = models.BooleanField(default=False, help_text="Set to true to enable the initiation"
                                                                                " of a new reference image")
+    # only when trigger_new_reference_image is True
+    trigger_copy_to_all = models.BooleanField(
+        default=False,
+        help_text="If enabled, copy all images when a new reference image is triggered"
+    )
     freeze_check = models.BooleanField(default=False,
                                        help_text="Set to true to check if previous log image is identical")
     trigger_new_reference_image_date = models.DateTimeField('date created', default=timezone.now)
@@ -132,11 +139,70 @@ class Camera(models.Model):
                                                                   " reading from Video Storage")
     group_name = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Group Name", default=None)
 
+    disable = models.BooleanField(
+        default=False,
+        help_text="If enabled, the camera is disabled."
+    )
+    disable_reason = models.TextField(
+        max_length=255,
+        blank=True, null=True, default=None,
+        help_text="Required when disabling the camera."
+    )
+    camera_disabled_date = models.DateTimeField(
+        blank=True, null=True, default=None,
+        help_text="Automatically set when the camera is disabled."
+    )
 
     history = HistoricalRecords(cascade_delete_history=True)
 
     def __str__(self):
         return f'{self.camera_name} / #{self.camera_number}'
+
+    class Meta:
+        constraints = [
+            # Enforce: if copy_all_images_after_trigger is True, trigger_new_reference_image must be True.
+            models.CheckConstraint(
+                name="copy_requires_trigger",
+                check=Q(trigger_new_reference_image=True) | Q(trigger_copy_to_all=False),
+            ),
+             # NEW: If disabled -> must have reason and date
+            models.CheckConstraint(
+                name="disable_requires_reason_and_date",
+                check=(
+                    Q(disable=False) |
+                    (Q(disable_reason__isnull=False) & ~Q(disable_reason='') &
+                     Q(camera_disabled_date__isnull=False))
+                ),
+            ),
+            # If enabled -> reason and date must be empty
+            models.CheckConstraint(
+                name="enabled_requires_no_reason_and_date",
+                check=(
+                    Q(disable=True) |
+                    (Q(disable_reason__isnull=True) & Q(camera_disabled_date__isnull=True))
+                ),
+            ),
+        ]
+
+    #It’s called when we use a ModelForm (e.g. in the admin or a user form), because forms call full_clean()
+    def clean(self):
+        super().clean()
+        if not self.trigger_new_reference_image:
+            # Force off if trigger isn't enabled
+            self.trigger_copy_to_all = False
+
+        # validation logic
+        if self.disable:
+            # Require a non-empty reason
+            if not (self.disable_reason and self.disable_reason.strip()):
+                raise ValidationError({"disable_reason": "Reason is required when disabling the camera."})
+            # Stamp the date if not already set (so forms don’t have to)
+            if self.camera_disabled_date is None:
+                self.camera_disabled_date = timezone.now()
+        else:
+            # When enabled, clear the reason and date for consistency
+            self.disable_reason = None
+            self.camera_disabled_date = None
 
     # def get_slug_camera_name(self):
     #     return reverse('images', kwargs={'slug': self.slug})

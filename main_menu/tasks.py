@@ -1381,6 +1381,80 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
         # logger.info("Entered zero")
         # if elapsed_time < timezone.timedelta(hours=24):
         last_version += 1
+
+        if camera_object.trigger_copy_to_all:
+            reference_image= None
+            if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
+                # logger.info("Entered first")
+                message = (message + f"[{timezone.now()}] INFO [read_and_compare] -"
+                                    f" Attempting capture of reference image\n")
+                response = create_base_image(camera_object, capture_device, last_version,
+                                            user, engine_state_id, password, image_frame)
+                message = (message + f"[{timezone.now()}] INFO [read_and_compare] -"
+                                    f" {response}\n")
+                close_capture_device(capture_device, multicast_address)
+            reference_image= reference_image_objects.filter(hour=current_hour, version=last_version).first()
+            
+            for hour in range(0,24):
+                hour=str(hour).zfill(2)
+                source_reference_image_object = reference_image
+                image = source_reference_image_object.image
+                version = str(source_reference_image_object.version).zfill(4)
+                url_id = source_reference_image_object.url_id
+                if reference_image_objects.filter(hour=hour, version=last_version).exists():
+                    message = (message + f"[{timezone.now()}] INFO [read_and_compare] -"
+                                    f"New version already exists for hour {hour}\n")
+                    continue
+
+                new_file_name = f"base_images/{url_id}/{version}-{hour}.jpg"
+                try:
+                    target_reference_image_object = ReferenceImage.objects.get(url_id = url_id, hour = hour, version = version)
+                    if image != new_file_name:
+                        result = subprocess.run(["cp", f"{settings.MEDIA_ROOT}/{image}", f"{settings.MEDIA_ROOT}/{new_file_name}"], capture_output=True, text=True)
+                    if result.returncode != 0:
+                        # handle error
+                        # queryset = ReferenceImage.objects.all()
+                        # table = ReferenceImageTable(queryset)
+                        # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                        message = (message + f"[{timezone.now()}] ERROR [read_and_compare] -"
+                                    f"Couldnt copy reference image {result.stderr}\n")
+                except ObjectDoesNotExist:
+                    # create here.
+                    try:
+                        ReferenceImage.objects.create(url=source_reference_image_object.url,
+                                                    image=f"base_images/{url_id}/{version}-{hour}.jpg",
+                                                    light_level=source_reference_image_object.light_level,
+                                                    focus_value=source_reference_image_object.focus_value,
+                                                    creation_date=timezone.now(),
+                                                    version=int(version),
+                                                    hour=hour
+                                                    )
+                        result = subprocess.run(["cp", f"{settings.MEDIA_ROOT}/{image}", f"{settings.MEDIA_ROOT}/{new_file_name}"], capture_output=True,
+                                                text=True)
+                        if result.returncode != 0:
+                            # table = ReferenceImageTable(queryset)
+                            # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                            message = (message + f"[{timezone.now()}] ERROR [read_and_compare] -"
+                                    f"Couldnt copy reference image {result.stderr}\n")
+                    except Exception as e:
+                        # table = ReferenceImageTable(queryset)
+                        # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                        message = (message + f"[{timezone.now()}] ERROR [read_and_compare] -"
+                                    f"Error creating new reference image {result.stderr}\n")
+
+
+            
+            message = message + f"[{timezone.now()}] INFO [read_and_compare] - Copied all reference images after trigger and New reference image trigger reset\n"
+            
+            Camera.objects.filter(pk=camera_object.id).update(trigger_copy_to_all=False)
+            Camera.objects.filter(pk=camera_object.id).update(trigger_new_reference_image=False)
+            Camera.objects.filter(pk=camera_object.id).update(reference_image_version=last_version)
+
+            # last_version -=1
+            return message
+
+
+
         if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
 
             # logger.info("Entered first")

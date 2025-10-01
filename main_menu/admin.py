@@ -69,8 +69,71 @@ def new_reference_image(modeladmin, request, queryset):
 new_reference_image.short_description = "Trigger New Reference Image"
 
 
-class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
+class DisableReasonWidget(forms.TextInput):
+    def render(self, name, value, attrs=None, renderer=None):
+        html = super().render(name, value, attrs, renderer)
+        js = """
+        <script>
+                    (function () {
+            function toggleCopyField() {
+                var trigger = document.getElementById("id_trigger_new_reference_image");
+                var copy = document.getElementById("id_trigger_copy_to_all");
+                if (!trigger || !copy) return;
 
+                var enable = trigger.checked === true;
+                copy.disabled = !enable;
+                if (!enable) copy.checked = false;  // keep consistent with server-side clean()
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                toggleCopyField();
+                var trigger = document.getElementById("id_trigger_new_reference_image");
+                if (trigger) trigger.addEventListener("change", toggleCopyField);
+            });
+            })();
+
+        </script>
+        """
+        return html + js
+
+class CameraForm(forms.ModelForm):
+    class Meta:
+        model = Camera
+        fields = "__all__"
+        widgets = {
+            "disable_reason": DisableReasonWidget(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        if self.is_bound:
+            raw = self.data.get('trigger_new_reference_image')
+            trigger_on = str(raw).lower() in ('on')
+        else:
+            # First render: use initial -> instance -> False
+            trigger_on = bool(
+                self.initial.get(
+                    'trigger_new_reference_image',
+                    getattr(self.instance, 'trigger_new_reference_image', False),
+                )
+            )
+
+        # Disable the dependent field unless the trigger is already True
+        if not trigger_on:
+            self.fields["trigger_copy_to_all"].disabled = True
+
+    def clean(self):
+        cleaned = super().clean()
+        trigger = cleaned.get("trigger_new_reference_image")
+        if not trigger:
+            # Enforce rule server-side: if trigger is off, dependent must be False
+            cleaned["trigger_copy_to_all"] = False
+        return cleaned
+
+
+class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
+    form = CameraForm
     massadmin_exclude = ['url', 'camera_number', 'camera_name', 'multicast_address',
                          'creation_date', "last_check_date"]
     filter_horizontal = ('scheduled_hours', 'scheduled_days')
@@ -152,6 +215,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
             except OSError:
                 logging.error(f"Unable to delete {settings.MEDIA_ROOT}/base_images/{camera.id}")
         queryset.delete()
+
 
 
 class ReferenceAdmin(ModelAdmin):
