@@ -1,9 +1,13 @@
-from django_filters import (ChoiceFilter, DateRangeFilter, FilterSet, RangeFilter,
-                            NumberFilter, CharFilter, DateFromToRangeFilter, Filter)
-from django_filters.widgets import RangeWidget, DateRangeWidget
+from random import choices
 
-from .models import LogImage, EngineState, Camera
-from django.forms.widgets import TextInput, NumberInput, SplitDateTimeWidget
+from django.contrib.admin import action
+from django_filters import (ChoiceFilter, DateRangeFilter, FilterSet, RangeFilter,
+                            NumberFilter, CharFilter, DateFromToRangeFilter, Filter, BooleanFilter)
+from django_filters.widgets import RangeWidget, DateRangeWidget
+from django.db.models import F, ExpressionWrapper, BooleanField
+
+from .models import LogImage, EngineState, Camera, ReferenceImage
+from django.forms.widgets import TextInput, NumberInput, SplitDateTimeWidget, CheckboxInput
 from django.forms import widgets
 from bootstrap_datepicker_plus.widgets import DatePickerInput, DateTimePickerInput
 from datetime import datetime
@@ -17,6 +21,11 @@ LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Triggered', 'Triggered'), ('Capture Er
                       ('Image Size Error', 'Image Size Error'))
 
 STATE_CHOICES = (('RUN COMPLETED', 'Finished'), ('STARTED', 'Started'), ('ERROR', 'Error'))
+
+SELECTION_CHOICES = (("FOV", "Match Score Below Threshold"),
+                     ("FOCUS", "Focus Value Below Threshold"),
+                     ("LIGHT", "Light Level Below Threshold"),
+                    )
 
 
 class CameraFilter(FilterSet):
@@ -77,7 +86,51 @@ class TimeRangeFilter(Filter):
                     pass
         return qs
 
+class StateTimeRangeFilter(Filter):
+    def filter(self, qs, value):
+        # Ensure the value is a list with the correct format
+        if value and isinstance(value, list) and len(value) == 2:
+            start_time_str, end_time_str = value
+            # Check if start_time_str and end_time_str are not None
+            if start_time_str and end_time_str:
+                try:
+                    start_time = datetime.strptime(start_time_str, "%H:%M").time()
+                    end_time = datetime.strptime(end_time_str, "%H:%M").time()
+
+                    # Return the filtered queryset based on the time range
+                    return qs.filter(
+                        Q(state_timestamp__time__gte=start_time) & Q(state_timestamp__time__lte=end_time)
+                    )
+                except ValueError:
+                    # Handle invalid time formats gracefully
+                    pass
+        return qs
+
 class LogFilter(FilterSet):
+    # def __init__(self, request):
+    #     super().__init__(request)
+    #     self.filter_method = "filter"
+
+    # below_threshold = BooleanFilter(
+    #     method='filter_below_threshold',
+    #     label='Below Threshold'
+    # )
+    below_threshold = ChoiceFilter(choices=SELECTION_CHOICES, method="filter_below_threshold")
+
+    def filter_below_threshold(self, queryset, name, value):
+        if value == "FOV":
+            queryset = queryset.filter(matching_score__lt = F('current_matching_threshold'),
+                                               action = "Triggered")
+
+        if value == "LIGHT":
+            queryset = queryset.filter(light_level__lt = F('current_light_level'),
+                                               action = "Triggered")
+        if value == "FOCUS":
+            queryset = queryset.filter(focus_value__lt = F('current_focus_value'),
+                                               action = "Triggered")
+        return queryset
+
+
     matching_score = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Match")
     focus_value = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Focus")
     light_level = RangeFilter(widget=RangeWidget(attrs={'size': '12'}), label="Light")
@@ -89,12 +142,12 @@ class LogFilter(FilterSet):
 
     camera_name = CharFilter(field_name='url__camera_name', lookup_expr='icontains', label="Name contains",
                              widget=TextInput(attrs={'size': '15'}))
-    camera_number = CharFilter(field_name='url__camera_number', lookup_expr='icontains', label="Number contains",
+    camera_number = NumberFilter(field_name='url__camera_number', lookup_expr='exact', label="Camera Number",
                                widget=TextInput(attrs={'size': '18'}))
     camera_location = CharFilter(field_name='url__camera_location', lookup_expr='icontains',
                                  label="Location contains",
                                  widget=TextInput(attrs={'size': '18'}))
-    run_number = CharFilter(field_name='run_number', label="Run number",
+    run_number = NumberFilter(field_name='run_number', lookup_expr='exact', label="Run number",
                             widget=TextInput(attrs={'size': '18'}))
 
     # Custom filter method to handle both date and time together
@@ -117,13 +170,59 @@ class LogFilter(FilterSet):
         fields = ["camera_number", "camera_name", "camera_location", "matching_score", "focus_value", "light_level",
                   "run_number", "action", "creation_date", "creation_time"]
 
+class StateTimeRangeFilter(Filter):
+    def filter(self, qs, value):
+        # Ensure the value is a list with the correct format
+        if value and isinstance(value, list) and len(value) == 2:
+            start_time_str, end_time_str = value
+            # Check if start_time_str and end_time_str are not None
+            if start_time_str and end_time_str:
+                try:
+                    start_time = datetime.strptime(start_time_str, "%H:%M").time()
+                    end_time = datetime.strptime(end_time_str, "%H:%M").time()
+
+                    # Return the filtered queryset based on the time range
+                    return qs.filter(
+                        Q(state_timestamp__time__gte=start_time) & Q(state_timestamp__time__lte=end_time)
+                    )
+                except ValueError:
+                    # Handle invalid time formats gracefully
+                    pass
+        return qs
+
+
 class EngineStateFilter(FilterSet):
     state = ChoiceFilter(choices=STATE_CHOICES)
-    state_timestamp = DateRangeFilter()
+    # state_timestamp = DateRangeFilter()
     number_failed_images = RangeFilter(widget=RangeWidget(attrs={'size': '7'},), label="Fails")
+
     number_pass_images = RangeFilter(widget=RangeWidget(attrs={'size': '7'},), label="Pass")
     user = CharFilter(field_name='user', lookup_expr='icontains', label="User contains",
                              widget=TextInput(attrs={'size': '15'}))
+    state_timestamp = DateFromToRangeFilter(widget=RangeWidget(attrs={'type': 'date'}))
+    state_timestamp_time = StateTimeRangeFilter(widget=RangeWidget(attrs={'type': 'time'}))
+
+    def filter_state_timestamp_datetime(self, queryset, name, value):
+        date_range = self.form.cleaned_data.get('state_timestamp')
+        time_range = self.form.cleaned_data.get('state_timestamp_time')
+        # print("date_range", date_range)
+        if date_range and time_range:
+            try:
+                # Combine date and time ranges
+                start_datetime = datetime.combine(date_range.start, time_range.start)
+                end_datetime = datetime.combine(date_range.stop, time_range.stop)
+                return queryset.filter(state_timestamp__range=(start_datetime, end_datetime))
+            except AttributeError:
+                pass  # Ignore if any part is missing or invalid
+        return queryset
+
     class Meta:
         model = EngineState
-        fields = ['state', 'state_timestamp', "number_failed_images", "number_pass_images", "user"]
+        fields = ['state', 'state_timestamp', 'state_timestamp_time', "number_failed_images", "number_pass_images", "user"]
+
+class ReferenceImageFilter(FilterSet):
+    camera_number = NumberFilter(widget=NumberInput(attrs={'style': 'width:23ch'}))
+
+    class Meta:
+        model = ReferenceImage
+        fields = ['url_id']

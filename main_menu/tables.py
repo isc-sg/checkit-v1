@@ -125,26 +125,26 @@ class LogTable(tables.Table):
     def render_light_level(self, value, record):
         # camera_object = Camera.objects.get(pk=record.url_id)
         # default_light_level = camera_object.light_level_threshold
-        if value > record.current_light_level:
-            return value
-        else:
+        if value < record.current_light_level:
             return mark_safe(f'<span style="color: red;">{value}</span>')
+        else:
+            return value
 
     def render_focus_value(self, value, record):
         # camera_object = Camera.objects.get(pk=record.url_id)
         # default_focus_level = camera_object.focus_value_threshold
-        if value > record.current_focus_value:
-            return value
-        else:
+        if value < record.current_focus_value:
             return mark_safe(f'<span style="color: red;">{value}</span>')
+        else:
+            return value
 
     def render_matching_score(self, value, record):
         # camera_object = Camera.objects.get(pk=record.url_id)
         # default_matching_threshold = camera_object.matching_threshold
-        if value >= record.current_matching_threshold:
-            return value
-        else:
+        if value < record.current_matching_threshold:
             return mark_safe(f'<span style="color: red;">{value}</span>')
+        else:
+            return value
 
     def render_action(self, value):
         if value == "Pass":
@@ -165,7 +165,7 @@ class LogTable(tables.Table):
         model = LogImage
         template_name = "django_tables2/bootstrap4.html"
         fields = ('camera_number', 'camera_name', 'camera_location', 'image', 'matching_score',
-                  'focus_value', 'light_level', 'action', 'creation_date',)
+                  'focus_value', 'light_level', 'action', 'creation_date', 'run_number')
         exclude = (['matching_threshold'])
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = '-creation_date'
@@ -336,5 +336,57 @@ class SuggestedValuesTable(tables.Table):
         template_name = "django_tables2/bootstrap4.html"
         fields = ('selection', 'camera_number', 'camera_name', 'new_matching_score',
                   'new_focus_value', 'new_light_level','modified_image')
+        attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
+        order_by = 'url_id'
+
+
+class ReferenceImageTable(tables.Table):
+    selection = tables.CheckBoxColumn(verbose_name="Select", accessor='pk',
+                                      attrs={"td": {
+                                          "width": 50, "align": "center"
+                                      }, "th__input": {"onclick": "toggle(this)"}})
+    # new_regions = tables.Column()
+    camera_number = tables.Column(empty_values=(),  attrs={
+        "td": {
+            "width": 100, "align": "left"
+        }})
+    camera_name = tables.Column(empty_values=(), attrs={
+        "td": {
+            "width": 350, "align": "left"
+        }})
+    hour = tables.Column(empty_values=(), attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }})
+    version = tables.Column(empty_values=(), attrs={
+        "td": {
+            "width": 100, "align": "center"
+        }})
+    creation_date = tables.DateTimeColumn(attrs={'td': {"width": 200, "align": "center"}},format='d M Y, h:i A')
+    modified_image = tables.Column(empty_values=())
+
+    def render_camera_name(self, value, record):
+        camera = Camera.objects.get(pk=record.url_id)
+        return camera.camera_name
+
+    def render_camera_number(self, value, record):
+        camera = Camera.objects.get(pk=record.url_id)
+        return camera.camera_number
+
+    def render_modified_image(self, record):
+        # camera = ReferenceImage.objects.filter(url_id=record.url_id).last()
+        ref_image = cv2.imread(f"/home/checkit/camera_checker/media/{record}")
+        if ref_image is None:
+            return "Reference Image in media not found"
+        _, buffer = cv2.imencode('.jpg', ref_image)
+        img_str = base64.b64encode(buffer).decode('utf-8')
+
+        # Encode the image to base64
+        return mark_safe(f'<img style="width:50px; height:auto;" src="data:image/jpeg;base64,{img_str}"/>')
+
+    class Meta:
+        model = ReferenceImage
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('selection', 'modified_image')
         attrs = {'class': 'table table-striped table-bordered table-hover table-dark'}
         order_by = 'url_id'

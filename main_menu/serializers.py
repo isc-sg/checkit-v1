@@ -69,7 +69,7 @@ class CameraSerializer(serializers.ModelSerializer):
 
 
 class LogImageSerializer(serializers.ModelSerializer):
-    # camera = CameraSerializer(source='url', read_only=True)
+    camera = CameraSerializer(source='url.camera_number', read_only=True)
 
     class Meta:
         model = LogImage

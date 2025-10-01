@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 from pathlib import Path
 import datetime
+import logging
+from logging.handlers import RotatingFileHandler
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -119,10 +121,10 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+	         'OPTIONS': {
+            'min_length': 4,  # Set your desired minimum length here
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -208,10 +210,11 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': '/home/checkit/camera_checker/logs/checkit.log',  # Replace with the desired path
-            'formatter': 'simple'
-        },
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': '/home/checkit/camera_checker/logs/checkit.log',
+            'maxBytes': 100 * 1024 * 1024,  # 100 MB
+            'backupCount': 5,               # Keep up to 5 rotated logs
+            'formatter': 'simple'}
     },
     'loggers': {
         '': {
@@ -258,3 +261,6 @@ DJANGO_CELERY_BEAT_TZ_AWARE = True
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o775
 FILE_UPLOAD_PERMISSIONS = 0o660
 FIELD_ENCRYPTION_KEY = b"SDFvHqmlRvzDEt8CJj4SySy9WxHNjrwZGOTGftIfH40="
+
+CELERY_TASK_SOFT_TIME_LIMIT = 1800
+CELERY_TASK_TIME_LIMIT = 1800

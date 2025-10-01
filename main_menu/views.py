@@ -1,9 +1,13 @@
 import ast
 import datetime
+import pytz
 from datetime import timedelta
 import subprocess
 import time
 import zipfile
+import tarfile
+from decimal import Decimal
+from io import BytesIO
 from subprocess import PIPE, Popen
 import csv
 import os
@@ -13,11 +17,14 @@ import base64
 import logging
 from logging.handlers import RotatingFileHandler
 from bisect import bisect_left
+from unicodedata import decimal
+
 import cv2
 import numpy as np
 import uuid
 import mysql.connector
 import psutil
+from celery.utils.functional import pass1
 from django.contrib.admin.templatetags.admin_list import pagination
 from django.core.serializers import serialize
 from django.utils import timezone
@@ -44,12 +51,15 @@ from django.views.decorators.cache import cache_control
 from django.contrib.auth.models import Permission, User, Group
 from django.core.paginator import Paginator
 from rest_framework.renderers import JSONRenderer
+from rest_framework.pagination import PageNumberPagination
+
 
 from .resources import CameraResource
 from .models import EngineState, Camera, LogImage, Licensing, ReferenceImage, DaysOfWeek, HoursInDay, SuggestedValues
-from .tables import CameraTable, LogTable, EngineStateTable, CameraSelectTable, LogSummaryTable, SuggestedValuesTable
-from .forms import DateForm, RegionsForm
-from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter
+from .tables import (CameraTable, LogTable, EngineStateTable, CameraSelectTable,
+                     LogSummaryTable, SuggestedValuesTable, ReferenceImageTable)
+from .forms import DateForm, RegionsForm, FilterForm
+from .filters import CameraFilter, LogFilter, EngineStateFilter, CameraSelectFilter, ReferenceImageFilter
 import main_menu.select_region as select_region
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.decorators import user_passes_test
@@ -94,11 +104,13 @@ from rest_framework.response import Response
 from .scheduler_task_manager import CeleryTaskManager
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.http import StreamingHttpResponse
+from django.db import models
+from decimal import Decimal, ROUND_HALF_UP
 
 
 
-
-__version__ = 2.1
+__version__ = 2.11
 
 # import main_menu.compare_images_v4
 
@@ -225,7 +237,7 @@ def group_cameras_by_psn_ip(camera_list=None):
     if isinstance(camera_list, list):
         cameras = Camera.objects.filter(id__in=camera_list)
     else:
-        cameras = Camera.objects.all().filter(snooze=False)
+        cameras = Camera.objects.all()
     # Initialize defaultdict to group cameras by psn_ip_address
     grouped = defaultdict(list)
 
@@ -400,6 +412,11 @@ class Test500ErrorView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
         raise Exception()
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10  # Number of items per page
+    page_size_query_param = 'page_size'  # Allows clients to override the page size
+    max_page_size = 100  # Maximum limit allowed when overridden
 
 class CheckCamerasView(APIView):
     permission_classes = [IsAuthenticated]
@@ -647,34 +664,60 @@ class LogImageViewSet(APIView):
     # lookup_field = 'id'
     # http_method_names = ['GET', 'delete']
     renderer_classes = [JSONRenderer]
-    
+
+    # Apply the pagination class (you can use a custom one if defined, otherwise use the default)
+    pagination_class = StandardResultsSetPagination  # Use PageNumberPagination if you didn't define a custom one
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter('run_number', openapi.IN_QUERY, description="Run Number", type=openapi.TYPE_STRING),
+            openapi.Parameter('camera_number', openapi.IN_QUERY, description="Camera Number", type=openapi.TYPE_STRING),
+            openapi.Parameter('from_creation_date', openapi.IN_QUERY, description="From creation date for searching", type=openapi.TYPE_STRING),
+            openapi.Parameter('to_creation_date', openapi.IN_QUERY, description="To creation date for searching", type=openapi.TYPE_STRING),
             openapi.Parameter('action', openapi.IN_QUERY, description="Action", type=openapi.TYPE_STRING),
+            openapi.Parameter('page', openapi.IN_QUERY, description="Page number", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('page_size', openapi.IN_QUERY, description="Number of items per page",
+                              type=openapi.TYPE_INTEGER)
+
         ],
         responses={
             200: LogImageSerializer(many=True),
         }
     )
 
-    def get(self, request, *args, **kwargs):
 
-        run_number = request.data.get('run_number')
-        log_item_status = request.data.get('action')
+    def get(self, request):
 
-        if run_number is not None and log_item_status is not None:
-            logs = LogImage.objects.filter(run_number=run_number).filter(action=log_item_status)
-        elif run_number is not None:
-            logs = LogImage.objects.filter(run_number=run_number)
-        elif log_item_status is not None:
-            logs = LogImage.objects.filter(action=log_item_status)
-        else:
-            logs = LogImage.objects.all()
+        run_number = request.GET.get('run_number') or request.data.get('run_number')
+        camera_number = request.GET.get('camera_number') or request.data.get('camera_number')
+        action = request.GET.get('action') or request.data.get('action')
+        from_creation_date = request.GET.get('from_creation_date') or request.data.get('from_creation_date')
+        to_creation_date = request.GET.get('to_creation_date') or request.data.get('to_creation_date')
 
-        serializer = LogImageSerializer(logs, many=True)
-        return Response(serializer.data)
-    
+        queryset = LogImage.objects.all()
+        if run_number:
+            queryset = queryset.filter(run_number=run_number)
+        if camera_number:
+            queryset = queryset.filter(url__camera_number=camera_number)
+        if action:
+            queryset = queryset.filter(action=action)
+        if from_creation_date and to_creation_date:
+            try:
+                from_creation_date = datetime.datetime.fromisoformat(from_creation_date.replace("Z", "+00:00")).date()
+                to_creation_date = datetime.datetime.fromisoformat(to_creation_date.replace("Z", "+00:00")).date()
+                queryset = queryset.filter(creation_date__range=(from_creation_date, to_creation_date))
+            except Exception:
+                return Response("Invalid dates")
+
+        # Force ordering for stable pagination
+        queryset = queryset.order_by('-creation_date')
+
+        # Paginate (auto-handles page_size/page from request.GET)
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(queryset, request)
+
+        serializer = LogImageSerializer(paginated_data, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 class ReferenceImageListCreateAPIView(ListAPIView):
     """
@@ -1320,7 +1363,7 @@ def scheduler(request):
         uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
 
         # filtering out any record that has snooze
-        matching_records = Camera.objects.filter(camera_number__in=uploaded_file).filter(snooze=False)
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
 
         # Extract the items that exist in the model
         matching_items = matching_records.values_list('camera_number', flat=True)
@@ -1335,7 +1378,7 @@ def scheduler(request):
                 bad_numbers.append(item)
 
         if bad_numbers:
-            context = {"error": "Invalid camera numbers in file"}
+            context = {"error": f"Invalid camera numbers in file - {bad_numbers}"}
             return HttpResponse(template.render(context, request))
         if good_numbers:
             template = loader.get_template('main_menu/scheduler_job_id.html')
@@ -1343,14 +1386,15 @@ def scheduler(request):
             for number in good_numbers:
                 camera_object = Camera.objects.get(camera_number=number)
                 # added check for snooze - principle is if snooze selected then never check anywhere,
-                if not camera_object.snooze:
-                    camera_ids.append(camera_object.id)
+                # if not camera_object.snooze:
+                camera_ids.append(camera_object.id)
             number_of_cameras_in_run = len(camera_ids)
             # x = int(number_of_cpus/2)
             # num_sublists = (len(camera_ids) + x - 1) // x
             # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
             # sublists = [camera_ids[i * x:int(len(camera_ids) / 7) * (i + 1)] for i in range(0, (x+1))]
             sublists = group_cameras_by_psn_ip(camera_ids)
+            cleaned_sublist = [x for x in sublists if x]
             # create STARTED record first then create FINISHED and pass that record id to celery to have the
             # workers update the timestamp and counts as the complete check
             engine_state_record = EngineState(state="STARTED", state_timestamp=timezone.now(), user=user_name,
@@ -1361,7 +1405,7 @@ def scheduler(request):
             engine_state_record.save()
             engine_state_id = engine_state_record.id
 
-            process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
+            process_cameras.delay(cleaned_sublist, engine_state_id, user_name, force_check=False)
             context = {"jobid": engine_state_id}
             return HttpResponse(template.render(context, request))
 
@@ -1373,7 +1417,7 @@ def scheduler(request):
             return HttpResponse(template.render(context, request))
 
         logger.info("User {u} started engine".format(u=user_name))
-        camera_objects = Camera.objects.all().filter(snooze=False)
+        camera_objects = Camera.objects.all()
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
         # x = int(number_of_cpus/2)
@@ -1382,6 +1426,7 @@ def scheduler(request):
         # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
         # sublists = split_list(camera_ids, number_of_cpus * 2)
         sublists = group_cameras_by_psn_ip()
+        cleaned_sublist = [x for x in sublists if x]
         # recommended configuration - set celery config file to have 2 x CPUs for concurrency and 2 workers
         # dual workers should provide some redundancy.
         # create STARTED record first then create FINISHED/ RUN COMPLETED and pass that record id to celery to have the
@@ -1398,7 +1443,7 @@ def scheduler(request):
         # for group_of_cameras in sublists:
             # process_cameras.delay(group_of_cameras, engine_state_id, user_name
         logger.info(f"STARTING ENGINE for Run Number {engine_state_id}")
-        process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
+        process_cameras.delay(cleaned_sublist, engine_state_id, user_name, force_check=False)
         context = {"jobid": engine_state_id}
         return HttpResponse(template.render(context, request))
 
@@ -1877,7 +1922,7 @@ def export_logs_to_csv(request):
 
             writer.writerow(["camera_name", "camera_number", "camera_location",
                              "pass_fail", "matching_score", "focus_value", "light_level", "Freeze Status" ,"creation_date",
-                             "current_focus_value", "current_light_level", "user", "run_number"])
+                             "current_matching_threshold", "current_focus_value", "current_light_level", "user", "run_number"])
             # print(logs)
             for log in logs:
                 local_timezone = timezone.get_current_timezone()
@@ -1885,7 +1930,7 @@ def export_logs_to_csv(request):
                 writer.writerow([log.url.camera_name, log.url.camera_number, log.url.camera_location,
                                  log.action, log.matching_score, log.focus_value, log.light_level, log.freeze_status,
                                  datetime.datetime.strftime(local_datetime, "%d-%b-%Y %H:%M:%S"),
-                                 log.current_focus_value, log.current_light_level, log.user, log.run_number])
+                                 log.current_matching_threshold, log.current_focus_value, log.current_light_level, log.user, log.run_number])
 
             return response
 
@@ -2018,12 +2063,132 @@ def export_logs_to_csv(request):
     else:
         return HttpResponseRedirect("/state/")
 
+# class SuggestedRegions:
+#     def __init__(self, request):
+#         self.request = request
+#
+#     def get_camera_ids(self):
+#         # Get list of camera IDs from request
+#         camera_ids = self.request.POST.getlist('camera_id')
+#         return camera_ids
+#
+#     def is_commit_enabled(self):
+#         # Check if commit flag is enabled in request
+#         commit_flag = self.request.POST.get('commit', 'false').lower() == 'true'
+#         return commit_flag
+#
+#     def is_status_enabled(self):
+#         # Check if status flag is enabled in request
+#         status_flag = self.request.POST.get('status', 'false').lower() == 'true'
+#         return status_flag
+#
+#     def handle_request(self):
+#         # Call appropriate method based on flags in request
+#         camera_ids = self.get_camera_ids()
+#         commit_enabled = self.is_commit_enabled()
+#         status_enabled = self.is_status_enabled()
+#
+#         if commit_enabled:
+#             self.commit(camera_ids)
+#         if status_enabled:
+#             self.status(camera_ids)
+#         if camera_ids:
+#             self.find_best_regions(camera_ids)
+#
+#     def find_best_regions(self, camera_ids):
+#         # Find the best regions for given cameras
+#         print(camera_ids)
+#         pass
+#
+#     def commit(self, camera_ids):
+#         # Commit changes to database for given cameras
+#         print("commit", camera_ids)
+#         pass
+#
+#     def status(self, camera_ids):
+#         # Get current status of given cameras
+#         print("status", camera_ids)
+#         pass
+
+# class TestAPI(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     @swagger_auto_schema(
+#         operation_id="TestAPI",
+#         description="Test API",
+#         tags=["test"],
+#
+#     )
+#     def post(self, request):
+#         test_manager = SuggestedRegions(request)
+#         tasks = test_manager.handle_request()
+#         return Response({'tasks': tasks})
+
+
+def split_into_groups(lst, y):
+    avg = len(lst) / float(y)
+    groups = []
+    last = 0.0
+
+    while last < len(lst):
+        groups.append(lst[int(last):int(last + avg)])
+        last += avg
+
+    return groups
+
 
 # @permission_required('main_menu.change_referenceimage')
 @group_required('Regions')
 def input_camera_for_regions(request):
     user_name = request.user.username
     logger.info("User {u} access to Regions".format(u=user_name))
+    if request.method == 'POST' and 'input_list_for_find_best_regions' and request.FILES:
+
+
+        uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.replace(b'\r\n', b'\n')
+        uploaded_file = uploaded_file.decode().split("\n")
+        uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
+
+        # filtering out any record that has snooze
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # Extract the items that exist in the model
+        matching_items = matching_records.values_list('camera_number', flat=True)
+
+        # Iterate over your list and check if each item exists in the model
+        good_numbers = []
+        bad_numbers = []
+        for item in uploaded_file:
+            if item in matching_items:
+                good_numbers.append(item)
+            else:
+                bad_numbers.append(item)
+
+        if bad_numbers:
+            message =  f"Invalid camera numbers in file - {bad_numbers}"
+            superuser = True
+            return render(request, 'main_menu/regions.html',
+                          {'message': message, 'superuser': superuser})
+
+        if good_numbers:
+            camera_ids = []
+            for number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=number)
+                # added check for snooze - principle is if snooze selected then never check anywhere,
+                # if not camera_object.snooze:
+                camera_ids.append(camera_object.id)
+
+            x = int(number_of_cpus)
+            sublists = split_into_groups(camera_ids, x)
+            cleaned_sublist = [x for x in sublists if x]
+            for cameras in cleaned_sublist:
+                find_best_regions.delay(cameras)
+
+            message = ""
+            superuser = True
+            return render(request, 'main_menu/regions.html',
+                          {'message': message, 'superuser': superuser})
 
     if request.method == 'POST' and 'find_best_regions' in request.POST:
         # print("Got best regions")
@@ -2032,15 +2197,22 @@ def input_camera_for_regions(request):
         camera_ids = [item.id for item in camera_objects]
         number_of_cameras_in_run = len(camera_ids)
         x = int(number_of_cpus)
-        num_sublists = (len(camera_ids) + x - 1) // x
-        sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
-        task_signatures = [find_best_regions.s(numbers) for numbers in sublists]
-        job = group(task_signatures)
-        result = job.apply_async()
-        try:
-            result.save()
-        except AttributeError:
-            pass
+        # num_sublists = (len(camera_ids) + x - 1) // x
+        # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(x)]
+        sublists = split_into_groups(camera_ids, x)
+        cleaned_sublist = [x for x in sublists if x]
+        for cameras in cleaned_sublist:
+            find_best_regions.delay(cameras)
+        # start_find_best_regions.delay(sublists)
+
+        #start_find_best_regions
+        # task_signatures = [find_best_regions.s(numbers) for numbers in sublists]
+        # job = group(task_signatures)
+        # result = job.apply_async()
+        # try:
+        #     result.save()
+        # except AttributeError:
+        #     pass
         # result = find_best_regions.delay(camera_ids)
         # for group_of_cameras in sublists:
         #     find_best_regions.delay(group_of_cameras)
@@ -2048,11 +2220,11 @@ def input_camera_for_regions(request):
         # while not result.ready():
         #     time.sleep(1)
         # message = result.get()
-        message = result.id
-        # print(message, result.backend)
-        request.session['task_id'] = result.id
-        request.session.save()  # Save session data
-        # print('message', message)
+        # message = result.id
+        # # print(message, result.backend)
+        # request.session['task_id'] = result.id
+        # request.session.save()  # Save session data
+        # # print('message', message)
         message = ""
         superuser = True
         return render(request, 'main_menu/regions.html',
@@ -2123,6 +2295,10 @@ def input_camera_for_regions(request):
         superuser = True
         return render(request, 'main_menu/regions.html',
                       {'message': message, 'superuser': superuser})
+
+    # if request.method == 'POST' and 'copy_references' in request.POST:
+    #     reverse("copy_references")
+
 
     if request.method == 'POST':
 
@@ -2311,23 +2487,7 @@ def action_per_hour_report(request):
     return render(request, 'main_menu/log_summary.html', {'table': table})
 
 
-@shared_task()
-def clear_logs():
-    last_log_date = timezone.now() - datetime.timedelta(days=log_retention_period_days)
-    logs = LogImage.objects.filter(creation_date__lte=last_log_date)
-    # print(len(logs))
-    number_of_logs = len(logs)
-    logs.delete()
-    engine_objects = EngineState.objects.filter(state_timestamp__lte=last_log_date)
-    engine_objects.delete()
-    # Camera.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
-    # LogImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
-    # ReferenceImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
-    LogEntry.objects.filter(action_time__lt=timezone.now() - timedelta(days=120)).delete()
-    logging.info(f"Log file cleared from {last_log_date} - {number_of_logs} logs removed")
-
-
-@shared_task()
+@shared_task(name='main_menu.views.check_all_cameras', time_limit=28800, soft_time_limit=28800)
 def check_all_cameras():
     user_name = "system_scheduler"
     camera_objects = Camera.objects.all()
@@ -2337,6 +2497,11 @@ def check_all_cameras():
     # sublists = [camera_ids[i * x: (i + 1) * x] for i in range(num_sublists)]
     number_of_cameras_in_run = len(camera_ids)
     sublists = group_cameras_by_psn_ip()
+    # [ [12725, 1276], [1345, 1357, 1367] ]
+    cleaned_sublists = [x for x in sublists if x]
+    # flattened_list = []
+    # for sublist in cleaned_sublists:
+    #     flattened_list.extend(sublist)
 
     # create STARTED record first then create FINISHED and pass that record id to celery to have the
     # workers update the timestamp and counts as the complete check
@@ -2350,7 +2515,10 @@ def check_all_cameras():
     logger.info(f"SCHEDULER STARTED for Run Number {engine_state_id}")
     # for group_of_cameras in sublists:
     #     process_cameras.delay(group_of_cameras, engine_state_id, user_name)
-    process_cameras.delay(sublists, engine_state_id, user_name, force_check=False)
+    logger.info(f"FORM VIEWS camera list {cleaned_sublists}")
+    process_cameras.delay(cleaned_sublists, engine_state_id, user_name, force_check=False)
+
+
 
 # @shared_task
 # def check_groups(groups, *args, **kwargs):
@@ -2385,3 +2553,620 @@ def check_all_cameras():
 #     # for group_of_cameras in sublists:
 #     #     process_cameras.delay(group_of_cameras, engine_state_id, user_name)
 #     process_cameras.delay(sublists, engine_state_id, user_name)
+
+def copy_reference_images(request):
+    filter_form = FilterForm(request.GET or None)
+    queryset = ReferenceImage.objects.all()
+    table = ReferenceImageTable(queryset)
+    table.paginate(page=request.GET.get("page", 1), per_page=24)
+
+    if request.method == 'POST':
+        selection = request.POST.getlist("selection")
+        selected_hours = request.POST.getlist('hour')
+        # print("selection", selection)
+        # print("selected_hours", selected_hours)
+        if len(selection) != 1:
+            # queryset = ReferenceImage.objects.all()
+            #
+            # table = ReferenceImageTable(queryset)
+            # table.paginate(page=request.GET.get("page", 1), per_page=24)
+            return render(request, "main_menu/select_regions_table.html", {'filter_form': filter_form,
+                                                                           "error_message": "Please select one reference image you wish to copy", "table": table})
+        if not selected_hours:
+            # queryset = ReferenceImage.objects.all()
+            #
+            # table = ReferenceImageTable(queryset)
+            # table.paginate(page=request.GET.get("page", 1), per_page=24)
+            return render(request, "main_menu/select_regions_table.html",
+                          {'filter_form': filter_form,
+                           "error_message": "Please select the hours to copy the reference image to",
+                           "table": table})
+
+        # Do copy here
+        source_reference_image_object = ReferenceImage.objects.get(id=selection[0])
+        image = source_reference_image_object.image
+        version = str(source_reference_image_object.version).zfill(4)
+        url_id = source_reference_image_object.url_id
+        for hour in selected_hours:
+            new_file_name = f"base_images/{url_id}/{version}-{hour}.jpg"
+
+            try:
+                target_reference_image_object = ReferenceImage.objects.get(url_id = url_id, hour = hour, version = version)
+                if image != new_file_name:
+                    result = subprocess.run(["cp", f"{settings.MEDIA_ROOT}/{image}", f"{settings.MEDIA_ROOT}/{new_file_name}"], capture_output=True, text=True)
+                if result.returncode != 0:
+                    # handle error
+                    # queryset = ReferenceImage.objects.all()
+                    # table = ReferenceImageTable(queryset)
+                    # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                    return render(request, "main_menu/select_regions_table.html",
+                              {'filter_form': filter_form,
+                               "error_message": f"Error copying reference image - {result.stderr}",
+                               "table": table})
+            except ObjectDoesNotExist:
+                # create here.
+                try:
+                    ReferenceImage.objects.create(url=source_reference_image_object.url,
+                                                  image=f"base_images/{url_id}/{version}-{hour}.jpg",
+                                                  light_level=source_reference_image_object.light_level,
+                                                  focus_value=source_reference_image_object.focus_value,
+                                                  creation_date=timezone.now(),
+                                                  version=int(version),
+                                                  hour=hour
+                                                  )
+                    result = subprocess.run(["cp", f"{settings.MEDIA_ROOT}/{image}", f"{settings.MEDIA_ROOT}/{new_file_name}"], capture_output=True,
+                                            text=True)
+                    if result.returncode != 0:
+                        # table = ReferenceImageTable(queryset)
+                        # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                        return render(request, "main_menu/select_regions_table.html",
+                                      {'filter_form': filter_form,
+                                       "error_message": f"Error copying reference image - {result.stderr}",
+                                       "table": table})
+                except Exception as e:
+                    # table = ReferenceImageTable(queryset)
+                    # table.paginate(page=request.GET.get("page", 1), per_page=24)
+                    return render(request, "main_menu/select_regions_table.html",
+                                  {'filter_form': filter_form,
+                                   "error_message": f"Error creating new reference image - {e}",
+                                   "table": table})
+                # print("Creating new hour")
+                all_new_reference_images = ReferenceImage.objects.filter(url_id=url_id, version=source_reference_image_object.version)
+                
+                if ReferenceImage.objects.filter(url_id=url_id, version=source_reference_image_object.version).count() == 24:
+                    try:
+
+                        Camera.objects.filter(pk=url_id).update(trigger_new_reference_image=False)
+                        Camera.objects.filter(pk=url_id).update(reference_image_version=source_reference_image_object.version)
+                        
+                    except ObjectDoesNotExist:
+                        logger.error(f"Unbale to update original camera unique id {url_id}")
+
+
+        # queryset = ReferenceImage.objects.all()
+        # table = ReferenceImageTable(queryset)
+        # table.paginate(page=request.GET.get("page", 1), per_page=24)
+        return render(request, "main_menu/select_regions_table.html",
+                          {'filter_form': filter_form,
+                           "error_message": "Successfully copied",
+                           "table": table})
+
+
+    if filter_form.is_valid():
+        camera_number = filter_form.cleaned_data.get('camera_number')
+        version = filter_form.cleaned_data.get('reference_image_version')
+ 
+        try:
+            camera = Camera.objects.get(camera_number=camera_number)
+            url_id = camera.id
+            # version = camera.reference_image_version
+            queryset = ReferenceImage.objects.filter(url_id=url_id, version=version)
+        except ObjectDoesNotExist:
+            queryset = ReferenceImage.objects.all()
+            table = ReferenceImageTable(queryset)
+            table.paginate(page=request.GET.get("page", 1), per_page=24)
+            return render(request, "main_menu/select_regions_table.html",
+                          {'filter_form': filter_form,
+                           "error_message": "Camera number does not exist",
+                           "table": table})
+        # if camera_number:
+        #     camera = Camera.objects.filter(camera_number=camera_number).first()
+        #     url_id = camera.id if camera else None
+        #     queryset = ReferenceImage.objects.filter(url_id=url_id)
+        # else:
+        #     queryset = ReferenceImage.objects.all()
+
+        # for key, value in filter_form.cleaned_data.items():
+        #     if key != 'camera_number':
+        #         queryset = queryset.filter(**{key: value})
+    else:
+        queryset = ReferenceImage.objects.all()
+
+    table = ReferenceImageTable(queryset)
+    table.paginate(page=request.GET.get("page", 1), per_page=24)
+    return render(request, "main_menu/select_regions_table.html", {'filter_form': filter_form,
+        "table": table})
+
+
+def migrate_reference_images(request):
+    buffer_for_download = io.BytesIO()
+    if request.method == "POST" and request.FILES and "input_list_for_migration" in request.POST:
+
+        uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.replace(b'\r\n', b'\n')
+        uploaded_file = uploaded_file.decode().split("\n")
+        uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
+
+        # filtering out any record that has snooze
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # Extract the items that exist in the model
+        matching_items = matching_records.values_list('camera_number', flat=True)
+
+        # Iterate over your list and check if each item exists in the model
+        good_numbers = []
+        bad_numbers = []
+        for item in uploaded_file:
+            if item in matching_items:
+                good_numbers.append(item)
+            else:
+                bad_numbers.append(item)
+
+        if bad_numbers:
+            message = f"Invalid camera numbers in file - {bad_numbers}"
+            superuser = True
+            return render(request, 'main_menu/regions.html',
+                          {'message': message, 'superuser': superuser})
+
+        if good_numbers:
+            camera_ids = []
+            for number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=number)
+                # added check for snooze - principle is if snooze selected then never check anywhere,
+                # if not camera_object.snooze:
+                camera_ids.append(camera_object.id)
+
+            # x = int(number_of_cpus)
+            # sublists = split_into_groups(camera_ids, x)
+            # cleaned_sublist = [x for x in sublists if x]
+            camera_csv_buffer = io.StringIO()
+            camera_writer = csv.writer(camera_csv_buffer)
+            fieldnames = [
+                'url',
+                'multicast_address',
+                'multicast_port',
+                'camera_username',
+                'camera_password',
+                'camera_number',
+                'camera_name',
+                'camera_location',
+                'image_regions',
+                'matching_threshold',
+                'focus_value_threshold',
+                'light_level_threshold',
+                'creation_date',
+                'last_check_date',
+                'snooze',
+                'trigger_new_reference_image',
+                'freeze_check',
+                'trigger_new_reference_image_date',
+                'reference_image_version',
+                'group_name_id'
+            ]
+            camera_writer.writerow(fieldnames)
+            for camera_number in good_numbers:
+                camera = Camera.objects.get(camera_number=camera_number)
+                camera.image_regions = camera.image_regions.replace("'","")
+                camera_dict = {
+                    'url': camera.url,
+                    'multicast_address': str(camera.multicast_address),
+                    'multicast_port': camera.multicast_port,
+                    'camera_username': camera.camera_username,
+                    'camera_password': camera.camera_password,
+                    'camera_number': camera.camera_number,
+                    'camera_name': camera.camera_name,
+                    'camera_location': camera.camera_location,
+                    'image_regions': camera.image_regions,
+                    'matching_threshold': camera.matching_threshold,
+                    'focus_value_threshold': camera.focus_value_threshold,
+                    'light_level_threshold': camera.light_level_threshold,
+                    'creation_date': camera.creation_date.strftime('%Y-%m-%d %H:%M:%STZ %Z%z'),
+                    'last_check_date': camera.last_check_date.strftime('%Y-%m-%d %H:%M:%STZ %Z%z'),
+                    'snooze': camera.snooze,
+                    'trigger_new_reference_image': camera.trigger_new_reference_image,
+                    'freeze_check': camera.freeze_check,
+                    'trigger_new_reference_image_date': camera.trigger_new_reference_image_date.strftime(
+                        '%Y-%m-%d %H:%M:%STZ %Z%z'),
+                    'reference_image_version': camera.reference_image_version,
+                    'group_name_id': camera.group_name_id
+                }
+
+                # Write the row to the CSV file
+                camera_writer.writerow([camera_dict[field] for field in fieldnames])
+            camera_csv_bytes = camera_csv_buffer.getvalue().encode('utf-8')
+            camera_csv_file = io.BytesIO(camera_csv_bytes)
+            camera_csv_file.seek(0)
+
+            fieldnames = [
+                'old_id',
+                'camera_number',
+                'image',
+                'hour',
+                'light_level',
+                'focus_value',
+                'creation_date',
+                'version'
+            ]
+            reference_csv_buffer = io.StringIO()
+            reference_writer = csv.writer(reference_csv_buffer)
+            reference_writer.writerow(fieldnames)
+
+            for camera_number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=camera_number)
+                reference_objects = ReferenceImage.objects.filter(url=camera_object.id)
+                for reference_object in reference_objects:
+                    reference_dict = {
+                        'old_id': camera_object.id,
+                        'camera_number': camera_object.camera_number,
+                        'image': reference_object.image,
+                        'hour': reference_object.hour,
+                        'light_level': reference_object.light_level,
+                        'focus_value': reference_object.focus_value,
+                        'creation_date': reference_object.creation_date.strftime('%Y-%m-%d %H:%M:%STZ %Z%z'),
+                        'version': reference_object.version
+                    }
+                    reference_writer.writerow([reference_dict[field] for field in fieldnames] )
+            reference_csv_bytes = reference_csv_buffer.getvalue().encode('utf-8')
+            reference_csv_file = io.BytesIO(reference_csv_bytes)
+            reference_csv_file.seek(0)
+
+            with tarfile.open(fileobj=buffer_for_download, mode='w:gz') as tar:
+                info = tarfile.TarInfo(name=f'camera_export-{datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}.csv')
+                info.size = len(camera_csv_bytes)
+                tar.addfile(tarinfo=info, fileobj=camera_csv_file)
+                info = tarfile.TarInfo(
+                    name=f'reference_export-{datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}.csv')
+                info.size = len(reference_csv_bytes)
+                tar.addfile(tarinfo=info, fileobj=reference_csv_file)
+
+                for camera_number in good_numbers:
+                    camera = Camera.objects.get(camera_number=camera_number)
+                    reference_images = ReferenceImage.objects.filter(url=camera.id, version=camera.reference_image_version)
+                    for reference_image in reference_images:
+                        reference_image_file = reference_image.image.name
+                        tar.add(settings.MEDIA_ROOT + "/" + reference_image_file, arcname=reference_image_file)
+
+            buffer_for_download.seek(0)
+
+            # return FileResponse(tarfile, as_attachment=True, filename='tar_file.tar')
+            response = StreamingHttpResponse(buffer_for_download, content_type='application/gzip')
+            response['Content-Disposition'] = 'attachment; filename="migration_archive.tar.gz"'
+            return response
+    if request.method == "POST" and request.FILES and "input_archive_migration" in request.POST:
+        pass
+        tar_file = request.FILES['tar_file']
+        logger.info(len(tar_file))
+        with tarfile.open(fileobj=tar_file, mode='r') as tar:
+            camera_csv_file_name = next((f for f in tar.getmembers() if f.name.startswith("camera_export")), None)
+            reference_csv_file_name = next((f for f in tar.getmembers() if f.name.startswith("reference_export")), None)
+            image_files_names = [f for f in tar.getmembers() if f.name.startswith("base_images")]
+            camera_csv_extract = tar.extractfile(camera_csv_file_name)
+            if camera_csv_extract:
+                camera_csv_bytes = BytesIO(camera_csv_extract.read())
+                csv_lines = camera_csv_bytes.getvalue().decode('utf-8').splitlines()
+                headers = csv_lines[0].strip().split(',')
+                headers = [header.strip() for header in headers]
+                for line in csv_lines[1:]:
+                    # data = line.strip().split(',')
+                    # data = [item.strip() for item in data]
+                    reader = csv.reader([line])
+                    data = list(reader)[0]
+                    row_dict = {headers[i]: data[i] for i in range(len(headers))}
+                    converted_row = {}
+                    for key, value in row_dict.items():
+                        field = Camera._meta.get_field(key)
+                        # if isinstance(field, models.CharField) and field.name == "image_regions":
+                        #     converted_row[key] = value.strip("\'")
+
+                        if isinstance(field, (models.DateTimeField)):
+                            try:
+                                dt = value.replace("TZ", '')
+                                date_val = datetime.datetime.strptime(dt, "%Y-%m-%d %H:%M:%S %Z%z")
+                                converted_row[key] = date_val
+                            except ValueError:
+                                print(f"Skipping {key} due to invalid date format")
+                                continue  # or set to None as needed
+                        elif isinstance(field, models.IntegerField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                converted_row[key] = int(value)
+                        elif isinstance(field, models.BooleanField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                # converted_row[key] = bool(value)
+                                converted_row[key] = value.lower() == 'true'
+                        elif isinstance(field, models.DecimalField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                converted_row[key] = float(value)
+                        # Add more field types as needed
+                        else:
+                            if value == "None":
+                                value = None
+                            converted_row[key] = value
+                    try:
+                        if Camera.objects.filter(camera_number=row_dict['camera_number']).exists():
+                            # Update existing record or create new if not exists
+                            # if row_dict['multicast_address'] == 'None':
+                            #     updates = {
+                            #         'url': row_dict['url'],
+                            #         'multicast_port': converted_row['multicast_port'],
+                            #         'camera_username': converted_row['camera_username'],
+                            #         'camera_password': converted_row['camera_password'],
+                            #         'camera_number': converted_row['camera_number'],
+                            #         'camera_name': converted_row['camera_name'],
+                            #         'camera_location': converted_row['camera_location'],
+                            #         'image_regions': converted_row['image_regions'],
+                            #         'matching_threshold': converted_row['matching_threshold'],
+                            #         'focus_value_threshold': converted_row['focus_value_threshold'],
+                            #         'light_level_threshold': converted_row['light_level_threshold'],
+                            #         'creation_date': converted_row['creation_date'],
+                            #         'last_check_date': converted_row['last_check_date'],
+                            #         'snooze': converted_row['snooze'],
+                            #         'trigger_new_reference_image': converted_row['trigger_new_reference_image'],
+                            #         'freeze_check': converted_row['freeze_check'],
+                            #         'trigger_new_reference_image_date': converted_row['trigger_new_reference_image_date'],
+                            #         'reference_image_version': converted_row['reference_image_version'],
+                            #         'group_name_id': converted_row['group_name_id']
+                            #     }
+                            #     Camera.objects.filter(camera_number=row_dict['camera_number']).update(**updates)
+                            #     logger.info(f"Updated {Camera.__name__} with camera number: {row_dict['camera_number']}")
+                            # else:
+                            #     Camera.objects.create(**converted_row)
+                            #     logger.info(f"Created {Camera.__name__} with camera number: {row_dict['camera_number']}")
+                            Camera.objects.filter(camera_number=row_dict['camera_number']).update(**converted_row)
+                            Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_hours.set(
+                                HoursInDay.objects.all())
+                            Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_days.set(
+                                DaysOfWeek.objects.all())
+                            print(Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_hours.all())
+                            print(Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_days.all())
+                        else:
+                            # create record
+                            Camera.objects.create(**converted_row)
+                            Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_hours.set(
+                                HoursInDay.objects.all())
+                            Camera.objects.get(camera_number=row_dict['camera_number']).scheduled_days.set(
+                                DaysOfWeek.objects.all())
+                            logger.info(f"Created {Camera.__name__} with camera number: {row_dict['camera_number']}")
+
+                    except Exception as e:
+                        logger.error(f"Error processing line: {e}")
+
+            reference_csv_extract = tar.extractfile(reference_csv_file_name)
+
+            if reference_csv_extract:
+                reference_csv_bytes = BytesIO(reference_csv_extract.read())
+                csv_lines = reference_csv_bytes.getvalue().decode('utf-8').splitlines()
+                headers = csv_lines[0].strip().split(',')
+                headers = [header.strip() for header in headers]
+                for line in csv_lines[1:]:
+                    # data = line.strip().split(',')
+                    # data = [item.strip() for item in data]
+                    reader = csv.reader([line])
+                    data = list(reader)[0]
+                    row_dict = {headers[i]: data[i] for i in range(len(headers))}
+                    converted_row = {}
+                    camera_object = Camera.objects.get(camera_number=row_dict['camera_number'])
+                    url = camera_object
+                    new_id = camera_object.id
+                    # url = Camera.objects.get(camera_number=row_dict['camera_number'])
+                    del row_dict['camera_number']
+                    old_id = row_dict['old_id']
+                    del row_dict['old_id']
+                    for key, value in row_dict.items():
+                        field = ReferenceImage._meta.get_field(key)
+                        # if isinstance(field, models.CharField) and field.name == "image_regions":
+                        #     converted_row[key] = value.strip("\'")
+
+                        if isinstance(field, (models.DateTimeField)):
+                            try:
+                                dt = value.replace("TZ", '')
+                                date_val = datetime.datetime.strptime(dt, "%Y-%m-%d %H:%M:%S %Z%z")
+                                converted_row[key] = date_val
+                            except ValueError:
+                                logger.error(f"Skipping {key} due to invalid date format")
+                                continue  # or set to None as needed
+                        elif isinstance(field, models.IntegerField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                converted_row[key] = int(value)
+                        elif isinstance(field, models.BooleanField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                converted_row[key] = bool(value)
+                        elif isinstance(field, models.DecimalField):
+                            if value.strip() == '':
+                                converted_row[key] = None
+                            else:
+                                converted_row[key] = float(value)
+                        # Add more field types as needed
+                        else:
+                            if value == "None":
+                                value = None
+                            converted_row[key] = value
+
+                    try:
+
+                        # Update existing record or create new if not exists
+                        # if row_dict['multicast_address'] == 'None':
+                            # updates = {
+                            #     'camera_number': converted_row['camera_number'],
+                            #     'image': converted_row['image'],
+                            #     'hour': converted_row['hour'],
+                            #     'image_regions': converted_row['image_regions'],
+                            #     'light_level': converted_row['light_level'],
+                            #     'focus_value': converted_row['focus_value'],
+                            #     'creation_date': converted_row['creation_date'],
+                            #     'version': converted_row['version'],
+                            # }
+                            # Update existing record or create new if not exists
+                        converted_row['image'] = str(converted_row['image']).replace(str(old_id), str(url.id))
+                        obj, created = ReferenceImage.objects.update_or_create(
+                            url=url, hour=row_dict['hour'],
+                            defaults=converted_row,
+                        )
+                        if created:
+                            logger.info(f"Created {ReferenceImage.__name__} with camera: {url.camera_number}")
+                        else:
+                            logger.info(f"Updated {ReferenceImage.__name__} with camera: {url.camera_number}")
+                        # else:
+                        #     # Create new record
+                        #     ReferenceImage.objects.create(**converted_row)
+                        #     print(f"Created new {ReferenceImage.__name__}")
+
+                        for file in image_files_names:
+                            hour_ext = row_dict['hour'] + ".jpg"
+                            if file.name.endswith(hour_ext) and file.name.startswith(f"base_images/{old_id}"):
+                                logger.info(f"found file {file.name}")
+                                file_object = tar.extractfile(file)
+                                file_data = file_object.read()
+                                os.makedirs(f"/home/checkit/camera_checker/media/base_images/{url.id}", exist_ok=True)
+                                new_file_name  = file.name.replace(f"base_images/{old_id}/", "")
+                                with open(f"/home/checkit/camera_checker/media/base_images/{url.id}/{new_file_name}", "wb") as f:
+                                    f.write(file_data)
+                                    f.close()
+                    except Exception as e:
+                        logger.info(f"Error processing line: {e}")
+
+            print("file_names")
+
+    if request.method == 'POST' and request.FILES and "synergy_import_file" in request.POST:
+        pass
+        input1 = int(request.POST.get('input1', 0))
+        input2 = int(request.POST.get('input2', 0))
+        uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.replace(b'\r\n', b'\n')
+        uploaded_file = uploaded_file.decode().split("\n")
+        uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
+
+        # filtering out any record that has snooze
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # Extract the items that exist in the model
+        matching_items = matching_records.values_list('camera_number', flat=True)
+
+        # Iterate over your list and check if each item exists in the model
+        good_numbers = []
+        bad_numbers = []
+        for item in uploaded_file:
+            if item in matching_items:
+                good_numbers.append(item)
+            else:
+                bad_numbers.append(item)
+
+        if bad_numbers:
+            message = f"Invalid camera numbers in file - {bad_numbers}"
+            superuser = True
+            return render(request, 'main_menu/regions.html',
+                          {'message': message, 'superuser': superuser})
+
+        camera_ids = []
+
+        if good_numbers:
+            for number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=number)
+                # added check for snooze - principle is if snooze selected then never check anywhere,
+                # if not camera_object.snooze:
+                #     camera_ids.append(camera_object.id)
+                camera_ids.append(camera_object.id)
+
+        fieldnames = [
+            'Camera ID',
+            'focus value threshold',
+            'light level threshold',
+            'matching threshold',
+            'schedule ID',
+            'device group ID',
+            'dg focus value threshold',
+            'dg light level threshold',
+            'dg matching threshold',
+            'dg schedule id'
+        ]
+        synergy_csv_buffer = io.StringIO()
+        synergy_writer = csv.writer(synergy_csv_buffer)
+        synergy_writer.writerow(fieldnames)
+        for camera_id in camera_ids:
+            camera_object = Camera.objects.get(id=camera_id)
+
+            synergy_dict = {
+                'Camera ID': camera_object.camera_number,
+                'focus value threshold': camera_object.focus_value_threshold,
+                'light level threshold': camera_object.light_level_threshold,
+                'matching threshold': camera_object.matching_threshold,
+                'schedule ID': input1,
+                'device group ID': input2,
+                'dg focus value threshold': None,
+                'dg light level threshold': None,
+                'dg matching threshold': None,
+                'dg schedule id': None
+            }
+            synergy_writer.writerow([synergy_dict[field] for field in fieldnames])
+        synergy_csv_bytes = synergy_csv_buffer.getvalue().encode('utf-8')
+        synergy_csv_file = io.BytesIO(synergy_csv_bytes)
+        synergy_csv_file.seek(0)
+        response = StreamingHttpResponse(synergy_csv_file, content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="synergy.csv"'
+        return response
+    return render(request, "main_menu/migrate_reference_images.html")
+
+
+def clear_reference_images(request):
+    user_name = request.user.username
+    logger.info(f"Clearing reference images accessed from user -- {request.user}")
+    if request.method == "POST" and request.FILES and "input_list_for_reference_image_deletion" in request.POST:
+
+        uploaded_file = request.FILES['camera_list'].read()
+        uploaded_file = uploaded_file.replace(b'\r\n', b'\n')
+        uploaded_file = uploaded_file.decode().split("\n")
+        uploaded_file = [int(item) for item in uploaded_file if item.isdigit()]
+
+        # filtering out any record that has snooze
+        matching_records = Camera.objects.filter(camera_number__in=uploaded_file)
+
+        # Extract the items that exist in the model
+        matching_items = matching_records.values_list('camera_number', flat=True)
+
+        # Iterate over your list and check if each item exists in the model
+        good_numbers = []
+        bad_numbers = []
+        for item in uploaded_file:
+            if item in matching_items:
+                good_numbers.append(item)
+            else:
+                bad_numbers.append(item)
+
+        if bad_numbers:
+            message = f"Invalid camera numbers in file - {bad_numbers}"
+            return render(request, 'main_menu/clear_reference_images.html',
+                          {'message': message, })
+
+        if good_numbers:
+            camera_ids = []
+            for number in good_numbers:
+                camera_object = Camera.objects.get(camera_number=number)
+                # added check for snooze - principle is if snooze selected then never check anywhere,
+                # if not camera_object.snooze:
+                camera_ids.append(camera_object.id)
+
+        reference_images = ReferenceImage.objects.filter(url_id__in=camera_ids)
+
+        reference_images.delete()
+        message = f"Deleted {len(reference_images)} reference images"
+        return render(request, 'main_menu/clear_reference_images.html', {'message': message})
+    return render(request, 'main_menu/clear_reference_images.html')

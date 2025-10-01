@@ -153,9 +153,10 @@
 
                         </form>
                         {% endif %}
+                                                    {% render_table table 'custom_table.html' %}
+
                         <form action="/export/" method="post">
                             {% csrf_token %}
-                            {% render_table table 'custom_table.html' %}
                             <script language="JavaScript">
                                 function toggle(source) {
                                 checkboxes = document.getElementsByName('selection');

@@ -20,6 +20,8 @@ import hashlib
 import ipaddress
 from urllib.parse import urlparse
 import base64
+
+from django.db.backends.mysql.base import version
 from wurlitzer import pipes
 import skimage
 from skimage import color
@@ -53,11 +55,16 @@ import decimal
 from math import isnan
 from requests_toolbelt.multipart import decoder
 import requests.auth
+from django.contrib.admin.models import LogEntry
+from datetime import timedelta
+from itertools import islice
+
+
 
 # camera_list = [10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030,
 #                10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038]
 
-__version__ = 2.1
+__version__ = 2.11
 
 logger = get_task_logger(__name__)
 
@@ -119,6 +126,7 @@ def setup_task():
     # Perform some setup actions
     logger.info("Setup task running")
     ret_code = ProtCheck()
+    # ret_code = 0
     if ret_code != 0:
         logger.error("LICENSE HARDWARE ERROR")
         return "License Hardware Failed"
@@ -128,7 +136,7 @@ def setup_task():
 
 
 
-@shared_task
+@shared_task(name='main_menu.tasks.all_done', time_limit=333333, soft_time_limit=333333)
 def all_done(previous_return_value, engine_state_id, camera_list):
     for return_value in previous_return_value:
         if return_value == "Success":
@@ -146,7 +154,9 @@ def all_done(previous_return_value, engine_state_id, camera_list):
     number_of_skipped = logs.filter(action="Skipped").count()
     number_of_reference_capture = logs.filter(action="Reference Captured").count()
     number_of_capture_errors = logs.filter(action="Capture Error").count()
-    number_of_others = number_of_capture_errors + number_of_skipped + number_of_reference_capture
+    number_of_image_size_errors = logs.filter(action="Image Size Error").count()
+    number_of_others = (number_of_capture_errors + number_of_skipped +
+                        number_of_reference_capture + number_of_image_size_errors)
     engine_start_time = EngineState.objects.get(id=engine_state_id - 1).state_timestamp
     engine_object = EngineState.objects.get(id=engine_state_id)
 
@@ -513,6 +523,7 @@ def get_config():
     global freeze_threshold
     global backup
     global backup_server
+    global log_retention_period_days
 
     try:
         if config.has_option('DEFAULT', 'log_alarms'):
@@ -555,6 +566,11 @@ def get_config():
             transaction_delay = config.getint('DEFAULT', 'transaction_delay', fallback=0)
         except ValueError:
             logger.error("Please configure config file for transaction_delay")
+
+        try:
+            log_retention_period_days = config.getint('DEFAULT', 'log_retention_period_days', fallback=0)
+        except ValueError:
+            log_retention_period_days = 30
 
         try:
             freeze_threshold = config.getfloat('DEFAULT', 'freeze_threshold', fallback=0.99)
@@ -700,7 +716,12 @@ def send_alarms(cameras_details, run_number, web_server_type):
         camera_location = cameras_details.get(id=url_id).camera_location
 
         if reference_image_id:
-            reference_image_object = ReferenceImage.objects.get(pk=reference_image_id)
+
+            try:
+                reference_image_object = ReferenceImage.objects.get(pk=reference_image_id)
+            except ObjectDoesNotExist:
+                logger.error(f"ERROR [send_alarm] reference image object does not exist {reference_image_id}")
+                return
             reference_image = reference_image_object.image
             reference_image_creation_date = reference_image_object.creation_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         else:
@@ -740,7 +761,7 @@ def send_alarms(cameras_details, run_number, web_server_type):
                      + "<additionalJpeg>" + reference_image + "</additionalJpeg>" \
                      + "<hidden>" + "false" + "</hidden>" \
                      + "<additionalData>" + additional_data + "</additionalData>" \
-                     + "<autoClose>true</autoClose></Request>""" + "\x00"
+                     + "<autoClose>true</autoClose></Request>" + "\x00"
 
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1120,7 +1141,9 @@ def compare_images(base, frame, regions):
         focus_value = 0
     # blur = cv2.blur(frame, (5, 5))
     # light_level = cv2.mean(blur)[0]
-
+    if matching_score < 0:
+        matching_score = 0
+    matching_score = float(matching_score)
     return {"matching score": matching_score, "focus value": focus_value,
             "region scores": region_scores, "noise_level": noise_level}
 
@@ -1237,8 +1260,9 @@ def create_base_image(camera_object, capture_device, version, user, engine_state
             # focus_value = round(1 - focus_value, 2)
 
             image_file_name = file_name.strip(f"{settings.MEDIA_ROOT}/")
+            reference_image_id = None
             try:
-                ReferenceImage.objects.create(url_id=camera_object.id, image=image_file_name,
+                reference_image_id = ReferenceImage.objects.create(url_id=camera_object.id, image=image_file_name,
                                               hour=timezone.localtime().strftime('%H'),
                                               light_level=base_brightness,
                                               creation_date=timezone.now(),
@@ -1260,9 +1284,9 @@ def create_base_image(camera_object, capture_device, version, user, engine_state
                                         current_light_level=camera_object.light_level_threshold,
                                         user=user,
                                         run_number=engine_state_id,
-                                        reference_image_id=None)
-            except:
-                logger.error(f"Error in creating LogImage for camera number {camera_object.camera_number}")
+                                        reference_image_id=reference_image_id.id)
+            except Exception as e:
+                logger.error(f"Error in creating LogImage for camera number {camera_object.camera_number} - {e}")
             try:
                 increment_transaction_count(password)
             except Exception as e:
@@ -1322,7 +1346,7 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
                    f" Error reading video frame for camera id {camera} camera number {camera_object.camera_number}\n")
         log_capture_error(camera, user, engine_state_id, password)
 
-        increment_transaction_count(password)
+        # increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
@@ -1341,26 +1365,62 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
     # we do this by getting the last of reference_image_objects.
     # from there get the version number.
     last_version = camera_object.reference_image_version
+    # if camera_object.trigger_new_reference_image:
+    #     last_version += 1
+
+    # elapsed_time = timezone.now() - camera_object.trigger_new_reference_image_date
+    #
+    # logger.info(
+    #     f"[{timezone.now()}] DEBUG [read_and_compare] - trigger_new_reference_image: {camera_object.trigger_new_reference_image}")
+    # logger.info(
+    #     f"[{timezone.now()}] DEBUG [read_and_compare] - trigger_new_reference_image_date: {camera_object.trigger_new_reference_image_date}")
+    # logger.info(f"[{timezone.now()}] DEBUG [read_and_compare] - last_version: {last_version}")
+    # logger.info(f"[{timezone.now()}] DEBUG [read_and_compare] - elapsed_time: {elapsed_time}")
+
     if camera_object.trigger_new_reference_image:
+        # logger.info("Entered zero")
+        # if elapsed_time < timezone.timedelta(hours=24):
         last_version += 1
-    elapsed_time = timezone.now() - camera_object.trigger_new_reference_image_date
+        if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
 
-    if (camera_object.trigger_new_reference_image and
-            not reference_image_objects.filter(url_id=camera, hour=current_hour, version=last_version).exists()):
-
-        if elapsed_time < timezone.timedelta(hours=24):
-            message = (message + f"[{dt}] INFO [read_and_compare] -"
+            # logger.info("Entered first")
+            message = (message + f"[{timezone.now()}] INFO [read_and_compare] -"
                                  f" Attempting capture of reference image\n")
             response = create_base_image(camera_object, capture_device, last_version,
                                          user, engine_state_id, password, image_frame)
-            message = (message + f"[{dt}] INFO [read_and_compare] -"
+            message = (message + f"[{timezone.now()}] INFO [read_and_compare] -"
                                  f" {response}\n")
             close_capture_device(capture_device, multicast_address)
+            reference_image_id = None
+            try:
+                reference_image_id = ReferenceImage.objects.filter(url_id=camera, hour=current_hour, version=last_version)
+            except ObjectDoesNotExist as e:
+                message = (message + f"[{timezone.now()}] ERROR [read_and_compare] -"
+                                 f" Unable to read newly created reference image {e}\n")
+            # LogImage.objects.create(url_id=camera_object.id, image=None,
+            #                         matching_score=0,
+            #                         region_scores=json.dumps(None),
+            #                         current_matching_threshold=camera_object.matching_threshold,
+            #                         light_level=0,
+            #                         focus_value=0,
+            #                         action="Reference Captured",
+            #                         creation_date=timezone.localtime(),
+            #                         current_focus_value=camera_object.focus_value_threshold,
+            #                         current_light_level=camera_object.light_level_threshold,
+            #                         user=user,
+            #                         run_number=engine_state_id,
+            #                         reference_image_id=reference_image_id)
             return message
-        else:
-            camera_object.trigger_new_reference_image = False
-            camera_object.reference_image_version = last_version + 1
-            camera_object.save()
+        elif reference_image_objects.filter(version=last_version).count() == 24:
+            # logger.info("Entered second")
+            # camera_object.trigger_new_reference_image = False
+            # camera_object.reference_image_version = last_version + 1
+            message = message + f"[{timezone.now()}] INFO [read_and_compare] - New reference image trigger reset\n"
+            # logger.info(
+            #     f"[{timezone.now()}] DEBUG [read_and_compare] - Resetting trigger_new_reference_image to False and updating reference_image_version to {camera_object.reference_image_version}")
+            # camera_object.save()
+            Camera.objects.filter(pk=camera_object.id).update(trigger_new_reference_image=False)
+            Camera.objects.filter(pk=camera_object.id).update(reference_image_version=last_version)
 
     if not reference_image_objects.filter(hour=current_hour, version=last_version).exists():
         message = (message + f"[{dt}] INFO [read_and_compare] -"
@@ -1378,7 +1438,15 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
     # if camera_object.trigger_new_reference_image and (camera_object.trigger_new_reference_image_date)
 
     # this now becomes our version we append to file name and also add this to the get below.
-    file_name = reference_image_objects.get(hour=current_hour, version=last_version).image
+
+    try:
+        file_name = reference_image_objects.get(hour=current_hour, version=last_version).image
+    except ObjectDoesNotExist:
+        logger.error(f"filename object {camera} {current_hour} {last_version}")
+        log_capture_error(camera, user, engine_state_id, password)
+        return
+
+
     base_image_name = f"{settings.MEDIA_ROOT}/{file_name}"
     base_image = cv2.imread(base_image_name)
     if base_image is None:
@@ -1389,7 +1457,7 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
         log_capture_error(camera, user, engine_state_id, password)
         
 
-        increment_transaction_count(password)
+        # increment_transaction_count(password)
         close_capture_device(capture_device, multicast_address)
         return message
 
@@ -1497,6 +1565,9 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
         close_capture_device(capture_device, multicast_address)
         return message
 
+    focus_value = round(decimal.Decimal(str(focus_value)),2)
+    light_level = round(decimal.Decimal(str(light_level)),2)
+
     if matching_score < camera_object.matching_threshold:
         action = "Triggered"
     elif focus_value < camera_object.focus_value_threshold:
@@ -1505,8 +1576,8 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
         action = "Triggered"
     else:
         action = "Pass"
-    if freeze_status:
-        action = "Triggered"
+    # if freeze_status:
+      #  action = "Triggered"
 
     # code below allows for upper and lower range % on thresholds.
     # threshold_ranges = {
@@ -1566,9 +1637,10 @@ def read_and_compare(capture_device, user, engine_state_id, camera_object, image
         return message
     increment_transaction_count(password)
 
-    camera_object = Camera.objects.get(id=camera)
-    camera_object.last_check_date = timezone.now()
-    camera_object.save()
+    # camera_object = Camera.objects.get(id=camera)
+    # camera_object.last_check_date = timezone.now()
+    # camera_object.save()
+    Camera.objects.filter(id=camera).update(last_check_date=timezone.now())
     close_capture_device(capture_device, multicast_address)
     return message
 
@@ -1593,25 +1665,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
             time.sleep(transaction_delay)
 
         camera_object = Camera.objects.get(id=camera)
-        psn_check = False
 
-        if camera_object.psn_ip_address and not camera_object.psn_api_method:
-            # mount the fs
-            os.makedirs(name=f"/tmp/mount_points/{camera_object.psn_ip_address}", exist_ok=True)
-
-            if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
-                psn_check = True
-            else:
-                os.system(f'sudo mount -t cifs -o username={camera_object.psn_user_name},'
-                          f'password={camera_object.psn_password} //{camera_object.psn_ip_address}/F$ /tmp/mount_points/{camera_object.psn_ip_address}/')
-                if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
-                    psn_check = True
-                else:
-                    logger.error(f"Unable to mount video storage for camera number {camera_object.camera_number}")
-                    log_capture_error(camera, user, engine_state_id, password)
-                    continue
-        if camera_object.psn_api_method and camera_object.psn_ip_address:
-            psn_check = True
 
         start_timer = time.time()
         # camera_object = cameras_details.get(id=camera)
@@ -1693,22 +1747,49 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                                         reference_image_id=None)
                 continue
 
+        psn_check = False
+
+        if camera_object.psn_ip_address and not camera_object.psn_api_method:
+            # mount the fs
+            psn_recorded_port = camera_object.psn_recorded_port
+            os.makedirs(name=f"/tmp/mount_points/{camera_object.psn_ip_address}", exist_ok=True)
+            path = f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data/{psn_recorded_port}"
+            date_time_path = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d/%H/")
+            curr_path = f"{path}/{date_time_path}"
+            if os.path.isdir(curr_path):
+                psn_check = True
+            else:
+                os.system(f'sudo mount -t cifs -o username={camera_object.psn_user_name},'
+                          f'password={camera_object.psn_password} //{camera_object.psn_ip_address}/F$ /tmp/mount_points/{camera_object.psn_ip_address}/')
+                if os.path.isdir(curr_path):
+                    psn_check = True
+                else:
+                    logger.error(f"Unable to mount video storage for camera number {camera_object.camera_number}")
+                    log_capture_error(camera, user, engine_state_id, password)
+                    continue
+
+        if camera_object.psn_api_method and camera_object.psn_ip_address:
+            psn_check = True
+
         if psn_check and not camera_object.psn_api_method:
             # PSN's run on UTC time
+
+
             dt = format_datetime_with_milliseconds(timezone.localtime())
             path = f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data/{psn_recorded_port}"
             date_time_path = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d/%H/")
-            if not os.path.isdir(path):
-                logger.error(f"Video storage path does not exist {path}")
+            curr_path = f"{path}/{date_time_path}"
+            if not os.path.isdir(curr_path):
+                logger.error(f"Video storage path does not exist {curr_path}")
                 log_capture_error(camera, user, engine_state_id, password)
                 continue
-            curr_path = f"{path}/{date_time_path}"
+
 
             pattern = os.path.join(curr_path, '*_1.synav')
             dir_files = glob.glob(pattern)
             # logger.info(f"dir_files {dir_files[-1]}")
             if not dir_files:
-                # logger.info(f"ERROR NOT ABLE TO FIND PSN FILE")
+                logger.info(f"ERROR NOT ABLE TO FIND PSN FILE")
                 message = (message + f"[{dt}] ERROR [check_the_camera] -"
                                      f" Error reading video frame for camera id {camera} "
                                      f"camera number {camera_object.camera_number}\n")
@@ -1738,19 +1819,25 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
             current_time = datetime.datetime.now(datetime.timezone.utc)
 
             # Subtract one minute
-            one_minute_prior = current_time - timedelta(minutes=1)
+            two_minute_prior = current_time - timedelta(minutes=2)
 
             # Format the time in the desired ISO 8601 format with 'Z'
-            formatted_time = one_minute_prior.strftime("%Y-%m-%dT%H:%M:%SZ")
+            formatted_time = two_minute_prior.strftime("%Y-%m-%dT%H:%M:%SZ")
             # read only the "I" frame hence frameTypes=I as we don't need P frames
 
             psn_api_url = (f"https://{camera_object.psn_ip_address}:2242/services/v1/synav?streamID=" +
                            f"{camera_object.psn_recorded_port}&frameTypes=I&time={formatted_time}")
-
-            response = requests.get(psn_api_url, auth=basic, verify=False)
+            try:
+                response = requests.get(psn_api_url, auth=basic, verify=False)
+            except requests.exceptions.ConnectionError as e:
+                log_capture_error(camera_object, user, engine_state_id, password)
+                # increment_transaction_count(password)
+                message = f"Request to read from Video Server failed with error: {e}"
+                logger.error(message)
+                continue
             if response.status_code != 200:
                 log_capture_error(camera, user, engine_state_id, password)
-                increment_transaction_count(password)
+                # increment_transaction_count(password)
                 message = message + (f"Request to read from Video Server failed with status code: "
                                      f"{response.status_code} - {response.content}")
                 logger.error(message)
@@ -1793,7 +1880,9 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                        f"Error in IP address for camera "
                        f"{camera_object.camera_name} {camera_number} {camera_object.id}\n")
             log_capture_error(camera, user, engine_state_id, password)
-            increment_transaction_count(password)
+
+
+            # increment_transaction_count(password)
             logger.error(message)
             continue
 
@@ -1834,7 +1923,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                 log_capture_error(camera, user, engine_state_id, password)
                 
 
-                increment_transaction_count(password)
+                # increment_transaction_count(password)
                 logger.error(message)
                 continue
             task_timer = time.time()
@@ -1852,7 +1941,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                 log_capture_error(camera, user, engine_state_id, password)
                 
 
-                increment_transaction_count(password)
+                # increment_transaction_count(password)
                 logger.error(message)
                 continue
 
@@ -1864,7 +1953,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                 log_capture_error(camera, user, engine_state_id, password)
                 
 
-                increment_transaction_count(password)
+                # increment_transaction_count(password)
                 close_capture_device(capture_device, multicast_address)
                 logger.error(message)
                 continue
@@ -1909,7 +1998,7 @@ def check_the_camera(previous_task_return_value, camera_list, engine_state_id, u
                 log_capture_error(camera, user, engine_state_id, password)
                 
 
-                increment_transaction_count(password)
+                # increment_transaction_count(password)
                 close_capture_device(capture_device, multicast_address)
                 logger.error(message)
                 continue
@@ -1956,7 +2045,7 @@ def process_cameras(camera_list, engine_state_id, user_name, force_check=False):
         #     if os.path.isdir(f"/tmp/mount_points/{camera_object.psn_ip_address}/recorded_video_data"):
         #         psn_check = True
         # check_the_camera(camera_list, cameras_details, engine_state_id, user_name, psn_check)
-
+        # [[ 125,146] [144, 156, 167]]
         header = [check_the_camera.s(data, engine_state_id,
                                      user_name, mysql_password, force_check) for data in camera_list]
         # logger.info(f"HEADER {type(header)} {header}")
@@ -1991,6 +2080,33 @@ def process_cameras(camera_list, engine_state_id, user_name, force_check=False):
 #     # Execute the workflow
 #     workflow()
 
+@shared_task(name='main_menu.tasks.do_nothing')
+def do_nothing():
+        pass
+
+
+@shared_task(name='main_menu.tasks.start_find_best_regions')
+def start_find_best_regions(camera_list):
+    #
+    # worker_id = start_find_best_regions.request.hostname
+    # logger.info(f"Worker ID: {worker_id} Cameras: {camera_list}")
+    #
+    # header = [find_best_regions.s(data) for data in camera_list]
+    # callback = do_nothing.s()
+    # # logger.info(f"CALLBACK {type(callback)} {callback}")
+    #
+    # main_tasks_chord = chord(header, callback)
+    # logger.info(f"main task chord {type(main_tasks_chord)}")
+    #
+    # # Create a chain to run the setup task first and then the chord of main tasks
+    # # logger.info(f"setup {type(setup_task.s())}, main {type(main_tasks_chord)}")
+    # workflow = chain(do_nothing.s(), main_tasks_chord)
+    #
+    # # Execute the workflow
+    # workflow.apply_async()
+    for cameras in camera_list:
+        find_best_regions(cameras)
+
 
 def get_transparent_edge(input_image, color):
     edge_image = cv2.Canny(input_image, 100, 200)
@@ -2003,41 +2119,63 @@ def get_transparent_edge(input_image, color):
     final_image = cv2.merge(rgba_image, 4)
     return final_image
 
+def save_suggested_values(camera_id, new_regions, new_matching_score, new_focus_value, new_light_level):
+    suggested_values, created = SuggestedValues.objects.update_or_create(
+        url_id=camera_id,
+        defaults={
+            'new_regions': new_regions,
+            'new_matching_score': new_matching_score,
+            'new_focus_value': new_focus_value,
+            'new_light_level': new_light_level,
+            'accepted': False
+        }
+    )
+
+    if not created:
+        suggested_values.current_regions = suggested_values.new_regions
+        suggested_values.current_matching_score = suggested_values.new_matching_score
+        suggested_values.current_focus_value = suggested_values.new_focus_value
+        suggested_values.current_light_level = suggested_values.new_light_level
+
+    suggested_values.save()
+
 
 @shared_task()
 def find_best_regions(camera_list):
     # cameras = Camera.objects.all()
     # camera_list = list(cameras.values_list('id', flat=True))
-    logger.info("Stared find best regions")
+    start_time = time.time()
+    logger.info(f"Stared find best regions  {len(camera_list)}")
     count = 0
     no_logs = 0
     ratio = 0
-    logger.info(camera_list)
+    # print(camera_list)
+    no_regions = 0
     for camera_id in camera_list:
         reference_image_version = Camera.objects.get(pk=camera_id).reference_image_version
         reference_image_objects = ReferenceImage.objects.filter(url_id=camera_id, version=reference_image_version)
         logs = LogImage.objects.filter(url_id=camera_id, reference_image__in=reference_image_objects)
 
-        pass_count = logs.filter(action="Pass").count()
-        fail_count = logs.filter(action="Triggered").count()
-        capture_error_count = logs.filter(action="Capture Error").count()
-
-        try:
-            ratio_count = fail_count / (pass_count + fail_count + capture_error_count)
-        except ZeroDivisionError:
-            ratio_count = 1
+        # pass_count = logs.filter(action="Pass").count()
+        # fail_count = logs.filter(action="Triggered").count()
+        # capture_error_count = logs.filter(action="Capture Error").count()
+        #
+        # try:
+        #     ratio_count = fail_count / (pass_count + fail_count + capture_error_count)
+        # except ZeroDivisionError:
+        #     ratio_count = 1
         average_scores = {}
-        if ratio_count < 0.01:
-            # print(f"Low ratio count {ratio_count} {pass_count} {fail_count} {capture_error_count}")
-            ratio += 1
-            # ref_image = logs.last().reference_image
-            # base_image = cv2.imread("/home/checkit/camera_checker/media/" + str(ref_image))
-            # h, w, _c = base_image.shape
-            # image = select_region.draw_grid([], base_image, h, w)
-            # image = cv2.resize(image, (int(w/2),int(h/2)))
-            # cv2.imshow("image", image)
-            # cv2.waitKey(0)
-            continue
+        # if ratio_count < 0.01:
+        #     # print(f"Low ratio count {ratio_count} {pass_count} {fail_count} {capture_error_count}")
+        #     ratio += 1
+        #     # ref_image = logs.last().reference_image
+        #     # base_image = cv2.imread("/home/checkit/camera_checker/media/" + str(ref_image))
+        #     # h, w, _c = base_image.shape
+        #     # image = select_region.draw_grid([], base_image, h, w)
+        #     # image = cv2.resize(image, (int(w/2),int(h/2)))
+        #     # cv2.imshow("image", image)
+        #     # cv2.waitKey(0)
+        #     continue
 
         average_matching_scores = {}
         focus_values = []
@@ -2082,20 +2220,21 @@ def find_best_regions(camera_list):
             average_scores[cell_number] = np.mean(scores) if len(scores) > 0 else 0
 
         average_focus_value = round(sum(focus_values) / len(focus_values), 2)
-        average_focus_value = round(average_focus_value * .95,2)
+
+        average_focus_value = round(average_focus_value * decimal.Decimal(.95)  ,2)
         if average_focus_value < .5:
             average_focus_value = .5
 
 
         average_light_level = round(sum(light_levels) / len(light_levels) * decimal.Decimal(.9), 2)
-        average_light_level = round(average_light_level * .95,2)
+        average_light_level = round(average_light_level * decimal.Decimal(.95),2)
         # Group cells into quartiles based on average scores
         quartile_thresholds = np.percentile(list(average_scores.values()), [0, 25, 50, 75, 100])
 
         # Identify cells in the top quartile
-        top_quartile_cells = [cell_number for cell_number, avg_score in average_scores.items() if
+        top_quartile_cells = [(cell_number, avg_score)  for cell_number, avg_score in average_scores.items() if
                               avg_score >= quartile_thresholds[3]]
-        # logger.info(f"{ratio_count}, {pass_count}, {fail_count}, {capture_error_count}, {top_quartile_cells}")
+        # print(f"{ratio_count}, {pass_count}, {fail_count}, {capture_error_count}, {top_quartile_cells}")
 
         skewness = skew(regions_score_values)
         new_matching_threshold = round(np.mean(regions_score_values) + skewness * np.std(regions_score_values), 2)
@@ -2113,20 +2252,51 @@ def find_best_regions(camera_list):
         # new_top_cells = top_quartile_cells
         ref_image = log.reference_image
         base_image = cv2.imread("/home/checkit/camera_checker/media/" + str(ref_image))
+        original_base = base_image.copy()
         h, w, _c = base_image.shape
-        c_list = select_region.get_coordinates(top_quartile_cells, h, w)
-        image = select_region.draw_grid(c_list, base_image, h, w)
+        cells = [cell[0] for cell in top_quartile_cells]
+        c_list = select_region.get_coordinates(cells, h, w)
+
+        # image = select_region.draw_grid(c_list, base_image, h, w)
+        # cv2.imshow("grid", original_base)
+        # cv2.waitKey(0)
         new_top_cells = []
         for i, cell in enumerate(c_list):
             (x, y), (qw, qh) = cell
-            sub_img_frame = image[y:y + qh, x:x + qw]
+            sub_img_frame = base_image[y:y + qh, x:x + qw]
             edges_in_cell = get_transparent_edge(sub_img_frame, (255, 255, 255))
+            # cv2.imshow("cell", edges_in_cell)
+            # cv2.waitKey(0)
             gray = cv2.cvtColor(edges_in_cell, cv2.COLOR_BGR2GRAY)
             _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
             num_white_pixels = cv2.countNonZero(binary)
 
-            if num_white_pixels > 50:
-                new_top_cells.append(top_quartile_cells[i])
+            # if num_white_pixels > 50:
+            #     new_top_cells.append(top_quartile_cells[i])
+            if num_white_pixels > 100:
+                new_top_cells.append((top_quartile_cells[i], num_white_pixels))
+        sorted_data = sorted(new_top_cells, key=lambda x: (-x[0][1], -x[1]))
+        prefered_cells = []
+        if len(sorted_data) == 0:
+            no_regions += 1
+            # print("No regions found", no_regions)
+            # cv2.imshow("No regions", base_image)
+            # cv2.waitKey(0)
+
+            continue
+        prefered_matching_scores_list = []
+        for item in islice(sorted_data, 4):
+            prefered_cells.append(item[0][0])
+            # print("Cell", item[0][0], "pixels", item[1])
+            prefered_matching_scores_list.append(item[0][1])
+        # skewness = skew(prefered_matching_scores_list)
+        new_matching_threshold = round(np.mean(prefered_matching_scores_list), 2)
+        new_matching_threshold = round(new_matching_threshold * 0.95, 2)
+        # new_c_list = select_region.get_coordinates(prefered_cells, h, w)
+        # image = select_region.draw_grid(new_c_list, base_image, h, w)
+        # image = cv2.resize(image, (int(w/2),int(h/2)))
+        # cv2.imshow("pref c", image)
+        # cv2.waitKey(0)
         #
         # image = cv2.resize(image, (int(w / 2), int(h / 2)))
 
@@ -2140,21 +2310,25 @@ def find_best_regions(camera_list):
             continue
 
         camera = Camera.objects.get(pk=camera_id)
+
         suggested_value = SuggestedValues()
         suggested_value.url = camera
         suggested_value.new_focus_value = average_focus_value
         suggested_value.new_light_level = average_light_level
-        suggested_value.new_regions = new_top_cells
+        suggested_value.new_regions = prefered_cells
         suggested_value.new_matching_score = new_matching_threshold
         suggested_value.accepted = False
         suggested_value.current_focus_value = camera.focus_value_threshold
         suggested_value.current_light_level = camera.light_level_threshold
         suggested_value.current_regions = camera.image_regions
         suggested_value.save()
-        logger.info("Best Regions Saved")
+        # print("Best Regions Saved")
         count += 1
         # print(f'Done camera {camera_id}')
     # print(f"Processed {count} cameras - skipped no logs {no_logs} low ratio {ratio} - total {no_logs+count+ratio}")
+    # print("Number of no region", no_regions)
+    # print("Time", round(time.time() - start_time,2))
+
     return "Done"
 
 
@@ -2354,42 +2528,32 @@ def read_from_file(file_data):
             return img, "Success"
     return img, "Success"
 
+def batch_delete_logs(queryset, batch_size=1000):
+    log_count = 0
+    while queryset.exists():
+        ids = list(queryset[:batch_size].values_list('id', flat=True))
+        if not ids:
+            break
+        LogImage.objects.filter(id__in=ids).delete()
+        log_count += len(ids)
+        if log_count % 100000 == 0:
+            logger.info(f"Cleared {log_count} logs")
+    return log_count
 
 
-@shared_task()
-def test_psn():
-    start_time = time.time()
-    path = '/mnt/share/recorded_video_data'
-    stream_directories = os.listdir(path)
-    pattern = os.path.join(path, '**', '*_1.synav')
-    # files = glob.glob(pattern, recursive=True)
-    files = []
-    current_hour = datetime.datetime.now().strftime("%I")
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    current_min = datetime.datetime.now().strftime("%M")
-    if current_min == "00":
-        time.sleep(2)
-    for stream_id in stream_directories:
-        # print(stream_id)
-        if current_hour == "12":
-            current_hour = "00"
-        curr_path = f"{path}/{stream_id}/{current_date}/{current_hour}/"
-        pattern = os.path.join(curr_path, '**', '*_1.synav')
-        dir_files = glob.glob(pattern, recursive=True)
-        file = (f"{path}/{stream_id}/{current_date}/{str(current_hour)}/{stream_id.zfill(5)}-{current_date}-"
-                f"{current_hour}-00_1.synav")
-        if dir_files:
-            file = dir_files[-1]
-            # logger.info(f"FILE USED FROM PSN {file}")
-            if os.path.isfile(file):
-                # print(file)
-                files.append(file)
-            # print(file)
-
-    # files = glob.glob("*_1.synav", root_dir=path)
-    # print(f"Processing {len(files)} files")
-
-    file_path = '/mnt/share/recorded_video_data/Incident109468/Cam9354/40800/2023-09-09/00/40800-2023-09-09-00-00-30_1.synav'
-    image_frame = read_from_file(path, files)
-    # print(f'Total Processing Time: {round((time.time() - start_time) * 1000, 2)}ms')
-    logger.info(f'Total Processing Time: {round((time.time() - start_time) * 1000, 2)}ms')
+@shared_task(name='main_menu.tasks.clear_logs', time_limit=28800, soft_time_limit=28800)
+def clear_logs():
+    get_config()
+    last_log_date = timezone.now() - datetime.timedelta(days=log_retention_period_days)
+    # logs = LogImage.objects.filter(creation_date__lte=last_log_date)
+    # print(len(logs))
+    # number_of_logs = len(logs)
+    # logs.delete()
+    number_of_logs = batch_delete_logs(LogImage.objects.filter(creation_date__lte=last_log_date))
+    engine_objects = EngineState.objects.filter(state_timestamp__lte=last_log_date)
+    engine_objects.delete()
+    # Camera.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    # LogImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    # ReferenceImage.history.filter(history_date__lt=timezone.now() - timedelta(days=120)).delete()
+    LogEntry.objects.filter(action_time__lt=timezone.now() - timedelta(days=120)).delete()
+    logger.info(f"Log file cleared from {last_log_date} - {number_of_logs} logs removed")

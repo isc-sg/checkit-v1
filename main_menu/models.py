@@ -15,7 +15,7 @@ from simple_history.models import HistoricalRecords
 # import shutil
 # from django_filters import ChoiceFilter, DateRangeFilter, FilterSet, NumberFilter, CharFilter, NumericRangeFilter
 
-__version__ = 2.1
+__version__ = 2.11
 
 
 LOG_RESULT_CHOICES = (('Pass', 'Pass'), ('Triggered', 'Triggered'), ('Capture Error', 'Capture Error'),
@@ -86,7 +86,7 @@ class Camera(models.Model):
     camera_username = models.CharField(max_length=32, blank=True, verbose_name="Username")
     camera_password = models.CharField(max_length=64, blank=True, verbose_name="Password")
     # image = models.ImageField(upload_to='base_images/')
-    camera_number = models.IntegerField(null=False, blank=False, unique=False,
+    camera_number = models.IntegerField(null=False, blank=False, unique=True,
                                         validators=[MaxValueValidator(9999999999), MinValueValidator(1)])
     camera_name = models.CharField(max_length=100, null=False, blank=False, unique=False)
     # slug = models.SlugField(max_length=100, null=True, blank=False, unique=False, verbose_name="URL friendly name")
@@ -128,10 +128,10 @@ class Camera(models.Model):
                                      verbose_name="Video Storage User Name")
     psn_password = models.CharField(max_length=255, null=True, blank=True, default=None,
                                     verbose_name="Video Storage Password")
-
-    group_name = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Group Name", default=None)
     psn_api_method = models.BooleanField(default=False, help_text="Set to true to use API method for"
                                                                   " reading from Video Storage")
+    group_name = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Group Name", default=None)
+
 
     history = HistoricalRecords(cascade_delete_history=True)
 
@@ -192,7 +192,7 @@ class LogImage(models.Model):
     action = models.CharField(max_length=20, null=True)
     creation_date = models.DateTimeField('date created', default=timezone.now)
     user = models.CharField(choices=STATE_CHOICES, max_length=32, null=True, blank=True, default=None)
-    run_number = models.PositiveIntegerField(null=False, blank=False, default=0)
+    run_number = models.PositiveIntegerField(null=False, blank=False, default=0, db_index=True)
     reference_image = models.ForeignKey('main_menu.ReferenceImage', on_delete=models.CASCADE,
                                         verbose_name="Reference Image", null=True, blank=True)
     freeze_status = models.BooleanField(default=False)
@@ -205,7 +205,7 @@ class LogImage(models.Model):
     class Meta:
         # Define indexes for the model
         indexes = [
-            models.Index(fields=['creation_date', 'action'])
+            models.Index(fields=['creation_date', 'action', 'run_number'])
         ]
 
 

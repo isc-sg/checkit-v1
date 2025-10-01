@@ -17,7 +17,7 @@ from main_menu import views
 from .views import ActiveTasksView, CheckCamerasView, CheckSoftwareVersionsView, Test500ErrorView
 
 
-__version__ = 2.1
+__version__ = 2.11
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -56,6 +56,7 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('api/scheduler/active-tasks/', ActiveTasksView.as_view(), name='active_tasks'),
     path('api/software_versions/', CheckSoftwareVersionsView.as_view(), name='software_versions'),
+    # path('api/testapi/', TestAPI.as_view(), name='software_versions'),
     path('test500/', Test500ErrorView.as_view(), name='test_500'),
 
 
@@ -77,6 +78,7 @@ urlpatterns = [
     path("state/", views.EngineStateView.as_view(), name='state'),
     path('license/', views.licensing, name='licensing'),
     path("display_regions/", views.display_regions, name='test'),
+    path("copy_references/", views.copy_reference_images, name='copy_references'),
     path("export/", views.export_logs_to_csv, name='export csv logs'),
     path("images/", views.compare_images, name="images"),
     path('regions/', views.input_camera_for_regions, name='regions'),
@@ -84,6 +86,8 @@ urlpatterns = [
     path('get_engine_status/', views.get_engine_status, name='get_progress'),
     path('progress_meter/', views.progress_meter, name='progress_meter'),
     path('missing_reference_images/', views.cameras_with_missing_reference_images, name='missing_ref'),
+    path('migrate_reference_images/', views.migrate_reference_images, name='migrate_ref'),
+    path('clear_reference_images/', views.clear_reference_images, name='clear_ref'),
     path('log_summary/', views.action_per_hour_report, name='log_summary'),
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()

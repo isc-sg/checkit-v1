@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 
+from celery.worker.consumer.mingle import exception
 from django.contrib import admin
 from django.conf import settings
 from django.utils.safestring import mark_safe
@@ -24,6 +25,7 @@ from django_celery_beat.apps import BeatConfig
 from .models import Camera, ReferenceImage, LogImage, DaysOfWeek, HoursInDay, Group
 from .resources import CameraResource, ReferenceImageResource
 from django import forms
+from django.contrib import messages
 BeatConfig.verbose_name = "Scene Check Clocks"
 
 # Register your models here.
@@ -43,10 +45,10 @@ class PasswordStarWidget(forms.PasswordInput):
         return super().render(name, value, attrs, renderer)
 
 
-class DisableClientSideCachingMiddleware(object):
-    def process_response(self, request, response):
-        add_never_cache_headers(response)
-        return response
+# class DisableClientSideCachingMiddleware(object):
+#     def process_response(self, request, response):
+#         add_never_cache_headers(response)
+#         return response
 
 
 def new_reference_image(modeladmin, request, queryset):
@@ -73,7 +75,7 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
                          'creation_date', "last_check_date"]
     filter_horizontal = ('scheduled_hours', 'scheduled_days')
     resource_class = CameraResource
-    search_fields = ['url', 'camera_number', 'camera_name', 'camera_location', 'id']
+    search_fields = ['camera_number__exact',]
     list_display = ('camera_name', 'camera_number', 'url', 'multicast_address', 'multicast_port',
                     'camera_location', 'matching_threshold', 'unique_camera_id', 'check_reference_image')
     readonly_fields = ["unique_camera_id", "creation_date", "last_check_date", 'image_regions',
@@ -85,6 +87,16 @@ class CameraAdmin(ImportExportModelAdmin, SimpleHistoryAdmin):
     history_list_display = ["matching_threshold", "focus_value_threshold", "light_level_threshold"]
     actions = [new_reference_image]
     exclude = ['trigger_new_version']
+
+    def get_search_results(self, request, queryset, search_term):
+        # Check if the search term is numeric
+        if search_term and not search_term.isdigit():
+            # Add a message to the admin
+            messages.error(request, "Please enter a numeric value for camera number.")
+            # Return an empty queryset
+            return queryset.none(), False
+        # Proceed with the default search
+        return super().get_search_results(request, queryset, search_term)
 
     # def get_form(self, request, obj=None, **kwargs):
     #     form = super().get_form(request, obj, **kwargs)
@@ -146,7 +158,7 @@ class ReferenceAdmin(ModelAdmin):
     # model = ReferenceImage
 
     resource_class = ReferenceImageResource
-    search_fields = ['url__camera_name', 'url__camera_number', 'image']
+    search_fields = ['url__camera_number__exact']
     # exclude = ('id',)
     list_display = ['url', 'hour', 'version', 'reference_image', 'get_location']
     readonly_fields = ['url', 'hour', 'get_regions', 'reference_image',
@@ -162,21 +174,37 @@ class ReferenceAdmin(ModelAdmin):
     get_regions.short_description = "Regions"
 
     def reference_image(self, obj):
-        scaling_factor = 4
-        if obj.image.width <= 720:
-            scaling_factor = 2
-        if obj.image.width > 1920:
-            scaling_factor = (obj.image.width / 1920) * 4
-        return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
-            url=obj.image.url,
-            width=(obj.image.width/scaling_factor),
-            height=(obj.image.height/scaling_factor),
-                                                                                     )
-                        )
+        try:
+            if os.path.isfile(settings.MEDIA_ROOT + "/" + obj.image.name):
+                scaling_factor = 4
+                if obj.image.width <= 720:
+                    scaling_factor = 2
+                if obj.image.width > 1920:
+                    scaling_factor = (obj.image.width / 1920) * 4
+                return mark_safe('<img src="{url}" width="{width}" height={height} />'.format(
+                    url=obj.image.url,
+                    width=(obj.image.width/scaling_factor),
+                    height=(obj.image.height/scaling_factor),
+                                                                                             )
+                                )
+            else:
+                return mark_safe('<span style="color:red;">ERROR - missing reference image file</span>')
+        except Exception:
+            return mark_safe('<span style="color:red;">ERROR - missing reference image file</span>')
 
     def get_location(self, obj):
         return obj.url.camera_location
     get_location.short_description = "Location"
+
+    def get_search_results(self, request, queryset, search_term):
+        # Check if the search term is numeric
+        if search_term and not search_term.isdigit():
+            # Add a message to the admin
+            messages.error(request, "Please enter a numeric value for camera number.")
+            # Return an empty queryset
+            return queryset.none(), False
+        # Proceed with the default search
+        return super().get_search_results(request, queryset, search_term)
 
     # def delete_model(self, request, obj):
     #     logs = LogImage.objects.filter(reference_image_id=obj.id)
@@ -198,7 +226,7 @@ class ReferenceAdmin(ModelAdmin):
 
 class LogImageAdmin(ModelAdmin):
     resource_class = LogImage
-    search_fields = ['url__camera_name', 'image', 'action', 'creation_date', 'url__camera_location']
+    search_fields = ['url__camera_number__exact']
     list_display = ['url', 'creation_date', 'action', 'get_location', ]
     exclude = ('id', 'region_scores')
     readonly_fields = ('url', 'image', 'matching_score', 'current_matching_threshold', 'focus_value', 'action',

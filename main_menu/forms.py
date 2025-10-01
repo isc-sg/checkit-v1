@@ -18,3 +18,12 @@ class DateForm(forms.Form):
 
 class RegionsForm(forms.Form):
     regions = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple(), choices=REGIONS)
+
+
+class FilterForm(forms.Form):
+    # Define fields for each filter you want to provide
+    # status = forms.ChoiceField(choices=[('active', 'Active'), ('inactive', 'Inactive')], required=False)
+    # category = forms.ChoiceField(choices=[('category1', 'Category 1'), ('category2', 'Category 2')], required=False)
+    camera_number = forms.IntegerField(widget=forms.NumberInput)
+    reference_image_version = forms.IntegerField(widget=forms.NumberInput)
+

@@ -1,0 +1,385 @@
+
+--- Running Queries ---
+Id,User,Host,db,Command,Time,State,Info
+5,event_scheduler,localhost,,Daemon,164224,Waiting on empty queue,
+3667,checkit,localhost,checkit,Sleep,1,,
+3668,root,localhost:52374,checkit,Query,0,init,SHOW FULL PROCESSLIST
+
+--- Slow Query Count ---
+Variable_name,Value
+Slow_queries,0
+
+--- InnoDB Status ---
+Type,Name,Status
+InnoDB,,"
+=====================================
+2025-04-19 03:59:51 281473098895328 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 9 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 4 srv_active, 0 srv_shutdown, 18241 srv_idle
+srv_master_thread log flush and writes: 0
+----------
+SEMAPHORES
+----------
+OS WAIT ARRAY INFO: reservation count 136
+OS WAIT ARRAY INFO: signal count 133
+RW-shared spins 0, rounds 0, OS waits 0
+RW-excl spins 0, rounds 0, OS waits 0
+RW-sx spins 0, rounds 0, OS waits 0
+Spin rounds per wait: 0.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx
+------------
+TRANSACTIONS
+------------
+Trx id counter 6688
+Purge done for trx's n:o < 6687 undo n:o < 0 state: running but idle
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 562948254093312, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 562948254092504, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 562948254091696, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 562948254090888, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+I/O thread 0 state: waiting for completed aio requests (insert buffer thread)
+I/O thread 1 state: waiting for completed aio requests (read thread)
+I/O thread 2 state: waiting for completed aio requests (read thread)
+I/O thread 3 state: waiting for completed aio requests (read thread)
+I/O thread 4 state: waiting for completed aio requests (read thread)
+I/O thread 5 state: waiting for completed aio requests (write thread)
+I/O thread 6 state: waiting for completed aio requests (write thread)
+I/O thread 7 state: waiting for completed aio requests (write thread)
+I/O thread 8 state: waiting for completed aio requests (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:
+Pending flushes (fsync) log: 0; buffer pool: 0
+1238 OS file reads, 337 OS file writes, 169 OS fsyncs
+0.11 reads/s, 16384 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 0, seg size 2, 0 merges
+merged operations:
+ insert 0, delete mark 0, delete 0
+discarded operations:
+ insert 0, delete mark 0, delete 0
+Hash table size 34679, node heap has 4 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+0.22 hash searches/s, 1.78 non-hash searches/s
+---
+LOG
+---
+Log sequence number          39873965
+Log buffer assigned up to    39873965
+Log buffer completed up to   39873965
+Log written up to            39873965
+Log flushed up to            39873965
+Added dirty pages up to      39873965
+Pages flushed up to          39873965
+Last checkpoint at           39873965
+Log minimum file id is       12
+Log maximum file id is       12
+53 log i/o's done, 0.00 log i/o's/second
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 0
+Dictionary memory allocated 639098
+Buffer pool size   8192
+Free buffers       6866
+Database pages     1320
+Old database pages 507
+Modified db pages  0
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 0, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 1177, created 143, written 225
+0.11 reads/s, 0.00 creates/s, 0.00 writes/s
+Buffer pool hit rate 969 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 1320, unzip_LRU len: 0
+I/O sum[0]:cur[1], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 queries inside InnoDB, 0 queries in queue
+0 read views open inside InnoDB
+Process ID=1176, Main thread ID=281472783663072 , state=sleeping
+Number of rows inserted 0, updated 6, deleted 0, read 3685
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.22 reads/s
+Number of system rows inserted 8, updated 331, deleted 8, read 5817
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.67 reads/s
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+"
+
+--- Lock Waits ---
+Error running query: 1109 (42S02): Unknown table 'INNODB_LOCKS' in information_schema
+
+--- Buffer Pool Usage ---
+Variable_name,Value
+Innodb_buffer_pool_dump_status,Dumping of buffer pool not started
+Innodb_buffer_pool_load_status,Buffer pool(s) load completed at 250417  6:22:47
+Innodb_buffer_pool_resize_status,
+Innodb_buffer_pool_resize_status_code,0
+Innodb_buffer_pool_resize_status_progress,0
+Innodb_buffer_pool_pages_data,1320
+Innodb_buffer_pool_bytes_data,21626880
+Innodb_buffer_pool_pages_dirty,0
+Innodb_buffer_pool_bytes_dirty,0
+Innodb_buffer_pool_pages_flushed,225
+Innodb_buffer_pool_pages_free,6866
+Innodb_buffer_pool_pages_misc,6
+Innodb_buffer_pool_pages_total,8192
+Innodb_buffer_pool_read_ahead_rnd,0
+Innodb_buffer_pool_read_ahead,0
+Innodb_buffer_pool_read_ahead_evicted,0
+Innodb_buffer_pool_read_requests,26441
+Innodb_buffer_pool_reads,1178
+Innodb_buffer_pool_wait_free,0
+Innodb_buffer_pool_write_requests,1943
+
+--- High Write Tables ---
+TABLE_NAME,TABLE_ROWS,DATA_LENGTH,INDEX_LENGTH,DATA_FREE,AUTO_INCREMENT
+auth_group,2,16384,16384,0,4
+auth_group_permissions,288,16384,32768,0,288
+auth_permission,96,16384,16384,0,96
+auth_user,0,16384,16384,0,2
+auth_user_groups,3,16384,32768,0,4
+
+--- Performance Schema Data ---
+SCHEMA_NAME,DIGEST,DIGEST_TEXT,COUNT_STAR,SUM_TIMER_WAIT,MIN_TIMER_WAIT,AVG_TIMER_WAIT,MAX_TIMER_WAIT,SUM_LOCK_TIME,SUM_ERRORS,SUM_WARNINGS,SUM_ROWS_AFFECTED,SUM_ROWS_SENT,SUM_ROWS_EXAMINED,SUM_CREATED_TMP_DISK_TABLES,SUM_CREATED_TMP_TABLES,SUM_SELECT_FULL_JOIN,SUM_SELECT_FULL_RANGE_JOIN,SUM_SELECT_RANGE,SUM_SELECT_RANGE_CHECK,SUM_SELECT_SCAN,SUM_SORT_MERGE_PASSES,SUM_SORT_RANGE,SUM_SORT_ROWS,SUM_SORT_SCAN,SUM_NO_INDEX_USED,SUM_NO_GOOD_INDEX_USED,SUM_CPU_TIME,MAX_CONTROLLED_MEMORY,MAX_TOTAL_MEMORY,COUNT_SECONDARY,FIRST_SEEN,LAST_SEEN,QUANTILE_95,QUANTILE_99,QUANTILE_999,QUERY_SAMPLE_TEXT,QUERY_SAMPLE_SEEN,QUERY_SAMPLE_TIMER_WAIT
+checkit,13fcb9bac24560527e210ae59823ea393edcac9d7989014c15a54d4e64b2e3ea,SET NAMES `utf8`,3660,932654522000,23709000,254823000,52870514000,0,0,3660,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8480,72422,0,2025-04-17 06:22:48.529511,2025-04-19 03:59:50.336930,380189396,630957344,1584893192,SET NAMES utf8,2025-04-19 03:59:05.254338,527234000
+checkit,158bfe3d4b4b0a372a4acdb38affe2cb4f6b3cb21a9af0ea9fad9a9a083ac18a,SET `autocommit` = ?,7325,789954160000,7500000,107843000,13609368000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18720,439142,0,2025-04-17 06:22:48.530310,2025-04-19 03:59:51.785639,173780082,316227766,1148153621,set autocommit=1,2025-04-19 03:59:05.255759,556444000
+checkit,68cbfa15b2b057b61b1130c9bcf129aea0e2841ec588d343da9d75e1038e9e9c,"SELECT `VERSION` ( ) , @@`sql_mode` , @@`default_storage_engine` , @@`sql_auto_is_null` , @@`lower_case_table_names` , `CONVERT_TZ` (...) IS NOT NULL",5,2290522000,134423000,458104000,991131000,2000000,0,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29056,99162,0,2025-04-17 06:22:48.531160,2025-04-19 03:22:53.024428,1000000000,1000000000,1000000000,"SELECT VERSION(),
+                       @@sql_mode,
+                       @@default_storage_engine,
+                       @@sql_auto_is_null,
+                       @@lower_case_table_names,
+                       CONVERT_TZ('2001-01-01 01:00:00', 'UTC', 'UTC') IS NOT NULL",2025-04-19 03:22:53.024428,220135000
+checkit,184b254cf8a04dc02dde13544f6b8fc2abe37037886cd02a153350b3909cf70e,SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED,3660,357982423000,8917000,97809000,14984957000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12576,82306,0,2025-04-17 06:22:48.531393,2025-04-19 03:59:50.337908,151356124,301995172,1202264434,SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED,2025-04-19 03:59:45.330282,182676000
+checkit,3f55b23fc455d03631c3c20815cf9b2b28bcd8c351afb0a4ef7b6243712ed943,"SELECT `django_celery_beat_periodictask` . `id` , `django_celery_beat_periodictask` . `name` , `django_celery_beat_periodictask` . `task` , `django_celery_beat_periodictask` . `interval_id` , `django_celery_beat_periodictask` . `crontab_id` , `django_celery_beat_periodictask` . `solar_id` , `django_celery_beat_periodictask` . `clocked_id` , `django_celery_beat_periodictask` . `args` , `django_celery_beat_periodictask` . `kwargs` , `django_celery_beat_periodictask` . `queue` , `django_celery_beat_periodictask` . `exchange` , `django_celery_beat_periodictask` . `routing_key` , `django_celery_beat_periodictask` . `headers` , `django_celery_beat_periodictask` . `priority` , `django_celery_beat_periodictask` . `expires` , `django_celery_beat_periodictask` . `expire_seconds` , `django_celery_beat_periodictask` . `one_off` , `django_celery_beat_periodictask` . `start_time` , `django_celery_beat_periodictask` . `enabled` , `django_celery_beat_periodictask` . `last_run_at` ,",4,5776457000,95959000,1444114000,3109292000,36000000,0,0,0,4,4,0,0,0,0,0,0,1,0,0,0,0,1,0,0,100272,484606,0,2025-04-17 06:22:48.534548,2025-04-18 19:48:44.930360,3162277660,3162277660,3162277660,"SELECT `django_celery_beat_periodictask`.`id`, `django_celery_beat_periodictask`.`name`, `django_celery_beat_periodictask`.`task`, `django_celery_beat_periodictask`.`interval_id`, `django_celery_beat_periodictask`.`crontab_id`, `django_celery_beat_periodictask`.`solar_id`, `django_celery_beat_periodictask`.`clocked_id`, `django_celery_beat_periodictask`.`args`, `django_celery_beat_periodictask`.`kwargs`, `django_celery_beat_periodictask`.`queue`, `django_celery_beat_periodictask`.`exchange`, `django_celery_beat_periodictask`.`routing_key`, `django_celery_beat_periodictask`.`headers`, `django_celery_beat_periodictask`.`priority`, `django_celery_beat_periodictask`.`expires`, `django_celery_beat_periodictask`.`expire_seconds`, `django_celery_beat_periodictask`.`one_off`, `django_celery_beat_periodictask`.`start_time`, `django_celery_beat_periodictask`.`enabled`, `django_celery_beat_periodictask`.`last_run_at`, `django_celery_beat_periodictask`.`total_run_count`, `django_celery_beat_periodictask`.`date_changed...",2025-04-18 19:48:44.930360,1906958000
+checkit,e3fb87cfd4dde70b003e4bf70d92105fec9af2bf6d7c74fa16588cb5421cddf1,"SELECT `django_celery_beat_crontabschedule` . `id` , `django_celery_beat_crontabschedule` . `minute` , `django_celery_beat_crontabschedule` . `hour` , `django_celery_beat_crontabschedule` . `day_of_month` , `django_celery_beat_crontabschedule` . `month_of_year` , `django_celery_beat_crontabschedule` . `day_of_week` , `django_celery_beat_crontabschedule` . `timezone` FROM `django_celery_beat_crontabschedule` WHERE `django_celery_beat_crontabschedule` . `id` IN (...) ORDER BY `django_celery_beat_crontabschedule` . `month_of_year` ASC , `django_celery_beat_crontabschedule` . `day_of_month` ASC , `django_celery_beat_crontabschedule` . `day_of_week` ASC , `django_celery_beat_crontabschedule` . `hour` ASC , `django_celery_beat_crontabschedule` . `minute` ASC , `django_celery_beat_crontabschedule` . `timezone` ASC",1,1181417000,1181417000,1181417000,1181417000,5000000,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39296,523707,0,2025-04-17 06:22:48.536827,2025-04-17 06:22:48.536827,1202264434,1202264434,1202264434,"SELECT `django_celery_beat_crontabschedule`.`id`, `django_celery_beat_crontabschedule`.`minute`, `django_celery_beat_crontabschedule`.`hour`, `django_celery_beat_crontabschedule`.`day_of_month`, `django_celery_beat_crontabschedule`.`month_of_year`, `django_celery_beat_crontabschedule`.`day_of_week`, `django_celery_beat_crontabschedule`.`timezone` FROM `django_celery_beat_crontabschedule` WHERE `django_celery_beat_crontabschedule`.`id` IN (1) ORDER BY `django_celery_beat_crontabschedule`.`month_of_year` ASC, `django_celery_beat_crontabschedule`.`day_of_month` ASC, `django_celery_beat_crontabschedule`.`day_of_week` ASC, `django_celery_beat_crontabschedule`.`hour` ASC, `django_celery_beat_crontabschedule`.`minute` ASC, `django_celery_beat_crontabschedule`.`timezone` ASC",2025-04-17 06:22:48.536827,1181417000
+checkit,4fdd16f8513bbca05177446d154e8fe67812ac8ee60cf9efe75c5c6079a74ff2,"SELECT `django_celery_beat_crontabschedule` . `id` , `django_celery_beat_crontabschedule` . `minute` , `django_celery_beat_crontabschedule` . `hour` , `django_celery_beat_crontabschedule` . `day_of_month` , `django_celery_beat_crontabschedule` . `month_of_year` , `django_celery_beat_crontabschedule` . `day_of_week` , `django_celery_beat_crontabschedule` . `timezone` FROM `django_celery_beat_crontabschedule` WHERE ( `django_celery_beat_crontabschedule` . `day_of_month` = ? AND `django_celery_beat_crontabschedule` . `day_of_week` = ? AND `django_celery_beat_crontabschedule` . `hour` = ? AND `django_celery_beat_crontabschedule` . `minute` = ? AND `django_celery_beat_crontabschedule` . `month_of_year` = ? AND `django_celery_beat_crontabschedule` . `timezone` = ? ) LIMIT ?",1,73792000,73792000,73792000,73792000,1000000,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,46416,435598,0,2025-04-17 06:22:48.538095,2025-04-17 06:22:48.538095,75857757,75857757,75857757,"SELECT `django_celery_beat_crontabschedule`.`id`, `django_celery_beat_crontabschedule`.`minute`, `django_celery_beat_crontabschedule`.`hour`, `django_celery_beat_crontabschedule`.`day_of_month`, `django_celery_beat_crontabschedule`.`month_of_year`, `django_celery_beat_crontabschedule`.`day_of_week`, `django_celery_beat_crontabschedule`.`timezone` FROM `django_celery_beat_crontabschedule` WHERE (`django_celery_beat_crontabschedule`.`day_of_month` = '*' AND `django_celery_beat_crontabschedule`.`day_of_week` = '*' AND `django_celery_beat_crontabschedule`.`hour` = '4' AND `django_celery_beat_crontabschedule`.`minute` = '0' AND `django_celery_beat_crontabschedule`.`month_of_year` = '*' AND `django_celery_beat_crontabschedule`.`timezone` = 'Australia/Melbourne') LIMIT 21",2025-04-17 06:22:48.538095,73792000
+checkit,fe1763065a8d231aa1cf01c583b37734b7b21e6377442bf06ae7986602832002,"UPDATE `django_celery_beat_crontabschedule` SET `minute` = ? , `hour` = ? , `day_of_month` = ? , `month_of_year` = ? , `day_of_week` = ? , `timezone` = ? WHERE `django_celery_beat_crontabschedule` . `id` = ?",1,77542000,77542000,77542000,77542000,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39296,428294,0,2025-04-17 06:22:48.538372,2025-04-17 06:22:48.538372,79432823,79432823,79432823,"UPDATE `django_celery_beat_crontabschedule` SET `minute` = '0', `hour` = '4', `day_of_month` = '*', `month_of_year` = '*', `day_of_week` = '*', `timezone` = 'Australia/Melbourne' WHERE `django_celery_beat_crontabschedule`.`id` = 1",2025-04-17 06:22:48.538372,77542000
+checkit,ed66975c40690e772c51653d6a9cc082742d43ee5132c158f092301d1f9062d8,"SELECT `django_celery_beat_periodictasks` . `ident` , `django_celery_beat_periodictasks` . `last_update` FROM `django_celery_beat_periodictasks` WHERE `django_celery_beat_periodictasks` . `ident` = ? LIMIT ? FOR UPDATE",3,1178498000,27041000,392832000,1119416000,5000000,0,0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,46416,464872,0,2025-04-17 06:22:48.539835,2025-04-17 06:22:48.543131,1148153621,1148153621,1148153621,"SELECT `django_celery_beat_periodictasks`.`ident`, `django_celery_beat_periodictasks`.`last_update` FROM `django_celery_beat_periodictasks` WHERE `django_celery_beat_periodictasks`.`ident` = 1 LIMIT 21 FOR UPDATE",2025-04-17 06:22:48.539835,1119416000
+checkit,274f5844ecad9cc8427913a0ceb01fc63f5d460914280da2da369fae64a05009,UPDATE `django_celery_beat_periodictasks` SET `last_update` = ? WHERE `django_celery_beat_periodictasks` . `ident` = ?,3,236541000,55583000,78847000,93833000,1000000,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24960,442585,0,2025-04-17 06:22:48.540159,2025-04-17 06:22:48.543343,95499258,95499258,95499258,UPDATE `django_celery_beat_periodictasks` SET `last_update` = '2025-04-17 06:22:48.542077' WHERE `django_celery_beat_periodictasks`.`ident` = 1,2025-04-17 06:22:48.542572,93833000
+checkit,f2b9be5f0f32ca7507e4ddf133cd2fad0993a1c26fde9caa6f067b1af2b7603c,COMMIT,2,1140958000,418917000,570479000,722041000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18720,437910,0,2025-04-17 06:22:48.540941,2025-04-17 06:22:48.543848,724435960,724435960,724435960,commit,2025-04-17 06:22:48.540941,722041000
+checkit,e214eb9297430327a9511ad76e4a21028e55a013587b17ba74c20c3c9f39dd45,SELECT ? AS `a` FROM `django_celery_beat_periodictask` WHERE ( `django_celery_beat_periodictask` . `name` = ? AND NOT ( `django_celery_beat_periodictask` . `id` = ? ) ) LIMIT ?,3,929206000,43416000,309735000,516458000,8000000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39296,448630,0,2025-04-17 06:22:48.542020,2025-04-18 19:48:44.934311,524807460,524807460,524807460,SELECT 1 AS `a` FROM `django_celery_beat_periodictask` WHERE (`django_celery_beat_periodictask`.`name` = 'celery.backend_cleanup' AND NOT (`django_celery_beat_periodictask`.`id` = 1)) LIMIT 1,2025-04-18 19:48:44.934311,516458000
+checkit,48a054be0513f3da08bb311ac0ec94daf573c35ccb3fad02602436a926811ad8,SAVEPOINT `s281472860140576_x1`,1,11166000,11166000,11166000,11166000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18720,436281,0,2025-04-17 06:22:48.542141,2025-04-17 06:22:48.542141,11481536,11481536,11481536,SAVEPOINT `s281472860140576_x1`,2025-04-17 06:22:48.542141,11166000
+checkit,ad42473052776f9b2574f7315d46827083a9481cd28992fc4a31e31a60291583,RELEASE SAVEPOINT `s281472860140576_x1`,1,11000000,11000000,11000000,11000000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12576,430801,0,2025-04-17 06:22:48.542634,2025-04-17 06:22:48.542634,11481536,11481536,11481536,RELEASE SAVEPOINT `s281472860140576_x1`,2025-04-17 06:22:48.542634,11000000
+checkit,94e562ea6622db72b9f2602630719f86667a5822e92bf4b6deecb5e82375a2b3,"UPDATE `django_celery_beat_periodictask` SET `task` = ? , `interval_id` = ? , `crontab_id` = ? , `solar_id` = ? , `clocked_id` = ? , `args` = ? , `kwargs` = ? , `queue` = ? , `exchange` = ? , `routing_key` = ? , `headers` = ? , `priority` = ? , `expires` = ? , `expire_seconds` = ? , `start_time` = ? , `last_run_at` = ? , `date_changed` = ? WHERE `django_celery_beat_periodictask` . `id` = ?",1,71042000,71042000,71042000,71042000,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62896,501790,0,2025-04-17 06:22:48.542887,2025-04-17 06:22:48.542887,72443596,72443596,72443596,"UPDATE `django_celery_beat_periodictask` SET `task` = 'celery.backend_cleanup', `interval_id` = NULL, `crontab_id` = 1, `solar_id` = NULL, `clocked_id` = NULL, `args` = '[]', `kwargs` = '{}', `queue` = NULL, `exchange` = NULL, `routing_key` = NULL, `headers` = '{}', `priority` = NULL, `expires` = NULL, `expire_seconds` = 43200, `start_time` = NULL, `last_run_at` = '2025-04-16 18:52:56.802475', `date_changed` = '2025-04-17 06:22:48.542677' WHERE `django_celery_beat_periodictask`.`id` = 1",2025-04-17 06:22:48.542887,71042000
+checkit,307553bab094edb2abadff4290976a110a64c899455a86c1749c65f5f4532717,SAVEPOINT `s281472860140576_x2`,1,19667000,19667000,19667000,19667000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8480,427670,0,2025-04-17 06:22:48.542970,2025-04-17 06:22:48.542970,19952623,19952623,19952623,SAVEPOINT `s281472860140576_x2`,2025-04-17 06:22:48.542970,19667000
+checkit,3c2b073e1b8c85976b52050b3ca6fcef8ea4d230b8d5d471249973562102aa0e,RELEASE SAVEPOINT `s281472860140576_x2`,1,7959000,7959000,7959000,7959000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18720,438025,0,2025-04-17 06:22:48.543389,2025-04-17 06:22:48.543389,10000000,10000000,10000000,RELEASE SAVEPOINT `s281472860140576_x2`,2025-04-17 06:22:48.543389,7959000
+checkit,8cfacff857bab83dfda07d0954a8f38d6fa2d0650dfe8c79948550bfb65e9062,"SELECT `django_celery_beat_periodictasks` . `ident` , `django_celery_beat_periodictasks` . `last_update` FROM `django_celery_beat_periodictasks` WHERE `django_celery_beat_periodictasks` . `ident` = ? LIMIT ?",3653,1475564214000,39334000,403932000,15858162000,24972000000,0,0,0,3653,3653,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28816,51247,0,2025-04-17 06:22:48.544611,2025-04-19 03:59:50.341358,575439937,1148153621,2884031503,"SELECT `django_celery_beat_periodictasks`.`ident`, `django_celery_beat_periodictasks`.`last_update` FROM `django_celery_beat_periodictasks` WHERE `django_celery_beat_periodictasks`.`ident` = 1 LIMIT 21",2025-04-19 03:59:50.341358,2773721000
+checkit,1782bee597638b7ff3fafd6fa9c2bf26f183d6c2aeaec82c0abec3ab065fc116,"SELECT `django_session` . `session_key` , `django_session` . `session_data` , `django_session` . `expire_date` FROM `django_session` WHERE ( `django_session` . `expire_date` > ? AND `django_session` . `session_key` = ? ) LIMIT ?",4,7569922000,231053000,1892480000,6657281000,15000000,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39056,274208,0,2025-04-17 12:06:34.438996,2025-04-19 03:22:53.031006,6918309709,6918309709,6918309709,"SELECT `django_session`.`session_key`, `django_session`.`session_data`, `django_session`.`expire_date` FROM `django_session` WHERE (`django_session`.`expire_date` > '2025-04-19 03:22:53.029687' AND `django_session`.`session_key` = 'mdmqegixrbnoux1sokvu8zkn0fipcfq1') LIMIT 21",2025-04-19 03:22:53.031006,254172000
+checkit,881d234e37226b37fe0df2b1bc5fa373a6001015f96cbbdc65bd5d1d99236476,"SELECT `auth_user` . `id` , `auth_user` . `password` , `auth_user` . `last_login` , `auth_user` . `is_superuser` , `auth_user` . `username` , `auth_user` . `first_name` , `auth_user` . `last_name` , `auth_user` . `email` , `auth_user` . `is_staff` , `auth_user` . `is_active` , `auth_user` . `date_joined` FROM `auth_user` WHERE `auth_user` . `id` = ? LIMIT ?",4,5924832000,145333000,1481208000,5433888000,52000000,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,46416,603156,0,2025-04-17 12:06:34.446966,2025-04-19 03:22:53.032211,5495408738,5495408738,5495408738,"SELECT `auth_user`.`id`, `auth_user`.`password`, `auth_user`.`last_login`, `auth_user`.`is_superuser`, `auth_user`.`username`, `auth_user`.`first_name`, `auth_user`.`last_name`, `auth_user`.`email`, `auth_user`.`is_staff`, `auth_user`.`is_active`, `auth_user`.`date_joined` FROM `auth_user` WHERE `auth_user`.`id` = 1 LIMIT 21",2025-04-19 03:22:53.032211,164560000
+checkit,890bf92eaa08b16ced1dcffae6e5172d5c9a7a04390756ca0037afeee5f5f17f,"SELECT `django_celery_beat_crontabschedule` . `id` , `django_celery_beat_crontabschedule` . `minute` , `django_celery_beat_crontabschedule` . `hour` , `django_celery_beat_crontabschedule` . `day_of_month` , `django_celery_beat_crontabschedule` . `month_of_year` , `django_celery_beat_crontabschedule` . `day_of_week` , `django_celery_beat_crontabschedule` . `timezone` FROM `django_celery_beat_crontabschedule` WHERE `django_celery_beat_crontabschedule` . `id` = ? LIMIT ?",2,723791000,247958000,361895000,475833000,4000000,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,46176,83993,0,2025-04-17 21:03:25.283229,2025-04-18 19:48:44.936079,478630092,478630092,478630092,"SELECT `django_celery_beat_crontabschedule`.`id`, `django_celery_beat_crontabschedule`.`minute`, `django_celery_beat_crontabschedule`.`hour`, `django_celery_beat_crontabschedule`.`day_of_month`, `django_celery_beat_crontabschedule`.`month_of_year`, `django_celery_beat_crontabschedule`.`day_of_week`, `django_celery_beat_crontabschedule`.`timezone` FROM `django_celery_beat_crontabschedule` WHERE `django_celery_beat_crontabschedule`.`id` = 1 LIMIT 21",2025-04-18 19:48:44.936079,475833000
+checkit,8cd591a2497284ea060480120fc60d1fda7b32b5085d63245655bddc2f2167a0,"UPDATE `django_celery_beat_periodictask` SET `name` = ? , `task` = ? , `interval_id` = ? , `crontab_id` = ? , `solar_id` = ? , `clocked_id` = ? , `args` = ? , `kwargs` = ? , `queue` = ? , `exchange` = ? , `routing_key` = ? , `headers` = ? , `priority` = ? , `expires` = ? , `expire_seconds` = ? , `one_off` = ? , `start_time` = ? , `enabled` = ? , `last_run_at` = ? , `total_run_count` = ? , `date_changed` = ? , `description` = ? WHERE `django_celery_beat_periodictask` . `id` = ?",2,14791103000,5813691000,7395551000,8977412000,4000000,0,0,2,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,43200,102969,0,2025-04-17 21:03:25.290726,2025-04-18 19:48:44.946690,9120108393,9120108393,9120108393,"UPDATE `django_celery_beat_periodictask` SET `name` = 'celery.backend_cleanup', `task` = 'celery.backend_cleanup', `interval_id` = NULL, `crontab_id` = 1, `solar_id` = NULL, `clocked_id` = NULL, `args` = '[]', `kwargs` = '{}', `queue` = NULL, `exchange` = NULL, `routing_key` = NULL, `headers` = '{}', `priority` = NULL, `expires` = NULL, `expire_seconds` = 43200, `one_off` = 0, `start_time` = NULL, `enabled` = 1, `last_run_at` = '2025-04-18 18:41:26.713672', `total_run_count` = 7, `date_changed` = '2025-04-18 19:48:44.936873', `description` = '' WHERE `django_celery_beat_periodictask`.`id` = 1",2025-04-18 19:48:44.946690,8977412000
+checkit,5f80838f15796fb3806ef12927b1669f5660c89da87fb856c5f44402c8ee3bfa,SELECT ? AS `a` FROM `auth_group` INNER JOIN `auth_user_groups` ON ( `auth_group` . `id` = `auth_user_groups` . `group_id` ) WHERE ( `auth_user_groups` . `user_id` = ? AND `auth_group` . `name` = ? ) LIMIT ?,1,3927291000,3927291000,3927291000,3927291000,24000000,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39056,168777,0,2025-04-18 04:54:00.316348,2025-04-18 04:54:00.316348,3981071705,3981071705,3981071705,SELECT 1 AS `a` FROM `auth_group` INNER JOIN `auth_user_groups` ON (`auth_group`.`id` = `auth_user_groups`.`group_id`) WHERE (`auth_user_groups`.`user_id` = 1 AND `auth_group`.`name` = 'Licensing') LIMIT 1,2025-04-18 04:54:00.316348,3927291000
+checkit,84d1d1eb7ef319b6f279559bcca4a1d9ef4b95bc7fd25b6b2dedc3fae325b244,"SELECT `auth_user` . `id` , `auth_user` . `password` , `auth_user` . `last_login` , `auth_user` . `is_superuser` , `auth_user` . `username` , `auth_user` . `first_name` , `auth_user` . `last_name` , `auth_user` . `email` , `auth_user` . `is_staff` , `auth_user` . `is_active` , `auth_user` . `date_joined` FROM `auth_user` WHERE `auth_user` . `username` = ? LIMIT ?",1,129958000,129958000,129958000,129958000,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,46176,131466,0,2025-04-18 04:54:00.316934,2025-04-18 04:54:00.316934,131825673,131825673,131825673,"SELECT `auth_user`.`id`, `auth_user`.`password`, `auth_user`.`last_login`, `auth_user`.`is_superuser`, `auth_user`.`username`, `auth_user`.`first_name`, `auth_user`.`last_name`, `auth_user`.`email`, `auth_user`.`is_staff`, `auth_user`.`is_active`, `auth_user`.`date_joined` FROM `auth_user` WHERE `auth_user`.`username` = 'checkit' LIMIT 21",2025-04-18 04:54:00.316934,129958000
+checkit,b15b9dc71ee9b26abbd7442de214f96734183d51b10697c6ef61c11ab4b8da15,"SELECT `main_menu_licensing` . `id` , `main_menu_licensing` . `start_date` , `main_menu_licensing` . `end_date` , `main_menu_licensing` . `transaction_limit` , `main_menu_licensing` . `transaction_count` , `main_menu_licensing` . `license_key` , `main_menu_licensing` . `license_owner` , `main_menu_licensing` . `site_name` , `main_menu_licensing` . `camera_limit` FROM `main_menu_licensing` ORDER BY `main_menu_licensing` . `id` DESC LIMIT ?",1,948791000,948791000,948791000,948791000,5000000,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,39056,188504,0,2025-04-18 04:54:00.325540,2025-04-18 04:54:00.325540,954992586,954992586,954992586,"SELECT `main_menu_licensing`.`id`, `main_menu_licensing`.`start_date`, `main_menu_licensing`.`end_date`, `main_menu_licensing`.`transaction_limit`, `main_menu_licensing`.`transaction_count`, `main_menu_licensing`.`license_key`, `main_menu_licensing`.`license_owner`, `main_menu_licensing`.`site_name`, `main_menu_licensing`.`camera_limit` FROM `main_menu_licensing` ORDER BY `main_menu_licensing`.`id` DESC LIMIT 1",2025-04-18 04:54:00.325540,948791000
+checkit,5a57c9d8b76b899547beaaea96dcb90b0ba2e76d15b1450e17eff7d58f8d652d,"SELECT `main_menu_enginestate` . `id` , `main_menu_enginestate` . `state` , `main_menu_enginestate` . `number_of_cameras_in_run` , `main_menu_enginestate` . `transaction_rate` , `main_menu_enginestate` . `state_timestamp` , `main_menu_enginestate` . `number_failed_images` , `main_menu_enginestate` . `number_pass_images` , `main_menu_enginestate` . `number_others` , `main_menu_enginestate` . `user` FROM `main_menu_enginestate` ORDER BY `main_menu_enginestate` . `id` DESC LIMIT ?",1,3498709000,3498709000,3498709000,3498709000,5000000,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,58512,259622,0,2025-04-19 03:22:53.028227,2025-04-19 03:22:53.028227,3630780547,3630780547,3630780547,"SELECT `main_menu_enginestate`.`id`, `main_menu_enginestate`.`state`, `main_menu_enginestate`.`number_of_cameras_in_run`, `main_menu_enginestate`.`transaction_rate`, `main_menu_enginestate`.`state_timestamp`, `main_menu_enginestate`.`number_failed_images`, `main_menu_enginestate`.`number_pass_images`, `main_menu_enginestate`.`number_others`, `main_menu_enginestate`.`user` FROM `main_menu_enginestate` ORDER BY `main_menu_enginestate`.`id` DESC LIMIT 1",2025-04-19 03:22:53.028227,3498709000
+checkit,52eaff6a7819ec096aa8c71501acd23ef138f2a775fc2827cc34ed7d77fa3e3d,SET NAMES ? COLLATE ?,1,1516575000,1516575000,1516575000,1516575000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8240,157910,0,2025-04-19 03:59:51.785540,2025-04-19 03:59:51.785540,1584893192,1584893192,1584893192,SET NAMES 'utf8mb4' COLLATE 'utf8mb4_general_ci',2025-04-19 03:59:51.785540,1516575000
+checkit,6d631211d940af327fe3f82a008b908dc6cba3912cae61881353006e73354eee,SET NAMES `utf8mb4`,1,22293000,22293000,22293000,22293000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8240,143110,0,2025-04-19 03:59:51.785599,2025-04-19 03:59:51.785599,22908676,22908676,22908676,SET NAMES utf8mb4,2025-04-19 03:59:51.785599,22293000
+checkit,60bb67f93ca4794b132572dbce9a9e5aeabb44811d90d3ba7a9eb88f63267a56,SHOW FULL PROCESSLIST,1,1416695000,1416695000,1416695000,1416695000,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8240,141734,0,2025-04-19 03:59:51.894735,2025-04-19 03:59:51.894735,1445439770,1445439770,1445439770,SHOW FULL PROCESSLIST,2025-04-19 03:59:51.894735,1416695000
+checkit,14752b67eb0925e19d522324c1b60b1b6c338794da0a912a92d5cab2f37821da,SHOW GLOBAL STATUS LIKE ?,2,17225356000,465649000,8612678000,16759707000,25000000,0,0,0,21,21,0,2,0,0,0,0,4,0,0,0,0,2,0,0,1123600,1279114,0,2025-04-19 03:59:51.911745,2025-04-19 03:59:51.916910,17378008287,17378008287,17378008287,SHOW GLOBAL STATUS LIKE 'Slow_queries',2025-04-19 03:59:51.911745,16759707000
+checkit,1cd41ed293193dde95f97f780253f308fcc9d4971d5fa575df2b859475258413,SHOW ENGINE `INNODB` STATUS,1,1776755000,1776755000,1776755000,1776755000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1056848,1229256,0,2025-04-19 03:59:51.913745,2025-04-19 03:59:51.913745,1819700858,1819700858,1819700858,SHOW ENGINE INNODB STATUS,2025-04-19 03:59:51.913745,1776755000
+checkit,1f3580ddd2aa47524c5a03704a30cb37914bbdcf8f675f42b632758da2e3f087,"SELECT TABLE_NAME , `TABLE_ROWS` , `DATA_LENGTH` , `INDEX_LENGTH` , `DATA_FREE` , AUTO_INCREMENT FROM `information_schema` . `TABLES` WHERE `TABLE_SCHEMA` = SCHEMA ( ) AND `DATA_LENGTH` > ? ORDER BY `DATA_LENGTH` DESC LIMIT ?",1,10543149000,10543149000,10543149000,10543149000,18000000,0,0,0,5,65,0,0,0,0,0,0,1,0,0,5,1,0,0,0,1456656,1790103,0,2025-04-19 03:59:51.927603,2025-04-19 03:59:51.927603,10964781961,10964781961,10964781961,"SELECT TABLE_NAME, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, DATA_FREE, AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND DATA_LENGTH > 0 ORDER BY DATA_LENGTH DESC LIMIT 5",2025-04-19 03:59:51.927603,10543149000
+
+--- Table Structure main_menu_logimage ---
+Table,Create Table
+main_menu_logimage,"CREATE TABLE `main_menu_logimage` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `image` varchar(100) NOT NULL,
+  `matching_score` decimal(3,2) NOT NULL,
+  `region_scores` json NOT NULL,
+  `current_matching_threshold` decimal(3,2) NOT NULL,
+  `focus_value` decimal(7,2) NOT NULL,
+  `current_focus_value` decimal(7,2) DEFAULT NULL,
+  `light_level` decimal(3,2) DEFAULT NULL,
+  `current_light_level` decimal(3,2) NOT NULL,
+  `action` varchar(20) DEFAULT NULL,
+  `creation_date` datetime(6) NOT NULL,
+  `user` varchar(32) DEFAULT NULL,
+  `run_number` int unsigned NOT NULL,
+  `freeze_status` tinyint(1) NOT NULL,
+  `reference_image_id` bigint DEFAULT NULL,
+  `url_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `main_menu_logimage_reference_image_id_48202479_fk_main_menu` (`reference_image_id`),
+  KEY `main_menu_logimage_url_id_d56f51aa_fk_main_menu_camera_id` (`url_id`),
+  KEY `main_menu_logimage_run_number_f87cd922` (`run_number`),
+  KEY `main_menu_l_creatio_22d58b_idx` (`creation_date`,`action`,`run_number`),
+  CONSTRAINT `main_menu_logimage_reference_image_id_48202479_fk_main_menu` FOREIGN KEY (`reference_image_id`) REFERENCES `main_menu_referenceimage` (`id`),
+  CONSTRAINT `main_menu_logimage_url_id_d56f51aa_fk_main_menu_camera_id` FOREIGN KEY (`url_id`) REFERENCES `main_menu_camera` (`id`),
+  CONSTRAINT `main_menu_logimage_chk_1` CHECK ((`run_number` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3"
+
+--- Row Count main_menu_logimage ---
+COUNT(*)
+0
+
+--- Indexes main_menu_logimage ---
+Table,Non_unique,Key_name,Seq_in_index,Column_name,Collation,Cardinality,Sub_part,Packed,Null,Index_type,Comment,Index_comment,Visible,Expression
+main_menu_logimage,0,PRIMARY,1,id,A,0,,,,BTREE,,,YES,
+main_menu_logimage,1,main_menu_logimage_reference_image_id_48202479_fk_main_menu,1,reference_image_id,A,0,,,YES,BTREE,,,YES,
+main_menu_logimage,1,main_menu_logimage_url_id_d56f51aa_fk_main_menu_camera_id,1,url_id,A,0,,,,BTREE,,,YES,
+main_menu_logimage,1,main_menu_logimage_run_number_f87cd922,1,run_number,A,0,,,,BTREE,,,YES,
+main_menu_logimage,1,main_menu_l_creatio_22d58b_idx,1,creation_date,A,0,,,,BTREE,,,YES,
+main_menu_logimage,1,main_menu_l_creatio_22d58b_idx,2,action,A,0,,,YES,BTREE,,,YES,
+main_menu_logimage,1,main_menu_l_creatio_22d58b_idx,3,run_number,A,0,,,,BTREE,,,YES,
+
+--- Table Size main_menu_logimage ---
+Name,Engine,Version,Row_format,Rows,Avg_row_length,Data_length,Max_data_length,Index_length,Data_free,Auto_increment,Create_time,Update_time,Check_time,Collation,Checksum,Create_options,Comment
+main_menu_logimage,InnoDB,10,Dynamic,0,0,16384,0,32768,0,1,2025-04-12 04:58:13,,,utf8mb3_general_ci,,,
+
+--- Open Tables main_menu_logimage ---
+Database,Table,In_use,Name_locked
+
+--- Index Usage main_menu_logimage ---
+table_schema,table_name,index_name,rows_selected,select_latency,rows_inserted,insert_latency,rows_updated,update_latency,rows_deleted,delete_latency
+checkit,main_menu_logimage,PRIMARY,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_logimage,main_menu_logimage_reference_image_id_48202479_fk_main_menu,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_logimage,main_menu_logimage_url_id_d56f51aa_fk_main_menu_camera_id,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_logimage,main_menu_logimage_run_number_f87cd922,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_logimage,main_menu_l_creatio_22d58b_idx,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+
+--- Table Structure main_menu_camera ---
+Table,Create Table
+main_menu_camera,"CREATE TABLE `main_menu_camera` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `url` varchar(255) NOT NULL,
+  `multicast_address` char(39) DEFAULT NULL,
+  `multicast_port` int DEFAULT NULL,
+  `camera_username` varchar(32) NOT NULL,
+  `camera_password` varchar(64) NOT NULL,
+  `camera_number` int NOT NULL,
+  `camera_name` varchar(100) NOT NULL,
+  `camera_location` varchar(100) NOT NULL,
+  `image_regions` varchar(300) NOT NULL,
+  `matching_threshold` decimal(3,2) NOT NULL,
+  `focus_value_threshold` decimal(6,2) NOT NULL,
+  `light_level_threshold` decimal(3,2) NOT NULL,
+  `creation_date` datetime(6) NOT NULL,
+  `last_check_date` datetime(6) NOT NULL,
+  `snooze` tinyint(1) NOT NULL,
+  `trigger_new_reference_image` tinyint(1) NOT NULL,
+  `freeze_check` tinyint(1) NOT NULL,
+  `trigger_new_reference_image_date` datetime(6) NOT NULL,
+  `reference_image_version` smallint unsigned NOT NULL,
+  `psn_ip_address` char(39) DEFAULT NULL,
+  `psn_name` varchar(20) DEFAULT NULL,
+  `psn_recorded_port` int unsigned DEFAULT NULL,
+  `psn_user_name` varchar(255) DEFAULT NULL,
+  `psn_password` varchar(255) DEFAULT NULL,
+  `group_name_id` bigint NOT NULL,
+  `psn_api_method` tinyint(1) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `url` (`url`),
+  UNIQUE KEY `main_menu_camera_camera_number_f3ca96f1_uniq` (`camera_number`),
+  UNIQUE KEY `multicast_address` (`multicast_address`),
+  KEY `main_menu_camera_group_name_id_af27d748_fk_main_menu_group_id` (`group_name_id`),
+  CONSTRAINT `main_menu_camera_group_name_id_af27d748_fk_main_menu_group_id` FOREIGN KEY (`group_name_id`) REFERENCES `main_menu_group` (`id`),
+  CONSTRAINT `main_menu_camera_chk_1` CHECK ((`reference_image_version` >= 0)),
+  CONSTRAINT `main_menu_camera_chk_2` CHECK ((`psn_recorded_port` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3"
+
+--- Row Count main_menu_camera ---
+COUNT(*)
+0
+
+--- Indexes main_menu_camera ---
+Table,Non_unique,Key_name,Seq_in_index,Column_name,Collation,Cardinality,Sub_part,Packed,Null,Index_type,Comment,Index_comment,Visible,Expression
+main_menu_camera,0,PRIMARY,1,id,A,0,,,,BTREE,,,YES,
+main_menu_camera,0,url,1,url,A,0,,,,BTREE,,,YES,
+main_menu_camera,0,main_menu_camera_camera_number_f3ca96f1_uniq,1,camera_number,A,0,,,,BTREE,,,YES,
+main_menu_camera,0,multicast_address,1,multicast_address,A,0,,,YES,BTREE,,,YES,
+main_menu_camera,1,main_menu_camera_group_name_id_af27d748_fk_main_menu_group_id,1,group_name_id,A,0,,,,BTREE,,,YES,
+
+--- Table Size main_menu_camera ---
+Name,Engine,Version,Row_format,Rows,Avg_row_length,Data_length,Max_data_length,Index_length,Data_free,Auto_increment,Create_time,Update_time,Check_time,Collation,Checksum,Create_options,Comment
+main_menu_camera,InnoDB,10,Dynamic,0,0,16384,0,49152,0,1,2025-04-12 04:58:13,,,utf8mb3_general_ci,,,
+
+--- Open Tables main_menu_camera ---
+Database,Table,In_use,Name_locked
+
+--- Index Usage main_menu_camera ---
+table_schema,table_name,index_name,rows_selected,select_latency,rows_inserted,insert_latency,rows_updated,update_latency,rows_deleted,delete_latency
+checkit,main_menu_camera,PRIMARY,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_camera,url,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_camera,main_menu_camera_camera_number_f3ca96f1_uniq,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_camera,multicast_address,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+checkit,main_menu_camera,main_menu_camera_group_name_id_af27d748_fk_main_menu_group_id,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps
+
+--- Table Structure main_menu_reference_image ---
+Error running query: 1146 (42S02): Table 'checkit.main_menu_reference_image' doesn't exist
+
+--- Row Count main_menu_reference_image ---
+Error running query: 1146 (42S02): Table 'checkit.main_menu_reference_image' doesn't exist
+
+--- Indexes main_menu_reference_image ---
+Error running query: 1146 (42S02): Table 'checkit.main_menu_reference_image' doesn't exist
+
+--- Table Size main_menu_reference_image ---
+Name,Engine,Version,Row_format,Rows,Avg_row_length,Data_length,Max_data_length,Index_length,Data_free,Auto_increment,Create_time,Update_time,Check_time,Collation,Checksum,Create_options,Comment
+
+--- Open Tables main_menu_reference_image ---
+Database,Table,In_use,Name_locked
+
+--- Index Usage main_menu_reference_image ---
+table_schema,table_name,index_name,rows_selected,select_latency,rows_inserted,insert_latency,rows_updated,update_latency,rows_deleted,delete_latency
+
+--- Table Structure main_menu_enginestate  ---
+Table,Create Table
+main_menu_enginestate,"CREATE TABLE `main_menu_enginestate` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `state` varchar(32) NOT NULL,
+  `number_of_cameras_in_run` int unsigned NOT NULL,
+  `transaction_rate` int unsigned NOT NULL,
+  `state_timestamp` datetime(6) NOT NULL,
+  `number_failed_images` int unsigned NOT NULL,
+  `number_pass_images` int unsigned NOT NULL,
+  `number_others` int unsigned NOT NULL,
+  `user` varchar(32) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `main_menu_enginestate_chk_1` CHECK ((`number_of_cameras_in_run` >= 0)),
+  CONSTRAINT `main_menu_enginestate_chk_2` CHECK ((`transaction_rate` >= 0)),
+  CONSTRAINT `main_menu_enginestate_chk_3` CHECK ((`number_failed_images` >= 0)),
+  CONSTRAINT `main_menu_enginestate_chk_4` CHECK ((`number_pass_images` >= 0)),
+  CONSTRAINT `main_menu_enginestate_chk_5` CHECK ((`number_others` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3"
+
+--- Row Count main_menu_enginestate ---
+COUNT(*)
+0
+
+--- Indexes main_menu_enginestate ---
+Table,Non_unique,Key_name,Seq_in_index,Column_name,Collation,Cardinality,Sub_part,Packed,Null,Index_type,Comment,Index_comment,Visible,Expression
+main_menu_enginestate,0,PRIMARY,1,id,A,0,,,,BTREE,,,YES,
+
+--- Table Size main_menu_enginestate ---
+Name,Engine,Version,Row_format,Rows,Avg_row_length,Data_length,Max_data_length,Index_length,Data_free,Auto_increment,Create_time,Update_time,Check_time,Collation,Checksum,Create_options,Comment
+main_menu_enginestate,InnoDB,10,Dynamic,0,0,16384,0,0,0,1,2025-04-12 04:58:13,,,utf8mb3_general_ci,,,
+
+--- Open Tables main_menu_enginestate ---
+Database,Table,In_use,Name_locked
+
+--- Index Usage main_menu_enginestate ---
+table_schema,table_name,index_name,rows_selected,select_latency,rows_inserted,insert_latency,rows_updated,update_latency,rows_deleted,delete_latency
+checkit,main_menu_enginestate,PRIMARY,0,  0 ps,0,  0 ps,0,  0 ps,0,  0 ps

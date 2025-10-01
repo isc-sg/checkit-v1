@@ -176,10 +176,10 @@
                                 </form>
                             </div>
                         </div>
-                        {% if superuser %}
+
                         <br>
                         <br>
-                        <div class="col-md-6 border-round">
+                        <div class="col-md-8 border-round">
                             <br>
                             <form method="post">
                                 {% csrf_token %}
@@ -192,6 +192,18 @@
                             </form>
                             <br>
 
+                            <br>
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="file" class="btn btn-round" name="camera_list" accept="text/pain,.csv,.txt">
+                                <button class="btn btn-round" type="submit" name="input_list_for_find_best_regions">
+                                    Load Cameras for Suggested Regions
+                                </button>
+
+                                <br>
+
+                            </form>
+                            <br>
 
                             <form method="post">
                                 {% csrf_token %}
@@ -210,8 +222,16 @@
 
                             </form>
                         </div>
-                        {% endif %}
 
+
+                        <br>
+                        <br>
+                        <div class="col-md-6 border-round">
+                            <br>
+                            <a href="{% url 'copy_references' %}" class="btn btn-round">Copy References</a>
+                            <br>
+                            <br>
+                        </div>
                     </div>
                 </div>
             </div>
